@@ -205,10 +205,16 @@ public class MockCodeunitHandle
         switch (args.Length)
         {
             case 1:
-                // ExpectedError(text) or single-arg methods
+            {
+                // ExpectedError(text) or Fail(text)
                 var arg0Str = args[0]?.ToString() ?? "";
-                MockAssert.ExpectedError(arg0Str);
+                var method1 = FindAssertMethodName(memberId);
+                if (method1 != null && method1.Contains("Fail", StringComparison.OrdinalIgnoreCase))
+                    MockAssert.Fail(arg0Str);
+                else
+                    MockAssert.ExpectedError(arg0Str);
                 return null;
+            }
 
             case 2:
                 // IsTrue(bool, text), IsFalse(bool, text), ExpectedErrorCode(code, msg),
@@ -221,16 +227,13 @@ public class MockCodeunitHandle
                 if (args[0] is bool || args[0] is NavBoolean ||
                     (args[0] is MockVariant mv0 && (mv0.Value is bool || mv0.Value is NavBoolean)))
                 {
-                    // Could be IsTrue or IsFalse — we need the member ID to distinguish
-                    // In BC, IsTrue and IsFalse are separate methods with different member IDs.
-                    // Use a heuristic: check if the bool value matches IsTrue pattern
-                    bool boolVal = ToBool(args[0]);
                     string msg = args[1]?.ToString() ?? "";
-                    // We can't distinguish IsTrue from IsFalse by args alone.
-                    // BC's Assert codeunit uses positive member IDs for IsTrue, but we don't
-                    // have a stable mapping. Default to IsTrue and let IsFalse fail naturally
-                    // if the user explicitly passes false.
-                    MockAssert.IsTrue(args[0], msg);
+                    // Use member ID to distinguish IsTrue from IsFalse
+                    var assertMethod = FindAssertMethodName(memberId);
+                    if (assertMethod != null && assertMethod.Contains("IsFalse", StringComparison.OrdinalIgnoreCase))
+                        MockAssert.IsFalse(args[0], msg);
+                    else
+                        MockAssert.IsTrue(args[0], msg);
                     return null;
                 }
                 // Fallback: treat as ExpectedMessage(expectedSubstring, actualError)
@@ -255,6 +258,11 @@ public class MockCodeunitHandle
                 {
                     MockAssert.AreEqual(expected, actual, message);
                 }
+                return null;
+
+            case 4:
+                // AreNearlyEqual(expected, actual, delta, message)
+                MockAssert.AreNearlyEqual(args[0], args[1], args[2], args[3]?.ToString() ?? "");
                 return null;
 
             default:

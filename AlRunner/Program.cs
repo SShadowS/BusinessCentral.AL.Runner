@@ -1111,16 +1111,19 @@ public static class RoslynCompiler
 
     private static string? FindServiceTierPath()
     {
+        // Allow explicit override via environment variable
+        var envPath = Environment.GetEnvironmentVariable("BC_SERVICE_TIER_PATH");
+        if (!string.IsNullOrEmpty(envPath) && Directory.Exists(envPath))
+            return envPath;
+
         const string relPath = "artifacts/onprem/27.5.46862.0/platform/ServiceTier/PFiles64/Microsoft Dynamics NAV/270/Service";
         var candidates = new[]
         {
-            // Relative to CWD (dotnet run from alDirectCompile/)
+            // Relative to CWD
             Path.GetFullPath(relPath),
             // Relative to binary output directory (various nesting levels)
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../..", relPath)),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../..", relPath)),
-            // Absolute fallback
-            "/home/stefan/Documents/Repos/community/alDirectCompile/" + relPath,
         };
 
         foreach (var c in candidates)
@@ -1132,6 +1135,7 @@ public static class RoslynCompiler
         Console.Error.WriteLine("Warning: Could not find BC service tier DLLs. Tried:");
         foreach (var c in candidates)
             Console.Error.WriteLine($"  {c}");
+        Console.Error.WriteLine("  Set BC_SERVICE_TIER_PATH environment variable to override.");
         return null;
     }
 }
