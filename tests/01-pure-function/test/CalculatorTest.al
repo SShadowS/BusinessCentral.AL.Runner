@@ -45,4 +45,24 @@ codeunit 50900 "Discount Calculator Tests"
         Result := DiscountCalc.CalculateVAT(100, 19);
         Assert.AreEqual(19, Result, 'VAT on 100 at 19% should be 19');
     end;
+
+    [Test]
+    procedure TestApplyDiscount_NegativePercent()
+    begin
+        // [WHEN] Applying a negative discount percentage
+        asserterror DiscountCalc.ApplyDiscount(200, -10);
+
+        // [THEN] Should error about negative percentage
+        Assert.ExpectedError('Discount percentage must not be negative');
+    end;
+
+    [Test]
+    procedure TestApplyDiscount_Over100Percent()
+    begin
+        // [WHEN] Applying a discount exceeding 100%
+        asserterror DiscountCalc.ApplyDiscount(200, 150);
+
+        // [THEN] Should error about exceeding 100
+        Assert.ExpectedError('Discount percentage must not exceed 100');
+    end;
 }

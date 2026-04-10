@@ -70,6 +70,31 @@ codeunit 50916 "Iso Storage Tests"
     end;
 
     [Test]
+    procedure TestGetNonExistentKey()
+    var
+        Result: Text;
+        Found: Boolean;
+    begin
+        // [WHEN] Getting a key that was never set
+        Found := IsoStorage.GetValue('nonexistent-key', Result);
+
+        // [THEN] Get should return false
+        Assert.IsFalse(Found, 'Get should return false for non-existent key');
+    end;
+
+    [Test]
+    procedure TestDeleteNonExistentKey()
+    var
+        Deleted: Boolean;
+    begin
+        // [WHEN] Deleting a key that was never set
+        Deleted := IsoStorage.RemoveKey('never-existed');
+
+        // [THEN] Delete should return false
+        Assert.IsFalse(Deleted, 'Delete should return false for non-existent key');
+    end;
+
+    [Test]
     procedure TestOverwriteValue()
     var
         Result: Text;

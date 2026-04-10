@@ -59,4 +59,44 @@ codeunit 50918 "Validate Trigger Tests"
         Rec.Get(3);
         Assert.AreEqual('UPDATED NAME', Rec."Name", 'Direct Validate should fire OnValidate');
     end;
+
+    [Test]
+    procedure TestDirectAssignSkipsValidateTrigger()
+    var
+        Rec: Record "Validate Demo";
+    begin
+        // [GIVEN] A record where Name is assigned directly (not via Validate)
+        Rec.Init();
+        Rec."Entry No." := 4;
+        Rec."Unit Price" := 10;
+        Rec."Name" := 'lower case name';
+        Rec."Quantity" := 5;
+        Rec."Amount" := 0;
+        Rec.Insert(true);
+
+        // [WHEN] Reading back the record
+        Rec.Get(4);
+
+        // [THEN] Name should NOT be uppercased (OnValidate was not fired)
+        Assert.AreEqual('lower case name', Rec."Name", 'Direct assign should not fire OnValidate');
+        // [THEN] Amount should NOT be computed (Quantity OnValidate was not fired)
+        Assert.AreEqual(0, Rec."Amount", 'Direct assign of Quantity should not compute Amount');
+    end;
+
+    [Test]
+    procedure TestZeroQuantityValidate()
+    var
+        Rec: Record "Validate Demo";
+    begin
+        // [GIVEN] An entry with price 50 and quantity 0
+        ValidateHelper.CreateEntry(5, 'Zero Qty', 0, 50);
+
+        // [WHEN] Reading back
+        Rec.Get(5);
+
+        // [THEN] Amount should be 0
+        Assert.AreEqual(0, Rec."Amount", 'Zero quantity should produce zero amount');
+        // [THEN] Name should still be uppercased
+        Assert.AreEqual('ZERO QTY', Rec."Name", 'Name should be uppercased even with zero qty');
+    end;
 }

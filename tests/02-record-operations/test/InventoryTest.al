@@ -99,6 +99,36 @@ codeunit 50901 "Inventory Management Tests"
         Assert.AreEqual(2, Item.Count(), 'Should find 2 items with price >= 50');
     end;
 
+    [Test]
+    procedure TestRemoveStock_InsufficientInventory()
+    var
+        Item: Record "Sample Item";
+    begin
+        // [GIVEN] An item with only 3 in stock
+        Item.Init();
+        Item."No." := 'ITEM-LOW';
+        Item."Inventory" := 3;
+        Item.Insert(true);
+
+        // [WHEN] Trying to remove 10 units
+        asserterror InvMgmt.RemoveStock('ITEM-LOW', 10);
+
+        // [THEN] Should error about insufficient inventory
+        Assert.ExpectedError('Insufficient inventory for item');
+    end;
+
+    [Test]
+    procedure TestCalculateOrderTotal_NoLines()
+    var
+        Total: Decimal;
+    begin
+        // [WHEN] Calculating total for an order with no lines
+        Total := InvMgmt.CalculateOrderTotal('NO-SUCH-ORDER');
+
+        // [THEN] Total should be zero
+        Assert.AreEqual(0, Total, 'Order with no lines should have zero total');
+    end;
+
     local procedure CreateItem(ItemNo: Code[20]; Description: Text[100]; Price: Decimal; Inventory: Integer)
     var
         Item: Record "Sample Item";
