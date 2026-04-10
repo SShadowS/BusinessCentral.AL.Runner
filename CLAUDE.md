@@ -195,6 +195,34 @@ end
 
 ---
 
+## Architecture: What's Real vs What's Mocked
+
+The runner uses the **real BC type system** — `NavText`, `Decimal18`, `NavOption`,
+`NavBoolean`, `NavCode`, etc. all come from the actual Microsoft DLLs
+(`Microsoft.Dynamics.Nav.Types.dll`, `Nav.Ncl.dll`, `Nav.Runtime.dll`). AL
+arithmetic, string operations, type conversions, and comparisons run as real
+Microsoft code, not reimplementations.
+
+What we mock is **only the I/O boundary** — the thin layer where BC types reach
+into infrastructure (database, session, UI):
+
+| Mocked | Real BC call | Why |
+|---|---|---|
+| `MockRecordHandle` | `NavRecordHandle.ALInsert()` → SQL | No database |
+| `MockIsolatedStorage` | `ALIsolatedStorage.ALSet()` → DB | No key-value DB |
+| `MockCodeunitHandle` | `NavCodeunit.RunCodeunit()` → runtime | No dispatcher |
+| `AlDialog.Error/Message` | `NavDialog.ALError()` → UI | No service tier |
+| `MockTextBuilder` | `NavTextBuilder` → `NavEnvironment` | Avoids session crash |
+
+Everything else — `NavText + NavText`, `Decimal18 * Decimal18`,
+`NavOption.Create()`, `Format()`, `Evaluate()` — runs as the real Microsoft
+code from the Service Tier DLLs.
+
+If you find yourself reimplementing business logic in a mock, that's a sign the
+test belongs in the full BC pipeline, not in the runner.
+
+---
+
 ## Known Limitations (by design)
 
 - **Implicit event publishers on DB operations** — OnAfterModify, OnAfterInsert,
