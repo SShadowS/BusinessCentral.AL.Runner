@@ -31,6 +31,8 @@ public class TestResult
     public long DurationMs { get; init; }
     public string? Message { get; init; }
     public string? StackTrace { get; init; }
+    /// <summary>AL source line where the error occurred (null for passing tests).</summary>
+    public int? AlSourceLine { get; init; }
 }
 
 public class CapturedValue
@@ -123,7 +125,8 @@ public class AlRunnerPipeline
                 status = t.Status.ToString().ToLowerInvariant(),
                 durationMs = t.DurationMs,
                 message = t.Message,
-                stackTrace = t.StackTrace?.TrimEnd()
+                stackTrace = t.StackTrace?.TrimEnd(),
+                alSourceLine = t.AlSourceLine
             }),
             passed = tests.Count(t => t.Status == TestStatus.Pass),
             failed = tests.Count(t => t.Status == TestStatus.Fail),
