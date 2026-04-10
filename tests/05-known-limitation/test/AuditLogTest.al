@@ -4,7 +4,7 @@ codeunit 50904 "Audit Log Tests"
 
     var
         BalanceMgr: Codeunit "Balance Manager";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestUpdateBalance_CreatesRecord()

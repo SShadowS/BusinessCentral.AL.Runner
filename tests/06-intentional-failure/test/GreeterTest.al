@@ -7,7 +7,7 @@ codeunit 50906 "Greeter Tests (Broken)"
 
     var
         Greeter: Codeunit "Greeter";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestGreet_WrongExpectedValue()

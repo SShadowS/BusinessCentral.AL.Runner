@@ -4,7 +4,7 @@ codeunit 50902 "Order Processor Tests"
 
     var
         OrderProc: Codeunit "Order Processor";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestProcessOrder_SimpleOrder()

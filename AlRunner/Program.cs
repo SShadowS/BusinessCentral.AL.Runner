@@ -281,11 +281,9 @@ Kernel32Shim.EnsureRegistered();
         {
             var src = File.ReadAllText(stubFile);
             alSources.Add(src);
-            // Add to the first input group (or create one) so stubs compile with all groups
-            if (inputGroups.Count > 0)
-                inputGroups[0].Sources.Add(src);
-            else
-                inputGroups.Add((stubsDir, new List<string> { src }));
+            // Add stubs to every input group so they're available in all compilations
+            foreach (var group in inputGroups)
+                group.Sources.Add(src);
         }
     }
 }
@@ -548,10 +546,58 @@ public static class AlTranspiler
                 }
                 else
                 {
-                    Console.Error.WriteLine("Warning: --packages specified but no dependencies discovered from inputs.");
-                    Console.Error.WriteLine("  Add dependency info via app.json in input directories or NavxManifest.xml in .app files.");
-                    // Still set up the reference loader in case dependencies are implicit
-                    compilation = compilation.WithReferenceLoader(refLoader);
+                    // No explicit dependencies in app.json — load all .app files from
+                    // the packages directory as symbol references. This handles the BC
+                    // convention where Application/System dependencies are implicit.
+                    // Deduplicates by app GUID, keeping the highest version.
+                    Console.Error.WriteLine("No explicit dependencies found. Loading all .app packages as symbols...");
+                    // Exclude the app being compiled (its source is already in the syntax trees)
+                    var selfName = appIdentity.Name.ToLowerInvariant();
+                    var selfGuid = appIdentity.AppId;
+                    var appsByGuid = new Dictionary<Guid, (string Publisher, string Name, Version Version)>();
+                    foreach (var pkgDir in allPackagePaths)
+                    {
+                        foreach (var appFile in Directory.GetFiles(pkgDir, "*.app", SearchOption.AllDirectories))
+                        {
+                            try
+                            {
+                                var doc = LoadNavxManifest(appFile);
+                                if (doc == null) continue;
+                                XNamespace ns = "http://schemas.microsoft.com/navx/2015/manifest";
+                                var appElement = doc.Root?.Element(ns + "App");
+                                var idStr = appElement?.Attribute("Id")?.Value;
+                                var appName = appElement?.Attribute("Name")?.Value ?? "";
+                                var appPublisher = appElement?.Attribute("Publisher")?.Value ?? "";
+                                var appVersionStr = appElement?.Attribute("Version")?.Value ?? "1.0.0.0";
+                                if (idStr != null && Guid.TryParse(idStr, out var appGuid)
+                                    && appGuid != selfGuid
+                                    && !string.Equals(appName, appIdentity.Name, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var ver = Version.Parse(appVersionStr);
+                                    if (!appsByGuid.TryGetValue(appGuid, out var existing) || ver > existing.Version)
+                                        appsByGuid[appGuid] = (appPublisher, appName, ver);
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (appsByGuid.Count > 0)
+                    {
+                        var allAppSpecs = appsByGuid.Select(kv =>
+                            new SymbolReferenceSpecification(
+                                kv.Value.Publisher, kv.Value.Name, kv.Value.Version,
+                                false, kv.Key, false, ImmutableArray<Guid>.Empty))
+                            .ToArray();
+                        Console.Error.WriteLine($"  Loaded {allAppSpecs.Length} symbol packages (deduplicated by app ID, latest version)");
+                        compilation = compilation
+                            .WithReferenceLoader(refLoader)
+                            .AddReferences(allAppSpecs);
+                    }
+                    else
+                    {
+                        compilation = compilation.WithReferenceLoader(refLoader);
+                    }
                 }
             }
             else
@@ -680,9 +726,9 @@ public static class AlTranspiler
 
         foreach (var inputPath in inputPaths)
         {
-            // Try app.json (for directory inputs)
-            var dir = Directory.Exists(inputPath) ? inputPath : Path.GetDirectoryName(inputPath);
-            if (dir != null)
+            // Walk up the directory tree looking for app.json (like git finds .git)
+            var dir = Directory.Exists(inputPath) ? Path.GetFullPath(inputPath) : Path.GetDirectoryName(Path.GetFullPath(inputPath));
+            while (dir != null)
             {
                 var appJsonPath = Path.Combine(dir, "app.json");
                 if (File.Exists(appJsonPath))
@@ -699,6 +745,9 @@ public static class AlTranspiler
                     }
                     catch { /* fall through */ }
                 }
+                var parent = Path.GetDirectoryName(dir);
+                if (parent == dir) break; // filesystem root
+                dir = parent;
             }
 
             // Try NavxManifest.xml (for .app file inputs, including Ready2Run packages)

@@ -4,7 +4,7 @@ codeunit 50900 "Discount Calculator Tests"
 
     var
         DiscountCalc: Codeunit "Discount Calculator";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestApplyDiscount_10Percent()

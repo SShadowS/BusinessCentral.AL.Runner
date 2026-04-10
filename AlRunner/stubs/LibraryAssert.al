@@ -1,7 +1,7 @@
-// Stub for BC's "Library Assert" codeunit (ID 130).
-// Provides method signatures so AL test code compiles.
+// Stub for BC's Assert codeunit (ID 130).
+// Known as both "Library Assert" and "Assert" depending on BC version.
 // At runtime, MockCodeunitHandle routes codeunit 130 calls to MockAssert.
-codeunit 130 "Library Assert"
+codeunit 130 "Assert"
 {
     procedure AreEqual(Expected: Variant; Actual: Variant; Msg: Text)
     begin

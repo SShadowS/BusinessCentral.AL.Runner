@@ -4,7 +4,7 @@ codeunit 50901 "Inventory Management Tests"
 
     var
         InvMgmt: Codeunit "Inventory Management";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestAddStock()

@@ -4,7 +4,7 @@ codeunit 50903 "Input Validator Tests"
 
     var
         Validator: Codeunit "Input Validator";
-        Assert: Codeunit "Library Assert";
+        Assert: Codeunit Assert;
 
     [Test]
     procedure TestValidateEmail_Empty()
