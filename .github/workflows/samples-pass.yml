@@ -2,12 +2,17 @@ name: Samples (passing)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
     branches: [main]
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  BC_ARTIFACT_VERSION: "27.5.46862.0"
+
 jobs:
-  setup:
+  test-samples:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,30 +23,65 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Install AL compiler
-        run: dotnet tool install --global microsoft.dynamics.businesscentral.development.tools.linux
+        run: dotnet tool install --global microsoft.dynamics.businesscentral.development.tools.linux --version 16.2.28.57946
 
       - name: Download BC Service Tier artifacts
         run: |
-          mkdir -p artifacts/onprem/27.5.46862.0/platform/ServiceTier/PFiles64/Microsoft\ Dynamics\ NAV/270/Service
-          # In CI, artifacts must be downloaded or cached.
-          # For now, this workflow requires the artifacts to be available.
-          # See https://github.com/StefanMaron/MsDyn365Bc.On.Linux for setup.
-          echo "BC artifacts setup required — see README for instructions"
+          # Download BC platform artifacts for the service tier DLLs.
+          # These are required for Roslyn compilation of the rewritten C#.
+          ARTIFACT_URL="https://bcartifacts-exdbf9fwegejdqak.b02.azurefd.net/onprem/${BC_ARTIFACT_VERSION}/platform"
+          ARTIFACT_DIR="artifacts/onprem/${BC_ARTIFACT_VERSION}/platform"
+          mkdir -p "${ARTIFACT_DIR}"
+
+          echo "Downloading BC platform artifact..."
+          curl -sSL -o /tmp/platform.zip "${ARTIFACT_URL}" || {
+            echo "::warning::Could not download BC artifacts from ${ARTIFACT_URL}"
+            echo "BC_ARTIFACTS_AVAILABLE=false" >> $GITHUB_ENV
+            exit 0
+          }
+
+          echo "Extracting service tier DLLs..."
+          unzip -q /tmp/platform.zip -d /tmp/platform
+          SERVICE_TIER_SRC=$(find /tmp/platform -path "*/ServiceTier/program files*" -name "Microsoft.Dynamics.Nav.Types.dll" -exec dirname {} \; | head -1)
+          if [ -z "$SERVICE_TIER_SRC" ]; then
+            echo "::warning::Service tier DLLs not found in artifact"
+            echo "BC_ARTIFACTS_AVAILABLE=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          TARGET_DIR="${ARTIFACT_DIR}/ServiceTier/PFiles64/Microsoft Dynamics NAV/270/Service"
+          mkdir -p "${TARGET_DIR}"
+          cp "${SERVICE_TIER_SRC}"/*.dll "${TARGET_DIR}/"
+          echo "BC_ARTIFACTS_AVAILABLE=true" >> $GITHUB_ENV
+          echo "Extracted service tier DLLs to ${TARGET_DIR}"
+          rm -rf /tmp/platform /tmp/platform.zip
 
       - name: Build
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet build AlRunner/
 
       - name: "Sample 01: Pure function tests"
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet run --project AlRunner -- samples/01-pure-function/src samples/01-pure-function/test
 
       - name: "Sample 02: Record operations tests"
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet run --project AlRunner -- samples/02-record-operations/src samples/02-record-operations/test
 
       - name: "Sample 03: Interface injection tests"
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet run --project AlRunner -- samples/03-interface-injection/src samples/03-interface-injection/test
 
       - name: "Sample 04: asserterror tests"
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet run --project AlRunner -- samples/04-asserterror/src samples/04-asserterror/test
 
       - name: "Sample 05: Known limitation tests"
+        if: env.BC_ARTIFACTS_AVAILABLE == 'true'
         run: dotnet run --project AlRunner -- samples/05-known-limitation/src samples/05-known-limitation/test
+
+      - name: Skip notice
+        if: env.BC_ARTIFACTS_AVAILABLE != 'true'
+        run: |
+          echo "::warning::Tests skipped — BC Service Tier artifacts could not be downloaded."
+          echo "See README.md for setup instructions."
