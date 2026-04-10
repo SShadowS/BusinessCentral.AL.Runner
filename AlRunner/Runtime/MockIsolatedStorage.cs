@@ -1,5 +1,6 @@
 namespace AlRunner.Runtime;
 
+using System.Reflection;
 using Microsoft.Dynamics.Nav.Runtime;
 using Microsoft.Dynamics.Nav.Types;
 
@@ -22,7 +23,7 @@ public static class MockIsolatedStorage
 
     public static void ALSet(DataError errorLevel, string key, NavSecretText value, object dataScope)
     {
-        _store[key] = value.ToString() ?? "";
+        _store[key] = ExtractSecretValue(value);
     }
 
     public static void ALSet(DataError errorLevel, string key, string value, object dataScope, object encryption)
@@ -32,7 +33,7 @@ public static class MockIsolatedStorage
 
     public static void ALSet(DataError errorLevel, string key, NavSecretText value, object dataScope, object encryption)
     {
-        _store[key] = value.ToString() ?? "";
+        _store[key] = ExtractSecretValue(value);
     }
 
     // ALSet overloads (without DataScope — transpiler strips it for simple IsolatedStorage.Set calls)
@@ -43,7 +44,7 @@ public static class MockIsolatedStorage
 
     public static void ALSet(DataError errorLevel, string key, NavSecretText value)
     {
-        _store[key] = value.ToString() ?? "";
+        _store[key] = ExtractSecretValue(value);
     }
 
     // ALGet overloads (with DataScope)
@@ -143,5 +144,46 @@ public static class MockIsolatedStorage
     public static bool ALDelete(DataError errorLevel, string key)
     {
         return _store.Remove(key);
+    }
+
+    /// <summary>
+    /// Extracts the plain text value from a NavSecretText.
+    /// NavSecretText.ToString() returns masked text ("***"), so we use reflection
+    /// to access the internal value field. Falls back to ToString() if reflection fails.
+    /// </summary>
+    private static string ExtractSecretValue(NavSecretText secret)
+    {
+        if (secret.ALIsEmpty()) return "";
+
+        // Try to find the internal field that holds the actual value.
+        // NavSecretText is a struct with an internal string field.
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        foreach (var field in typeof(NavSecretText).GetFields(flags))
+        {
+            if (field.FieldType == typeof(string))
+            {
+                var val = field.GetValue(secret);
+                if (val is string s && !string.IsNullOrEmpty(s))
+                    return s;
+            }
+        }
+
+        // Fallback: try properties
+        foreach (var prop in typeof(NavSecretText).GetProperties(flags))
+        {
+            if (prop.PropertyType == typeof(string) && prop.CanRead)
+            {
+                try
+                {
+                    var val = prop.GetValue(secret);
+                    if (val is string s && !string.IsNullOrEmpty(s))
+                        return s;
+                }
+                catch { }
+            }
+        }
+
+        // Last resort
+        return secret.ToString() ?? "";
     }
 }

@@ -525,6 +525,19 @@ public static class AlCompat
     public static bool ALIsAutomation(object? v) => false; // Automation types not supported in standalone
 
     /// <summary>
+    /// Replacement for ALCompiler.ToSecretText(navText).
+    /// Converts a NavText (or string) to NavSecretText.
+    /// The BC version goes through NavSession; our version constructs directly.
+    /// </summary>
+    public static NavSecretText ToSecretText(object? value)
+    {
+        if (value is NavSecretText st) return st;
+        if (value is NavText nt) return NavSecretText.Create((string)nt);
+        if (value is string s) return NavSecretText.Create(s);
+        return NavSecretText.Create(value?.ToString() ?? "");
+    }
+
+    /// <summary>
     /// Safe NavCode constructor that pre-uppercases the string value.
     /// NavCode.EnsureValueIsUppercasedIfNeeded() calls NavEnvironment which crashes on Linux.
     /// By passing an already-uppercased string, the check is skipped.

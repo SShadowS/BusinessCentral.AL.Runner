@@ -1131,6 +1131,17 @@ public NavValue ALGetRangeMaxSafe(int fieldNo, NavType expectedType) => Rec.ALGe
                     SyntaxFactory.IdentifierName("Default"));
             }
 
+            // ALCompiler.ToSecretText(navText) -> AlCompat.ToSecretText(navText)
+            // ToSecretText wraps a text value as NavSecretText; requires NavSession in BC.
+            if (exprText == "ALCompiler" && methodName == "ToSecretText")
+            {
+                return visited.WithExpression(
+                    SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("AlCompat"),
+                        SyntaxFactory.IdentifierName("ToSecretText")));
+            }
+
             // ALCompiler.ToNavValue(x) -> AlCompat.ToNavValue(x)
             // ToNavValue chains through NavValueFormatter -> NavSession -> NavEnvironment
             if (exprText == "ALCompiler" && methodName == "ToNavValue")
