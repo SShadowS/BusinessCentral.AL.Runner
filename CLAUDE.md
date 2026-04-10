@@ -85,7 +85,7 @@ These are the BC runtime types replaced in standalone mode:
 
 ### MockRecordHandle capabilities
 
-- Init, Insert, Modify, Get, Delete, DeleteAll
+- Init, Insert, Modify, ModifyAll, Get, Delete, DeleteAll
 - FindFirst, FindLast, FindSet, Next iteration
 - Composite primary keys (RegisterPrimaryKey)
 - SetCurrentKey / SetAscending sort ordering
@@ -268,6 +268,20 @@ These have been implemented and are tested by the test suite:
 4. **ALFieldNo(fieldName)** — Field-by-name lookups work when registered via
    `MockRecordHandle.RegisterFieldName()`.
 
+5. **Table extension field support** — Extension-scoped `SetFieldValueSafe`,
+   `GetFieldValueSafe`, `GetFieldRefSafe`, and `Invoke` overloads accept the
+   `(extensionId, fieldId, ...)` pattern emitted by the BC compiler for table
+   extension fields. The extensionId is ignored; fields are stored flat.
+
+6. **ALRecordId** — `MockRecordHandle.ALRecordId` returns `NavRecordId.Default`.
+
+7. **ALModifyAllSafe** — `MockRecordHandle.ALModifyAllSafe` updates a field on
+   all records matching current filters.
+
+8. **Interface return from functions** — `MockInterfaceHandle` supports 1-arg
+   constructor (parent scope), nested interface delegation, and `NavScope`
+   parameter conversion in cross-codeunit dispatch.
+
 ## Remaining Gaps
 
 These are gaps that remain for full production use:
@@ -438,6 +452,10 @@ Follows the `BusinessCentral.AL.*` pattern:
 | `tests/25-expected-error-code/` | Assert.ExpectedErrorCode (1-arg) |
 | `tests/26-time-format/` | NavTime comparison and formatting |
 | `tests/27-testfield-error/` | Assert.ExpectedTestFieldError |
+| `tests/28-table-extension-fields/` | Table extension field read/write |
+| `tests/29-record-id/` | RecordId property access |
+| `tests/30-modify-all/` | ModifyAll with filters |
+| `tests/31-interface-return/` | Interface returned from functions |
 | `.github/workflows/test-matrix.yml` | CI: runs all tests across BC version matrix |
 | `.github/workflows/publish.yml` | CI: publish to NuGet on tag |
 | `.github/workflows/coverage-demo.yml` | CI: coverage report demo |
