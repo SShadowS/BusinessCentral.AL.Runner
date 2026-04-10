@@ -73,7 +73,13 @@ public class MockCodeunitHandle
         var assembly = CurrentAssembly ?? Assembly.GetExecutingAssembly();
         var codeunitType = FindCodeunitType(assembly);
         if (codeunitType == null)
+        {
+            var exclusionInfo = RoslynCompiler.GetExclusionInfo($"Codeunit{_codeunitId}");
+            if (exclusionInfo != null)
+                throw new InvalidOperationException(
+                    $"Codeunit {_codeunitId} was excluded during compilation.\n{exclusionInfo}");
             throw new InvalidOperationException($"Codeunit {_codeunitId} not found in assembly");
+        }
 
         // Lazily create codeunit instance and call InitializeComponent
         if (_codeunitInstance == null)
@@ -177,7 +183,13 @@ public class MockCodeunitHandle
         var assembly = CurrentAssembly ?? Assembly.GetExecutingAssembly();
         var codeunitType = handle.FindCodeunitType(assembly);
         if (codeunitType == null)
+        {
+            var exclusionInfo = RoslynCompiler.GetExclusionInfo($"Codeunit{codeunitId}");
+            if (exclusionInfo != null)
+                throw new InvalidOperationException(
+                    $"Codeunit {codeunitId} was excluded during compilation.\n{exclusionInfo}");
             throw new InvalidOperationException($"Codeunit {codeunitId} not found in assembly");
+        }
 
         var instance = System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(codeunitType);
         var initMethod = codeunitType.GetMethod("InitializeComponent",

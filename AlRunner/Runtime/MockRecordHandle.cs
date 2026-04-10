@@ -1217,7 +1217,13 @@ public class MockRecordHandle
         var recordTypeName = $"Record{_tableId}";
         var recordType = assembly.GetTypes().FirstOrDefault(t => t.Name == recordTypeName);
         if (recordType == null)
+        {
+            var exclusionInfo = RoslynCompiler.GetExclusionInfo(recordTypeName);
+            if (exclusionInfo != null)
+                throw new InvalidOperationException(
+                    $"Record type {recordTypeName} was excluded during compilation.\n{exclusionInfo}");
             throw new InvalidOperationException($"Record type {recordTypeName} not found in assembly for Invoke");
+        }
 
         // Find scope class matching the member ID
         var absMemberId = Math.Abs(memberId).ToString();
