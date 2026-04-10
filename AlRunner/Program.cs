@@ -30,6 +30,7 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("Options:");
     Console.Error.WriteLine("  --coverage            Show statement-level coverage report and write cobertura.xml");
     Console.Error.WriteLine("  --packages <dir>      Add symbol references from .app files in directory");
+    Console.Error.WriteLine("  --stubs <dir>         Override dependency objects with stub AL files");
     Console.Error.WriteLine("  --dump-csharp         Print generated C# (before rewriting) and exit");
     Console.Error.WriteLine("  --dump-rewritten      Print rewritten C# (after rewriting) and exit");
     Console.Error.WriteLine("  -e '<al code>'        Run inline AL code");
@@ -51,6 +52,7 @@ bool dumpCSharp = false;
 bool dumpRewritten = false;
 bool showCoverage = false;
 bool verbose = false;
+var stubPaths = new List<string>();
 var alSources = new List<string>();
 var packagePaths = new List<string>();
 var inputPaths = new List<string>(); // track input dirs/files for auto-discovery
@@ -78,6 +80,26 @@ while (argIdx < args.Length)
         case "-v":
             verbose = true;
             Log.Verbose = true;
+            argIdx++;
+            break;
+        case "--stubs":
+            argIdx++;
+            if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --stubs requires a directory argument"); return 1; }
+            var stubPath = Path.GetFullPath(args[argIdx]);
+            if (!Directory.Exists(stubPath)) { Console.Error.WriteLine($"Error: stubs directory not found: {stubPath}"); return 1; }
+            stubPaths.Add(stubPath);
+            Log.HasStubs = true;
+            // Load stub AL files as source
+            var stubFiles = Directory.GetFiles(stubPath, "*.al", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+            Log.Info($"Loading {stubFiles.Count} stub files from {stubPath}");
+            foreach (var sf in stubFiles)
+            {
+                var stubSrc = File.ReadAllText(sf);
+                alSources.Add(stubSrc);
+                // Add to all input groups
+                foreach (var g in inputGroups)
+                    g.Sources.Add(stubSrc);
+            }
             argIdx++;
             break;
         case "--packages":
@@ -502,6 +524,7 @@ return exitCode;
 public static class Log
 {
     public static bool Verbose { get; set; }
+    public static bool HasStubs { get; set; }
     public static void Info(string msg) { if (Verbose) Console.Error.WriteLine(msg); }
     public static void Warn(string msg) => Console.Error.WriteLine($"Warning: {msg}");
     public static void Error(string msg) => Console.Error.WriteLine($"Error: {msg}");
@@ -576,10 +599,12 @@ public static class AlTranspiler
         // Only enable symbol references when --packages is explicitly provided.
         // This avoids conflicts when compiling self-contained multi-project spikes from source.
         bool hasExplicitPackages = packagePaths != null && packagePaths.Count > 0;
+        var allPackagePaths = hasExplicitPackages ? ResolvePackagePaths(packagePaths, inputPaths) : new List<string>();
+        var appsByGuid = new Dictionary<Guid, (string Publisher, string Name, Version Version)>();
+        Microsoft.Dynamics.Nav.CodeAnalysis.ISymbolReferenceLoader? refLoader = null;
 
         if (hasExplicitPackages)
         {
-            var allPackagePaths = ResolvePackagePaths(packagePaths, inputPaths);
             var depSpecs = DiscoverDependencies(inputPaths, forceResolve: true);
 
             if (allPackagePaths.Count > 0)
@@ -588,7 +613,7 @@ public static class AlTranspiler
                 foreach (var p in allPackagePaths)
                     Log.Info($"  {p}");
 
-                var refLoader = ReferenceLoaderFactory.CreateReferenceLoader(allPackagePaths);
+                refLoader = ReferenceLoaderFactory.CreateReferenceLoader(allPackagePaths);
 
                 if (depSpecs.Count > 0)
                 {
@@ -610,7 +635,7 @@ public static class AlTranspiler
                     // Exclude the app being compiled (its source is already in the syntax trees)
                     var selfName = appIdentity.Name.ToLowerInvariant();
                     var selfGuid = appIdentity.AppId;
-                    var appsByGuid = new Dictionary<Guid, (string Publisher, string Name, Version Version)>();
+                    appsByGuid.Clear();
                     foreach (var pkgDir in allPackagePaths)
                     {
                         foreach (var appFile in Directory.GetFiles(pkgDir, "*.app", SearchOption.AllDirectories))
@@ -663,11 +688,76 @@ public static class AlTranspiler
         }
 
         // Check for declaration-level diagnostics before emit
+        // AL0432 (obsolete/removed field) is not a blocking error for the runner
+        var ignoredErrorIds = new HashSet<string> { "AL0432", "AL0433" };
         var declDiags = compilation.GetDeclarationDiagnostics().ToList();
-        var declErrors = declDiags.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+        var declErrors = declDiags
+            .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
+            .ToList();
+
+        // When stubs are loaded: detect ambiguity conflicts (AL0275/AL0197) and resolve
+        // by removing the conflicting symbol package, then retrying compilation
+        if (Log.HasStubs && declErrors.Any(d => d.Id is "AL0275" or "AL0197"))
+        {
+            // Extract conflicting extension names from error messages
+            // Format: "'X' is an ambiguous reference between 'X' defined by the extension 'AppName by Publisher (Version)' and ..."
+            var conflictingApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var d in declErrors.Where(d => d.Id is "AL0275" or "AL0197"))
+            {
+                var msg = d.GetMessage();
+                // Extract extension names: 'AppName by Publisher (Version)'
+                foreach (var part in msg.Split("'"))
+                {
+                    if (part.Contains(" by ") && part.Contains("(") &&
+                        !part.Contains(appIdentity.Name))
+                    {
+                        // Extract just the app name before " by "
+                        var appName = part.Split(" by ")[0].Trim();
+                        conflictingApps.Add(appName);
+                    }
+                }
+            }
+
+            if (conflictingApps.Count > 0 && hasExplicitPackages)
+            {
+                Log.Info($"Stubs override {conflictingApps.Count} package(s): {string.Join(", ", conflictingApps)}");
+
+                // Rebuild compilation without conflicting packages
+                // Re-discover dependencies excluding conflicted app names
+                if (allPackagePaths.Count > 0)
+                {
+                    var filteredSpecs = appsByGuid
+                        .Where(kv => !conflictingApps.Contains(kv.Value.Name))
+                        .Select(kv => new SymbolReferenceSpecification(
+                            kv.Value.Publisher, kv.Value.Name, kv.Value.Version,
+                            false, kv.Key, false, ImmutableArray<Guid>.Empty))
+                        .ToArray();
+
+                    compilation = Compilation.Create(
+                        moduleName: appIdentity.Name,
+                        publisher: appIdentity.Publisher,
+                        version: appIdentity.Version,
+                        appId: appIdentity.AppId,
+                        syntaxTrees: syntaxTrees.ToArray(),
+                        options: new CompilationOptions(
+                            continueBuildOnError: true,
+                            target: CompilationTarget.OnPrem,
+                            generateOptions: CompilationGenerationOptions.All
+                        ))
+                        .WithReferenceLoader(refLoader)
+                        .AddReferences(filteredSpecs);
+                }
+
+                // Re-check declaration diagnostics
+                declDiags = compilation.GetDeclarationDiagnostics().ToList();
+                declErrors = declDiags
+                    .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
+                    .ToList();
+            }
+        }
+
         if (declErrors.Count > 0)
         {
-            // Summarize missing codeunits (actionable) vs other errors (verbose)
             var missingObjects = declErrors
                 .Where(d => d.Id == "AL0185")
                 .Select(d => d.GetMessage())
