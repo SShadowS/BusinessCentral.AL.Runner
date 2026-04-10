@@ -14,6 +14,15 @@ public class MockInterfaceHandle
     }
 
     /// <summary>
+    /// Constructor accepting a parent scope — used when an interface is returned
+    /// from a function. The BC compiler passes the parent NavScope as an argument.
+    /// In standalone mode, we ignore the parent.
+    /// </summary>
+    public MockInterfaceHandle(object? parent)
+    {
+    }
+
+    /// <summary>
     /// Assigns an interface implementation (codeunit) to this handle.
     /// In BC, ALAssign wraps the codeunit as an interface implementation.
     /// </summary>
@@ -40,6 +49,11 @@ public class MockInterfaceHandle
         // If the implementation is a MockCodeunitHandle, delegate to it
         if (_implementation is MockCodeunitHandle handle)
             return handle.Invoke(memberId, args);
+
+        // If the implementation is another MockInterfaceHandle (e.g., returned from a factory),
+        // delegate through it
+        if (_implementation is MockInterfaceHandle innerHandle)
+            return innerHandle.InvokeInterfaceMethod(memberId, args);
 
         throw new NotSupportedException(
             $"Interface dispatch not supported for implementation type {_implementation.GetType().Name}");

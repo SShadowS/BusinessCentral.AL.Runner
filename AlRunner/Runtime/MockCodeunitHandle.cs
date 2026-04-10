@@ -396,6 +396,11 @@ public class MockCodeunitHandle
         if (arg == null) return null;
         if (targetType.IsAssignableFrom(arg.GetType())) return arg;
 
+        // NavScope parameters are used for return-value parent scoping.
+        // In standalone mode, pass null — our AlScope doesn't extend NavScope.
+        if (targetType == typeof(NavScope) || targetType.IsSubclassOf(typeof(NavScope)))
+            return null;
+
         // MockVariant -> unwrap to underlying value and retry
         if (arg is MockVariant mv)
         {
