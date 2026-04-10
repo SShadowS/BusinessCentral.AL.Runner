@@ -309,7 +309,9 @@ if (packagePaths.Count > 0 && inputGroups.Any(g => g.Path.EndsWith(".app", Strin
 // ---------------------------------------------------------------------------
 // Step 0: Register kernel32 shim (needed for BC DLLs on Linux)
 // ---------------------------------------------------------------------------
+Timer.StartStage("Kernel32 shim");
 Kernel32Shim.EnsureRegistered();
+Timer.EndStage("Kernel32 shim");
 
 // ---------------------------------------------------------------------------
 // Auto-include AL stubs (e.g., Library Assert) from the stubs/ directory
@@ -384,6 +386,7 @@ Kernel32Shim.EnsureRegistered();
     }
 }
 
+Timer.StartStage("AL transpilation");
 // ---------------------------------------------------------------------------
 // Step 1: Transpile AL -> C#
 // When --packages is specified and there are multiple input groups (e.g. multiple .app files),
@@ -478,6 +481,8 @@ if (dumpCSharp)
     }
 }
 
+Timer.EndStage("AL transpilation");
+Timer.StartStage("Roslyn rewriting");
 // ---------------------------------------------------------------------------
 // Step 2: Rewrite C# for standalone execution
 // ---------------------------------------------------------------------------
@@ -498,6 +503,8 @@ if (dumpRewritten)
     }
 }
 
+Timer.EndStage("Roslyn rewriting");
+Timer.StartStage("Roslyn compilation");
 // ---------------------------------------------------------------------------
 // Step 3: Build AL source line mapping and compile rewritten C# with Roslyn
 // ---------------------------------------------------------------------------
@@ -518,6 +525,8 @@ if (assembly == null)
     return 1;
 }
 
+Timer.EndStage("Roslyn compilation");
+Timer.StartStage("Test execution");
 // ---------------------------------------------------------------------------
 // Step 4: Detect mode and execute
 // ---------------------------------------------------------------------------
@@ -562,6 +571,8 @@ else
     exitCode = Executor.RunOnRun(assembly);
 }
 
+Timer.EndStage("Test execution");
+Timer.Print();
 return exitCode;
 
 void PrintGuide()
@@ -711,6 +722,33 @@ public static class Log
     public static void Info(string msg) { if (Verbose) Console.Error.WriteLine(msg); }
     public static void Warn(string msg) => Console.Error.WriteLine($"Warning: {msg}");
     public static void Error(string msg) => Console.Error.WriteLine($"Error: {msg}");
+}
+
+public static class Timer
+{
+    private static readonly System.Diagnostics.Stopwatch _total = System.Diagnostics.Stopwatch.StartNew();
+    private static readonly System.Diagnostics.Stopwatch _stage = new();
+    private static readonly List<(string Name, long Ms)> _stages = new();
+
+    public static void StartStage(string name)
+    {
+        _stage.Restart();
+    }
+
+    public static void EndStage(string name)
+    {
+        _stage.Stop();
+        _stages.Add((name, _stage.ElapsedMilliseconds));
+    }
+
+    public static void Print()
+    {
+        _total.Stop();
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"Timing: {_total.ElapsedMilliseconds}ms total");
+        foreach (var (name, ms) in _stages)
+            Console.Error.WriteLine($"  {name,-30} {ms,6}ms");
+    }
 }
 
 // ===========================================================================
@@ -2001,8 +2039,10 @@ public static class Executor
                     continue;
                 }
 
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 onRunMethod.Invoke(scope, null);
-                Console.WriteLine($"PASS  {testName}");
+                sw.Stop();
+                Console.WriteLine($"PASS  {testName} ({sw.ElapsedMilliseconds}ms)");
                 passed++;
             }
             catch (TargetInvocationException ex)
