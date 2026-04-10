@@ -16,17 +16,12 @@ import zlib
 import tempfile
 import shutil
 
-# Only the DLLs referenced in AlRunner.csproj
-NEEDED_DLLS = {
-    'microsoft.dynamics.nav.ncl.dll',
-    'microsoft.dynamics.nav.types.dll',
-    'microsoft.dynamics.nav.common.dll',
-    'microsoft.dynamics.nav.language.dll',
-    'microsoft.dynamics.nav.core.dll',
-    'microsoft.dynamics.nav.types.report.dll',
-    'microsoft.dynamics.nav.types.report.base.dll',
-    'microsoft.dynamics.nav.types.report.runtime.dll',
-}
+# All Microsoft.Dynamics.Nav.*.dll files are needed:
+# - 8 are referenced in AlRunner.csproj for build
+# - The rest are referenced by RoslynCompiler for in-memory Roslyn compilation
+# - Transitive runtime dependencies (e.g. Nav.Apps.dll) are loaded dynamically
+# We match by prefix instead of an explicit list.
+NAV_DLL_PREFIX = 'microsoft.dynamics.nav.'
 
 
 def download(url, output_path, byte_range=None):
@@ -76,7 +71,7 @@ def main():
 
     print(f"Artifact: {url}")
     print(f"Size: {total_size:,} bytes ({total_size // 1048576} MB)")
-    print(f"Target DLLs: {len(NEEDED_DLLS)}")
+    print(f"Target: Microsoft.Dynamics.Nav.*.dll from ServiceTier")
 
     tmp_dir = tempfile.mkdtemp(prefix='bc-dlls-')
 
@@ -127,58 +122,55 @@ def main():
             if '/' in after_service:
                 continue  # skip management/, sideservices/, etc.
             basename = os.path.basename(name_lower)
-            if basename in NEEDED_DLLS and e['comp_size'] > 0:
+            if basename.startswith(NAV_DLL_PREFIX) and basename.endswith('.dll') and e['comp_size'] > 0:
                 matching.append(e)
 
-        print(f"Found {len(matching)} of {len(NEEDED_DLLS)} needed DLLs")
+        print(f"Found {len(matching)} Nav DLLs")
         if len(matching) == 0:
             print("ERROR: No matching DLLs found")
             sys.exit(1)
 
-        for e in matching:
-            print(f"  {os.path.basename(e['name'])} ({e['comp_size'] // 1024} KB compressed)")
+        total_comp = sum(e['comp_size'] for e in matching)
+        print(f"  Total compressed: {total_comp // 1024} KB")
 
-        # Step 4: Download each DLL individually via range request
-        # Each file needs: local header (30 bytes) + name + extra + compressed data
-        # We add a generous buffer for the local header overhead
+        # Step 4: Download all matching DLLs in a single range request
+        # They're in the same ServiceTier directory so offsets are clustered
+        sorted_entries = sorted(matching, key=lambda e: e['offset'])
+        first_offset = sorted_entries[0]['offset']
+        last_entry = sorted_entries[-1]
+        range_end = last_entry['offset'] + 30 + len(last_entry['name'].encode('utf-8')) + 512 + last_entry['comp_size']
+        range_end = min(range_end, total_size - 1)
+        download_size = range_end - first_offset
+        savings = round((1 - download_size / total_size) * 100)
+        print(f"Range: {first_offset}-{range_end} ({download_size // 1048576} MB, {savings}% savings)")
+
+        range_file = os.path.join(tmp_dir, 'nav_dlls.bin')
+        if not download(url, range_file, f'{first_offset}-{range_end}'):
+            print("ERROR: Failed to download DLL range")
+            sys.exit(1)
+
+        with open(range_file, 'rb') as f:
+            data = f.read()
+
         extracted = 0
         total_bytes = 0
-        for e in matching:
+        for e in sorted_entries:
             basename = os.path.basename(e['name'])
-            # Range: from local file header to end of compressed data
-            # Local header is 30 + name_len + extra_len bytes, then compressed data follows
-            # We don't know extra_len upfront, so download with generous extra (512 bytes)
-            range_start = e['offset']
-            range_end   = e['offset'] + 30 + len(e['name'].encode('utf-8')) + 512 + e['comp_size']
-            range_end   = min(range_end, total_size - 1)
-
-            range_file = os.path.join(tmp_dir, f'{basename}.bin')
-            if not download(url, range_file, f'{range_start}-{range_end}'):
-                print(f"  WARNING: Failed to download {basename}")
+            pos = e['offset'] - first_offset
+            if pos < 0 or pos + 30 > len(data):
+                print(f"  WARNING: {basename} outside range")
                 continue
-
-            with open(range_file, 'rb') as f:
-                data = f.read()
-
-            # Parse local file header
-            if data[:4] != b'\x50\x4b\x03\x04':
+            if data[pos:pos+4] != b'\x50\x4b\x03\x04':
                 print(f"  WARNING: Invalid local header for {basename}")
                 continue
 
-            name_len   = struct.unpack_from('<H', data, 26)[0]
-            extra_len  = struct.unpack_from('<H', data, 28)[0]
-            data_start = 30 + name_len + extra_len
+            name_len   = struct.unpack_from('<H', data, pos + 26)[0]
+            extra_len  = struct.unpack_from('<H', data, pos + 28)[0]
+            data_start = pos + 30 + name_len + extra_len
 
             if data_start + e['comp_size'] > len(data):
-                print(f"  WARNING: {basename} data truncated, re-downloading with larger range")
-                range_end = e['offset'] + data_start + e['comp_size'] + 16
-                if not download(url, range_file, f'{range_start}-{range_end}'):
-                    continue
-                with open(range_file, 'rb') as f:
-                    data = f.read()
-                name_len   = struct.unpack_from('<H', data, 26)[0]
-                extra_len  = struct.unpack_from('<H', data, 28)[0]
-                data_start = 30 + name_len + extra_len
+                print(f"  WARNING: {basename} extends beyond range")
+                continue
 
             comp_data = data[data_start:data_start + e['comp_size']]
 
@@ -191,24 +183,15 @@ def main():
                     print(f"  WARNING: Decompression failed for {basename}: {err}")
                     continue
             else:
-                print(f"  WARNING: Unsupported compression for {basename}")
                 continue
 
             out_path = os.path.join(output_dir, basename)
             with open(out_path, 'wb') as f:
                 f.write(file_data)
-
             extracted   += 1
             total_bytes += len(file_data)
-            os.remove(range_file)
 
-        print(f"\nExtracted {extracted} DLLs ({total_bytes // 1024} KB)")
-
-        if extracted < len(NEEDED_DLLS):
-            found = {os.path.basename(e['name']).lower() for e in matching}
-            missing = NEEDED_DLLS - found
-            if missing:
-                print(f"WARNING: Missing DLLs: {', '.join(sorted(missing))}")
+        print(f"Extracted {extracted} DLLs ({total_bytes // 1024} KB)")
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
