@@ -394,14 +394,15 @@ Timer.StartStage("AL transpilation");
 List<(string Name, string Code)>? generatedCSharpList;
 
 // --stubs: replace matching source objects with stub versions.
-// Extract object IDs from stubs (e.g., "codeunit 74321" → "74321") and remove
-// matching sources before compilation. Then add stubs to the source list.
+// Stubs that match source objects are compiled in place of the originals.
+// Stubs that DON'T match source objects (e.g., dependency stubs like Library - ERM)
+// are compiled separately and merged at the C# level to avoid package conflicts.
+var separateStubSources = new List<string>();
 if (stubSources.Count > 0)
 {
     var stubObjectIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     foreach (var stub in stubSources)
     {
-        // Parse "codeunit NNN", "table NNN", etc. from the start of the stub
         var match = System.Text.RegularExpressions.Regex.Match(stub,
             @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -409,22 +410,44 @@ if (stubSources.Count > 0)
             stubObjectIds.Add(match.Value.ToLowerInvariant());
     }
 
-    if (stubObjectIds.Count > 0)
+    // Partition stubs: those matching source objects replace them inline;
+    // those not matching any source are compiled separately.
+    foreach (var stub in stubSources)
     {
-        // Remove source entries whose object declaration matches a stub
-        int removed = alSources.RemoveAll(src =>
+        var match = System.Text.RegularExpressions.Regex.Match(stub,
+            @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success) { separateStubSources.Add(stub); continue; }
+
+        var stubId = match.Value.ToLowerInvariant();
+        bool foundInSource = alSources.Any(src =>
         {
             var srcMatch = System.Text.RegularExpressions.Regex.Match(src,
                 @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return srcMatch.Success && stubObjectIds.Contains(srcMatch.Value.ToLowerInvariant());
+            return srcMatch.Success && srcMatch.Value.ToLowerInvariant() == stubId;
         });
-        if (removed > 0)
-            Log.Info($"Stubs replaced {removed} source object(s)");
-    }
 
-    // Add stub sources
-    alSources.AddRange(stubSources);
+        if (foundInSource)
+        {
+            // Replace matching source with stub
+            alSources.RemoveAll(src =>
+            {
+                var srcMatch = System.Text.RegularExpressions.Regex.Match(src,
+                    @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                return srcMatch.Success && srcMatch.Value.ToLowerInvariant() == stubId;
+            });
+            alSources.Add(stub);
+            Log.Info($"Stub replaces source object: {stubId}");
+        }
+        else
+        {
+            // Dependency stub — compile separately to avoid package conflicts
+            separateStubSources.Add(stub);
+            Log.Info($"Stub for dependency object: {stubId} (compiled separately)");
+        }
+    }
 }
 
 bool hasExplicitPackages = packagePaths.Count > 0;
@@ -486,6 +509,19 @@ else
     generatedCSharpList = AlTranspiler.TranspileMulti(alSources, packagePaths, inputPaths);
     if (generatedCSharpList == null || generatedCSharpList.Count == 0)
         return 1;
+}
+
+// Compile dependency stubs separately — these provide source for objects that exist
+// only in .app packages. Compiling them separately avoids BC compiler conflicts
+// with the package that already defines the object.
+if (separateStubSources.Count > 0)
+{
+    var depStubCSharp = AlTranspiler.TranspileMulti(separateStubSources, packagePaths, inputPaths);
+    if (depStubCSharp != null && depStubCSharp.Count > 0)
+    {
+        generatedCSharpList.AddRange(depStubCSharp);
+        Log.Info($"Added {depStubCSharp.Count} dependency stub(s) for runtime dispatch");
+    }
 }
 
 // If Assert stubs were loaded separately (Assert.app found in packages), transpile
