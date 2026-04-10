@@ -484,18 +484,32 @@ if (dumpCSharp)
 Timer.EndStage("AL transpilation");
 Timer.StartStage("Roslyn rewriting");
 // ---------------------------------------------------------------------------
-// Step 2: Rewrite C# for standalone execution
+// Step 2: Rewrite C# for standalone execution (parallel, returning SyntaxTrees)
 // ---------------------------------------------------------------------------
-var rewrittenList = new List<(string Name, string Code)>();
-foreach (var (name, code) in generatedCSharpList)
+var rewrittenTrees = new (string Name, Microsoft.CodeAnalysis.SyntaxTree Tree)[generatedCSharpList.Count];
+System.Threading.Tasks.Parallel.For(0, generatedCSharpList.Count, i =>
 {
-    var rewritten = RoslynRewriter.Rewrite(code);
-    rewrittenList.Add((name, rewritten));
+    var (name, code) = generatedCSharpList[i];
+    rewrittenTrees[i] = (name, RoslynRewriter.RewriteToTree(code));
+});
+var rewrittenTreeList = rewrittenTrees.ToList();
+
+// Lazily convert rewritten trees to string form (only needed for dump/debug/mapper)
+List<(string Name, string Code)>? _rewrittenStringList = null;
+List<(string Name, string Code)> GetRewrittenStrings()
+{
+    if (_rewrittenStringList == null)
+    {
+        _rewrittenStringList = rewrittenTreeList
+            .Select(t => (t.Name, t.Tree.GetRoot().ToFullString()))
+            .ToList();
+    }
+    return _rewrittenStringList;
 }
 
 if (dumpRewritten)
 {
-    foreach (var (name, code) in rewrittenList)
+    foreach (var (name, code) in GetRewrittenStrings())
     {
         Console.WriteLine($"=== Rewritten C# for {name} ===");
         Console.WriteLine(code);
@@ -508,15 +522,15 @@ Timer.StartStage("Roslyn compilation");
 // ---------------------------------------------------------------------------
 // Step 3: Build AL source line mapping and compile rewritten C# with Roslyn
 // ---------------------------------------------------------------------------
-SourceLineMapper.Build(generatedCSharpList, rewrittenList);
-var assembly = RoslynCompiler.Compile(rewrittenList);
+SourceLineMapper.Build(generatedCSharpList, GetRewrittenStrings());
+var assembly = RoslynCompiler.Compile(rewrittenTreeList);
 if (assembly == null)
 {
     // Dump rewritten C# for debugging if verbose
     if (!dumpRewritten && verbose)
     {
         Console.Error.WriteLine("\n--- Rewritten C# (for debugging compilation failure) ---");
-        foreach (var (name, code) in rewrittenList)
+        foreach (var (name, code) in GetRewrittenStrings())
         {
             Console.Error.WriteLine($"=== {name} ===");
             Console.Error.WriteLine(code);
@@ -534,7 +548,7 @@ Timer.StartStage("Test execution");
 AlRunner.Runtime.MockCodeunitHandle.CurrentAssembly = assembly;
 
 // Register total statement count for coverage tracking
-Executor.RegisterStatements(rewrittenList);
+Executor.RegisterStatements(GetRewrittenStrings());
 
 // Auto-detect test codeunits: check if any AL source contains "Subtype = Test"
 bool hasTests = alSources.Any(s => s.Contains("Subtype = Test"));
@@ -1667,15 +1681,7 @@ public static class RoslynCompiler
 
     public static Assembly? Compile(List<(string Name, string Code)> namedSources)
     {
-        // Clear any exclusion info from previous compilations
-        ExcludedFiles.Clear();
-
-        // Use AL object names as file paths for readable Roslyn diagnostics
-        // (e.g., "Codeunit50100.cs(45,12): error CS0246" instead of "source_0.cs")
-        // Deduplicate names: different AL object types (Table, Page) can share the same
-        // SymbolName, which would give them identical file paths. The iterative retry
-        // removes files by path, so collisions cause error-free files to be excluded
-        // as collateral damage. Append _2, _3, etc. for duplicates.
+        // Parse source strings into syntax trees, then delegate to the tree-based overload
         var nameCount = new Dictionary<string, int>();
         var syntaxTrees = namedSources.Select((src, idx) =>
         {
@@ -1692,6 +1698,41 @@ public static class RoslynCompiler
             return Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
                 src.Code, path: $"{baseName}.cs");
         }).ToList();
+
+        return CompileFromTrees(syntaxTrees);
+    }
+
+    /// <summary>
+    /// Compile from pre-built SyntaxTrees (avoids re-parsing rewritten C#).
+    /// Trees are re-rooted with deduplicated file paths for readable diagnostics.
+    /// </summary>
+    public static Assembly? Compile(List<(string Name, Microsoft.CodeAnalysis.SyntaxTree Tree)> namedTrees)
+    {
+        // Assign deduplicated file paths to trees for readable Roslyn diagnostics
+        var nameCount = new Dictionary<string, int>();
+        var syntaxTrees = namedTrees.Select(t =>
+        {
+            var baseName = t.Name;
+            if (nameCount.TryGetValue(baseName, out int count))
+            {
+                nameCount[baseName] = count + 1;
+                baseName = $"{baseName}_{count + 1}";
+            }
+            else
+            {
+                nameCount[baseName] = 1;
+            }
+            // Re-root the tree with a file path for diagnostics
+            return t.Tree.WithFilePath($"{baseName}.cs");
+        }).ToList();
+
+        return CompileFromTrees(syntaxTrees);
+    }
+
+    private static Assembly? CompileFromTrees(List<Microsoft.CodeAnalysis.SyntaxTree> syntaxTrees)
+    {
+        // Clear any exclusion info from previous compilations
+        ExcludedFiles.Clear();
 
         var references = new List<Microsoft.CodeAnalysis.MetadataReference>();
 

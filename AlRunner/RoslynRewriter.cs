@@ -99,13 +99,24 @@ public class RoslynRewriter : CSharpSyntaxRewriter
 
     public static string Rewrite(string csharp)
     {
+        return RewriteToTree(csharp).GetRoot().ToFullString();
+    }
+
+    /// <summary>
+    /// Rewrite BC-generated C# and return the result as a SyntaxTree.
+    /// NormalizeWhitespace is applied to fix trivia left by node removal.
+    /// The returned tree can be passed directly to Roslyn compilation,
+    /// avoiding a redundant parse round-trip through string form.
+    /// </summary>
+    public static SyntaxTree RewriteToTree(string csharp)
+    {
         var tree = CSharpSyntaxTree.ParseText(csharp);
         var root = tree.GetRoot();
 
         var rewriter = new RoslynRewriter();
 
         var newRoot = rewriter.Visit(root);
-        return newRoot.NormalizeWhitespace().ToFullString();
+        return CSharpSyntaxTree.Create((CSharpSyntaxNode)newRoot.NormalizeWhitespace());
     }
 
     // -----------------------------------------------------------------------
