@@ -35,6 +35,10 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("  --dump-rewritten      Print rewritten C# (after rewriting) and exit");
     Console.Error.WriteLine("  -e '<al code>'        Run inline AL code");
     Console.Error.WriteLine("  -v, --verbose         Show detailed transpilation and compilation output");
+    Console.Error.WriteLine("  --output-json         Output results as machine-readable JSON");
+    Console.Error.WriteLine("  --capture-values      Capture variable values after each test for inline display");
+    Console.Error.WriteLine("  --run <procedure>     Run only the specified procedure by name");
+    Console.Error.WriteLine("  --server              Start in server mode (JSON-RPC over stdin/stdout)");
     Console.Error.WriteLine("  --guide               Print test-writing guide for AI coding agents");
     Console.Error.WriteLine("  -h, --help            Show this help");
     Console.Error.WriteLine();
@@ -50,19 +54,8 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     return args.Length == 0 ? 1 : 0;
 }
 
-// Parse arguments
-bool dumpCSharp = false;
-bool dumpRewritten = false;
-bool showCoverage = false;
-bool verbose = false;
-var stubPaths = new List<string>();
-var alSources = new List<string>();
-var stubSources = new List<string>(); // --stubs AL sources that replace matching objects
-var assertStubSources = new List<string>(); // Assert stub AL sources to transpile separately when Assert.app is in packages
-var packagePaths = new List<string>();
-var inputPaths = new List<string>(); // track input dirs/files for auto-discovery
-// Each input group = one .app or directory that should be compiled as a separate AL compilation
-var inputGroups = new List<(string Path, List<string> Sources)>();
+// Parse arguments into PipelineOptions
+var options = new AlRunner.PipelineOptions();
 
 int argIdx = 0;
 while (argIdx < args.Length)
@@ -70,601 +63,80 @@ while (argIdx < args.Length)
     switch (args[argIdx])
     {
         case "--dump-csharp":
-            dumpCSharp = true;
+            options.DumpCSharp = true;
             argIdx++;
             break;
         case "--dump-rewritten":
-            dumpRewritten = true;
+            options.DumpRewritten = true;
             argIdx++;
             break;
         case "--guide":
             PrintGuide();
             return 0;
+        case "--server":
+        {
+            var server = new AlRunner.AlRunnerServer();
+            await server.RunAsync(Console.In, Console.Out);
+            return 0;
+        }
         case "--coverage":
-            showCoverage = true;
+            options.ShowCoverage = true;
+            argIdx++;
+            break;
+        case "--output-json":
+            options.OutputJson = true;
+            argIdx++;
+            break;
+        case "--capture-values":
+            options.CaptureValues = true;
+            argIdx++;
+            break;
+        case "--run":
+            argIdx++;
+            if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --run requires a procedure name"); return 1; }
+            options.RunProcedure = args[argIdx];
             argIdx++;
             break;
         case "--verbose":
         case "-v":
-            verbose = true;
-            Log.Verbose = true;
+            options.Verbose = true;
             argIdx++;
             break;
         case "--stubs":
             argIdx++;
             if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --stubs requires a directory argument"); return 1; }
-            var stubPath = Path.GetFullPath(args[argIdx]);
-            if (!Directory.Exists(stubPath)) { Console.Error.WriteLine($"Error: stubs directory not found: {stubPath}"); return 1; }
-            stubPaths.Add(stubPath);
-            Log.HasStubs = true;
-            // Load stub AL files — these replace matching source objects
-            var stubFiles = Directory.GetFiles(stubPath, "*.al", SearchOption.AllDirectories).OrderBy(f => f).ToList();
-            Log.Info($"Loading {stubFiles.Count} stub files from {stubPath}");
-            foreach (var sf in stubFiles)
-            {
-                var stubSrc = File.ReadAllText(sf);
-                stubSources.Add(stubSrc);
-            }
+            options.StubPaths.Add(Path.GetFullPath(args[argIdx]));
             argIdx++;
             break;
         case "--packages":
             argIdx++;
             if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --packages requires a directory argument"); return 1; }
-            var pkgPath = Path.GetFullPath(args[argIdx]);
-            if (!Directory.Exists(pkgPath)) { Console.Error.WriteLine($"Error: packages directory not found: {pkgPath}"); return 1; }
-            packagePaths.Add(pkgPath);
+            options.PackagePaths.Add(Path.GetFullPath(args[argIdx]));
             argIdx++;
             break;
         case "-e":
             argIdx++;
             if (argIdx >= args.Length) { Console.Error.WriteLine("Error: -e requires an argument"); return 1; }
-            var inlineCode = args[argIdx];
-            // Auto-wrap bare AL statements in a codeunit
-            if (!inlineCode.TrimStart().StartsWith("codeunit", StringComparison.OrdinalIgnoreCase) &&
-                !inlineCode.TrimStart().StartsWith("table", StringComparison.OrdinalIgnoreCase))
-            {
-                inlineCode = $"codeunit 99 __Inline {{ trigger OnRun() begin {inlineCode} end; }}";
-            }
-            alSources.Add(inlineCode);
+            options.InlineCode = args[argIdx];
             argIdx++;
             break;
         default:
-            var path = args[argIdx];
-            if (path.EndsWith(".app", StringComparison.OrdinalIgnoreCase) && File.Exists(path))
-            {
-                // Extract AL source files from .app package (ZIP archive)
-                var extracted = AppPackageReader.ExtractAlSources(path);
-                if (extracted.Count == 0)
-                {
-                    Console.Error.WriteLine($"Error: no .al files found in app package {path}");
-                    return 1;
-                }
-                Log.Info($"Loading {extracted.Count} AL files from {Path.GetFileName(path)}");
-                var groupSources = new List<string>();
-                foreach (var (name, source) in extracted)
-                {
-                    Log.Info($"  {name}");
-                    alSources.Add(source);
-                    groupSources.Add(source);
-                }
-                var fullPath = Path.GetFullPath(path);
-                inputPaths.Add(fullPath);
-                inputGroups.Add((fullPath, groupSources));
-            }
-            else if (Directory.Exists(path))
-            {
-                // Load all .al files from directory
-                var alFiles = Directory.GetFiles(path, "*.al", SearchOption.AllDirectories)
-                    .OrderBy(f => f) // deterministic order
-                    .ToList();
-                if (alFiles.Count == 0)
-                {
-                    Console.Error.WriteLine($"Error: no .al files found in directory {path}");
-                    return 1;
-                }
-                Log.Info($"Loading {alFiles.Count} AL files from {path}");
-                var groupSources = new List<string>();
-                foreach (var f in alFiles)
-                {
-                    Log.Info($"  {Path.GetFileName(f)}");
-                    var src = File.ReadAllText(f);
-                    alSources.Add(src);
-                    groupSources.Add(src);
-                }
-                var fullPath = Path.GetFullPath(path);
-                inputPaths.Add(fullPath);
-                inputGroups.Add((fullPath, groupSources));
-            }
-            else if (File.Exists(path))
-            {
-                var src = File.ReadAllText(path);
-                alSources.Add(src);
-                var fullPath = Path.GetFullPath(Path.GetDirectoryName(path)!);
-                inputPaths.Add(fullPath);
-                inputGroups.Add((fullPath, new List<string> { src }));
-            }
-            else
-            {
-                Console.Error.WriteLine($"Error: file or directory not found: {path}");
-                return 1;
-            }
+            options.InputPaths.Add(args[argIdx]);
             argIdx++;
             break;
     }
 }
 
-if (alSources.Count == 0)
-{
-    Console.Error.WriteLine("Error: no AL source provided");
-    return 1;
-}
+var pipeline = new AlRunner.AlRunnerPipeline();
+var result = pipeline.Run(options);
 
-// ---------------------------------------------------------------------------
-// Auto-discover dependency .app files from --packages directories.
-// Reads the NavxManifest.xml of each input .app to find dependencies,
-// then recursively finds matching .app files in the package directories
-// and adds them as additional input groups for transpilation.
-// ---------------------------------------------------------------------------
-if (packagePaths.Count > 0 && inputGroups.Any(g => g.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase)))
-{
-    // Build index: app GUID -> .app file path from all package directories
-    var appIndex = new Dictionary<Guid, string>();
-    foreach (var pkgDir in packagePaths)
-    {
-        foreach (var appFile in Directory.GetFiles(pkgDir, "*.app", SearchOption.AllDirectories))
-        {
-            try
-            {
-                var doc = AlTranspiler.LoadNavxManifest(appFile);
-                if (doc == null) continue;
-                XNamespace ns = "http://schemas.microsoft.com/navx/2015/manifest";
-                var appElement = doc.Root?.Element(ns + "App");
-                var idStr = appElement?.Attribute("Id")?.Value;
-                if (idStr != null && Guid.TryParse(idStr, out var appGuid))
-                {
-                    // Prefer non-test apps (Source over Test) by not overwriting
-                    if (!appIndex.ContainsKey(appGuid))
-                        appIndex[appGuid] = appFile;
-                }
-            }
-            catch { /* skip unreadable .app files */ }
-        }
-    }
+// Forward captured output to actual console
+if (!string.IsNullOrEmpty(result.StdOut))
+    Console.Write(result.StdOut);
+if (!string.IsNullOrEmpty(result.StdErr))
+    Console.Error.Write(result.StdErr);
 
-    // Collect GUIDs of apps already provided as inputs
-    var inputAppGuids = new HashSet<Guid>();
-    foreach (var group in inputGroups)
-    {
-        if (!group.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase)) continue;
-        try
-        {
-            var doc = AlTranspiler.LoadNavxManifest(group.Path);
-            if (doc == null) continue;
-            XNamespace ns = "http://schemas.microsoft.com/navx/2015/manifest";
-            var idStr = doc.Root?.Element(ns + "App")?.Attribute("Id")?.Value;
-            if (idStr != null && Guid.TryParse(idStr, out var appGuid))
-                inputAppGuids.Add(appGuid);
-        }
-        catch { }
-    }
-
-    // Resolve dependencies transitively
-    var toProcess = new Queue<Guid>();
-    var discovered = new HashSet<Guid>(inputAppGuids);
-
-    // Seed: deps of all input apps
-    foreach (var group in inputGroups)
-    {
-        if (!group.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase)) continue;
-        foreach (var depGuid in AlTranspiler.GetDependencyGuids(group.Path))
-        {
-            if (discovered.Add(depGuid))
-                toProcess.Enqueue(depGuid);
-        }
-    }
-
-    // BFS to find transitive deps
-    var autoDiscovered = new List<(Guid Id, string Path)>();
-    while (toProcess.Count > 0)
-    {
-        var depGuid = toProcess.Dequeue();
-        if (!appIndex.TryGetValue(depGuid, out var depAppPath)) continue;
-        autoDiscovered.Add((depGuid, depAppPath));
-
-        // Also resolve this dep's dependencies
-        foreach (var transDepGuid in AlTranspiler.GetDependencyGuids(depAppPath))
-        {
-            if (discovered.Add(transDepGuid))
-                toProcess.Enqueue(transDepGuid);
-        }
-    }
-
-    // Add discovered deps as input groups
-    if (autoDiscovered.Count > 0)
-    {
-        Log.Info($"\nAuto-discovered {autoDiscovered.Count} dependency app(s) for transpilation:");
-        foreach (var (id, depPath) in autoDiscovered)
-        {
-            var fileName = Path.GetFileName(depPath);
-            Log.Info($"  {fileName}");
-
-            var extracted = AppPackageReader.ExtractAlSources(depPath);
-            if (extracted.Count == 0) continue;
-
-            var groupSources = new List<string>();
-            foreach (var (name, source) in extracted)
-            {
-                alSources.Add(source);
-                groupSources.Add(source);
-            }
-            var fullPath = Path.GetFullPath(depPath);
-            inputPaths.Add(fullPath);
-            inputGroups.Add((fullPath, groupSources));
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Step 0: Register kernel32 shim (needed for BC DLLs on Linux)
-// ---------------------------------------------------------------------------
-Timer.StartStage("Kernel32 shim");
-Kernel32Shim.EnsureRegistered();
-Timer.EndStage("Kernel32 shim");
-
-// ---------------------------------------------------------------------------
-// Auto-include AL stubs (e.g., Library Assert) from the stubs/ directory
-// These provide AL declarations for runtime-mocked codeunits so user code compiles.
-// ---------------------------------------------------------------------------
-{
-    // Skip stubs if the packages already contain the real Assert codeunit
-    bool packagesHaveAssert = packagePaths.Any(p =>
-        Directory.Exists(p) &&
-        Directory.GetFiles(p, "*.app", SearchOption.AllDirectories)
-            .Any(f => Path.GetFileName(f).Contains("Assert", StringComparison.OrdinalIgnoreCase) ||
-                       Path.GetFileName(f).Contains("TestLibraries", StringComparison.OrdinalIgnoreCase)));
-    // Also check .alpackages directories discovered from input paths
-    if (!packagesHaveAssert)
-    {
-        foreach (var ip in inputPaths)
-        {
-            var dir = Directory.Exists(ip) ? ip : Path.GetDirectoryName(ip);
-            while (dir != null)
-            {
-                var alPkgs = Path.Combine(dir, ".alpackages");
-                if (Directory.Exists(alPkgs) &&
-                    Directory.GetFiles(alPkgs, "*.app", SearchOption.AllDirectories)
-                        .Any(f => Path.GetFileName(f).Contains("Assert", StringComparison.OrdinalIgnoreCase)))
-                {
-                    packagesHaveAssert = true;
-                    break;
-                }
-                var parent = Path.GetDirectoryName(dir);
-                if (parent == dir) break;
-                dir = parent;
-            }
-            if (packagesHaveAssert) break;
-        }
-    }
-
-    if (!packagesHaveAssert)
-    {
-        var stubsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "stubs");
-        if (!Directory.Exists(stubsDir))
-            stubsDir = Path.Combine(AppContext.BaseDirectory, "stubs");
-        if (Directory.Exists(stubsDir))
-        {
-            Log.Info("Loading Assert stubs (no Assert.app found in packages)");
-            foreach (var stubFile in Directory.GetFiles(stubsDir, "*.al", SearchOption.TopDirectoryOnly).OrderBy(f => f))
-            {
-                var src = File.ReadAllText(stubFile);
-                alSources.Add(src);
-                foreach (var group in inputGroups)
-                    group.Sources.Add(src);
-            }
-        }
-    }
-    else
-    {
-        // When Assert.app is in packages, we still need the stub's transpiled C# in
-        // the Roslyn compilation so that Codeunit130 exists in the final assembly.
-        // FindAssertMethodName() relies on inspecting the Codeunit130 nested scope
-        // classes to distinguish IsTrue from IsFalse, AreEqual from AreNotEqual, etc.
-        // We load the stub AL code into a separate list that gets transpiled and added
-        // to the C# compilation, but NOT to the AL sources (which would conflict with
-        // the Assert.app symbols).
-        var stubsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "stubs");
-        if (!Directory.Exists(stubsDir))
-            stubsDir = Path.Combine(AppContext.BaseDirectory, "stubs");
-        if (Directory.Exists(stubsDir))
-        {
-            foreach (var stubFile in Directory.GetFiles(stubsDir, "*.al", SearchOption.TopDirectoryOnly).OrderBy(f => f))
-                assertStubSources.Add(File.ReadAllText(stubFile));
-        }
-        Log.Info("Skipping Assert stubs for AL compilation (real Assert.app found in packages)");
-    }
-}
-
-Timer.StartStage("AL transpilation");
-// ---------------------------------------------------------------------------
-// Step 1: Transpile AL -> C#
-// When --packages is specified and there are multiple input groups (e.g. multiple .app files),
-// each group is transpiled as its own AL compilation to avoid ambiguous reference errors.
-// Other groups act as additional symbol references for each compilation.
-// ---------------------------------------------------------------------------
-List<(string Name, string Code)>? generatedCSharpList;
-
-// --stubs: replace matching source objects with stub versions.
-// Stubs that match source objects are compiled in place of the originals.
-// Stubs that DON'T match source objects (e.g., dependency stubs like Library - ERM)
-// are compiled separately and merged at the C# level to avoid package conflicts.
-var separateStubSources = new List<string>();
-if (stubSources.Count > 0)
-{
-    var stubObjectIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    foreach (var stub in stubSources)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(stub,
-            @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (match.Success)
-            stubObjectIds.Add(match.Value.ToLowerInvariant());
-    }
-
-    // Partition stubs: those matching source objects replace them inline;
-    // those not matching any source are compiled separately.
-    foreach (var stub in stubSources)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(stub,
-            @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (!match.Success) { separateStubSources.Add(stub); continue; }
-
-        var stubId = match.Value.ToLowerInvariant();
-        bool foundInSource = alSources.Any(src =>
-        {
-            var srcMatch = System.Text.RegularExpressions.Regex.Match(src,
-                @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return srcMatch.Success && srcMatch.Value.ToLowerInvariant() == stubId;
-        });
-
-        if (foundInSource)
-        {
-            // Replace matching source with stub
-            alSources.RemoveAll(src =>
-            {
-                var srcMatch = System.Text.RegularExpressions.Regex.Match(src,
-                    @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                return srcMatch.Success && srcMatch.Value.ToLowerInvariant() == stubId;
-            });
-            alSources.Add(stub);
-            Log.Info($"Stub replaces source object: {stubId}");
-        }
-        else
-        {
-            // Dependency stub — compile separately to avoid package conflicts
-            separateStubSources.Add(stub);
-            Log.Info($"Stub for dependency object: {stubId} (compiled separately)");
-        }
-    }
-}
-
-bool hasExplicitPackages = packagePaths.Count > 0;
-// Multi-app mode only when inputs are .app files (not source directories).
-// Source directories should compile together so internal procedures are visible.
-bool hasAppInputs = inputGroups.Any(g => g.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase));
-if (hasExplicitPackages && inputGroups.Count > 1 && hasAppInputs)
-{
-    // Multi-app mode: transpile each input group separately
-    generatedCSharpList = new List<(string Name, string Code)>();
-    for (int gi = 0; gi < inputGroups.Count; gi++)
-    {
-        var group = inputGroups[gi];
-        Log.Info($"\n--- Transpiling group {gi + 1}/{inputGroups.Count}: {Path.GetFileName(group.Path)} ---");
-
-        // Other input groups' .app files act as additional package paths for this group
-        var groupPackagePaths = new List<string>(packagePaths);
-        for (int oi = 0; oi < inputGroups.Count; oi++)
-        {
-            if (oi == gi) continue;
-            var otherPath = inputGroups[oi].Path;
-            // If it's a .app file, add its parent directory as a package path
-            if (otherPath.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
-            {
-                var parentDir = Path.GetDirectoryName(otherPath)!;
-                if (!groupPackagePaths.Contains(parentDir))
-                    groupPackagePaths.Add(parentDir);
-            }
-            else
-            {
-                // It's a directory — check if it has .alpackages or .app files
-                if (!groupPackagePaths.Contains(otherPath))
-                    groupPackagePaths.Add(otherPath);
-            }
-        }
-
-        var groupInputPaths = new List<string> { group.Path };
-        var groupResult = AlTranspiler.TranspileMulti(group.Sources, groupPackagePaths, groupInputPaths);
-        if (groupResult != null && groupResult.Count > 0)
-        {
-            Log.Info($"  Transpiled {groupResult.Count} AL objects");
-            generatedCSharpList.AddRange(groupResult);
-        }
-        else
-        {
-            Console.Error.WriteLine($"  Warning: no C# generated for {Path.GetFileName(group.Path)}");
-        }
-    }
-
-    if (generatedCSharpList.Count == 0)
-    {
-        Console.Error.WriteLine("Error: no C# code generated from any input group");
-        return 1;
-    }
-}
-else
-{
-    // Single-compilation mode: all sources compiled together
-    generatedCSharpList = AlTranspiler.TranspileMulti(alSources, packagePaths, inputPaths);
-    if (generatedCSharpList == null || generatedCSharpList.Count == 0)
-        return 1;
-}
-
-// Compile dependency stubs separately — these provide source for objects that exist
-// only in .app packages. Compiling them separately avoids BC compiler conflicts
-// with the package that already defines the object.
-if (separateStubSources.Count > 0)
-{
-    var depStubCSharp = AlTranspiler.TranspileMulti(separateStubSources, packagePaths, inputPaths);
-    if (depStubCSharp != null && depStubCSharp.Count > 0)
-    {
-        generatedCSharpList.AddRange(depStubCSharp);
-        Log.Info($"Added {depStubCSharp.Count} dependency stub(s) for runtime dispatch");
-    }
-}
-
-// If Assert stubs were loaded separately (Assert.app found in packages), transpile
-// them now and add to the C# list. The stub provides Codeunit130 type so that
-// FindAssertMethodName() can resolve method names (IsTrue vs IsFalse, etc.) at runtime.
-if (assertStubSources.Count > 0)
-{
-    var stubCSharp = AlTranspiler.TranspileMulti(assertStubSources, packagePaths, inputPaths);
-    if (stubCSharp != null)
-    {
-        generatedCSharpList.AddRange(stubCSharp);
-        Log.Info($"Added {stubCSharp.Count} Assert stub(s) for runtime dispatch");
-    }
-}
-
-Log.Info($"\nTranspiled {generatedCSharpList.Count} AL objects to C#");
-
-if (dumpCSharp)
-{
-    foreach (var (name, code) in generatedCSharpList)
-    {
-        Console.WriteLine($"=== Generated C# for {name} (before rewriting) ===");
-        Console.WriteLine(code);
-        Console.WriteLine($"=== End {name} ===\n");
-    }
-}
-
-Timer.EndStage("AL transpilation");
-Timer.StartStage("Roslyn rewriting");
-// ---------------------------------------------------------------------------
-// Step 2: Rewrite C# for standalone execution (parallel, returning SyntaxTrees)
-//         Also start loading MetadataReferences in parallel since they are
-//         independent of the rewritten source code.
-// ---------------------------------------------------------------------------
-var refsTask = System.Threading.Tasks.Task.Run(() => RoslynCompiler.LoadReferences());
-
-var rewrittenTrees = new (string Name, Microsoft.CodeAnalysis.SyntaxTree Tree)[generatedCSharpList.Count];
-System.Threading.Tasks.Parallel.For(0, generatedCSharpList.Count, i =>
-{
-    var (name, code) = generatedCSharpList[i];
-    rewrittenTrees[i] = (name, RoslynRewriter.RewriteToTree(code));
-});
-var rewrittenTreeList = rewrittenTrees.ToList();
-
-// Lazily convert rewritten trees to string form (only needed for dump/debug/mapper)
-List<(string Name, string Code)>? _rewrittenStringList = null;
-List<(string Name, string Code)> GetRewrittenStrings()
-{
-    if (_rewrittenStringList == null)
-    {
-        _rewrittenStringList = rewrittenTreeList
-            .Select(t => (t.Name, t.Tree.GetRoot().ToFullString()))
-            .ToList();
-    }
-    return _rewrittenStringList;
-}
-
-if (dumpRewritten)
-{
-    foreach (var (name, code) in GetRewrittenStrings())
-    {
-        Console.WriteLine($"=== Rewritten C# for {name} ===");
-        Console.WriteLine(code);
-        Console.WriteLine($"=== End {name} ===\n");
-    }
-}
-
-Timer.EndStage("Roslyn rewriting");
-Timer.StartStage("Roslyn compilation");
-// ---------------------------------------------------------------------------
-// Step 3: Build AL source line mapping (in parallel) and compile rewritten C#
-// ---------------------------------------------------------------------------
-// SourceLineMapper needs string form; compilation needs trees.
-// Run them concurrently since they are independent.
-var mapperTask = System.Threading.Tasks.Task.Run(() =>
-    SourceLineMapper.Build(generatedCSharpList, GetRewrittenStrings()));
-var preloadedRefs = refsTask.Result;
-var assembly = RoslynCompiler.Compile(rewrittenTreeList, preloadedRefs);
-mapperTask.Wait(); // Ensure mapper finishes before we use diagnostics
-if (assembly == null)
-{
-    // Dump rewritten C# for debugging if verbose
-    if (!dumpRewritten && verbose)
-    {
-        Console.Error.WriteLine("\n--- Rewritten C# (for debugging compilation failure) ---");
-        foreach (var (name, code) in GetRewrittenStrings())
-        {
-            Console.Error.WriteLine($"=== {name} ===");
-            Console.Error.WriteLine(code);
-        }
-    }
-    return 1;
-}
-
-Timer.EndStage("Roslyn compilation");
-Timer.StartStage("Test execution");
-// ---------------------------------------------------------------------------
-// Step 4: Detect mode and execute
-// ---------------------------------------------------------------------------
-// Set current assembly for cross-codeunit calls
-AlRunner.Runtime.MockCodeunitHandle.CurrentAssembly = assembly;
-
-// Register total statement count for coverage tracking
-Executor.RegisterStatements(GetRewrittenStrings());
-
-// Auto-detect test codeunits: check if any AL source contains "Subtype = Test"
-bool hasTests = alSources.Any(s => s.Contains("Subtype = Test"));
-
-int exitCode;
-if (hasTests)
-{
-    exitCode = Executor.RunTests(assembly);
-    if (showCoverage)
-    {
-        Executor.PrintCoverageReport();
-
-        // Write Cobertura XML for editor/CI integration
-        var sourceSpans = CoverageReport.ParseSourceSpans(generatedCSharpList!);
-        var (hitStmts, totalStmts) = AlRunner.Runtime.AlScope.GetCoverageSets();
-
-        // Collect AL source file paths for file mapping
-        var alFilePaths = new List<string>();
-        foreach (var inputPath in inputPaths)
-        {
-            if (Directory.Exists(inputPath))
-                alFilePaths.AddRange(Directory.GetFiles(inputPath, "*.al", SearchOption.AllDirectories));
-            else if (File.Exists(inputPath))
-                alFilePaths.Add(inputPath);
-        }
-
-        var objectToFile = CoverageReport.MapObjectsToFiles(generatedCSharpList!, alFilePaths);
-        CoverageReport.WriteCobertura("cobertura.xml", sourceSpans, hitStmts, totalStmts, objectToFile);
-        Log.Info("Coverage report: cobertura.xml");
-    }
-}
-else
-{
-    exitCode = Executor.RunOnRun(assembly);
-}
-
-Timer.EndStage("Test execution");
-Timer.Print();
-return exitCode;
+return result.ExitCode;
 
 void PrintGuide()
 {
@@ -2143,7 +1615,7 @@ public static class Executor
         }
     }
 
-    public static int RunTests(Assembly assembly)
+    public static List<AlRunner.TestResult> RunTests(Assembly assembly, bool captureValues = false, string? runProcedure = null)
     {
         // Find test methods using [NavTest] attribute on the parent method,
         // then find the corresponding _Scope_ nested class.
@@ -2179,9 +1651,19 @@ public static class Executor
             }
         }
 
+        // Filter to a single procedure if requested
+        if (runProcedure != null)
+        {
+            testScopes = testScopes.Where(t =>
+                t.TestName.Equals(runProcedure, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
         if (testScopes.Count == 0)
         {
-            Console.Error.WriteLine("Error: No test methods found in the generated code.");
+            var msg = runProcedure != null
+                ? $"Error: Procedure '{runProcedure}' not found in the generated code."
+                : "Error: No test methods found in the generated code.";
+            Console.Error.WriteLine(msg);
             Log.Info("Available types:");
             foreach (var t in assembly.GetTypes())
             {
@@ -2189,12 +1671,10 @@ public static class Executor
                 foreach (var n in t.GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public))
                     Log.Info($"    {n.Name}");
             }
-            return 1;
+            return new List<AlRunner.TestResult>();
         }
 
-        int passed = 0;
-        int failed = 0;
-        int errors = 0;
+        var results = new List<AlRunner.TestResult>();
 
         foreach (var (testName, scopeType, parentType) in testScopes)
         {
@@ -2235,17 +1715,29 @@ public static class Executor
                     BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
                 if (onRunMethod == null)
                 {
-                    Console.WriteLine($"FAIL  {testName}");
-                    Console.WriteLine($"      OnRun() method not found on {scopeType.Name}");
-                    failed++;
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Fail,
+                        Message = $"OnRun() method not found on {scopeType.Name}"
+                    });
                     continue;
                 }
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 onRunMethod.Invoke(scope, null);
                 sw.Stop();
-                Console.WriteLine($"PASS  {testName} ({sw.ElapsedMilliseconds}ms)");
-                passed++;
+
+                // Capture variable values from scope fields if enabled
+                if (captureValues)
+                    CaptureFieldValues(scope, scopeType, testName);
+
+                results.Add(new AlRunner.TestResult
+                {
+                    Name = testName,
+                    Status = AlRunner.TestStatus.Pass,
+                    DurationMs = sw.ElapsedMilliseconds
+                });
             }
             catch (TargetInvocationException ex)
             {
@@ -2255,54 +1747,109 @@ public static class Executor
 
                 if (inner is NotSupportedException)
                 {
-                    // Unsupported feature — runner cannot execute
-                    Console.WriteLine($"ERROR {testName}");
-                    Console.WriteLine($"      {inner!.GetType().Name}: {inner.Message}");
-                    Console.WriteLine($"      Inject this dependency via an AL interface.");
-                    PrintStackFrames(inner, parentType.Name, testName);
-                    errors++;
-                }
-                else if (inner is AlRunner.Runtime.AssertException)
-                {
-                    // Assertion failure — real test failure
-                    Console.WriteLine($"FAIL  {testName}");
-                    Console.WriteLine($"      {inner!.Message}");
-                    PrintStackFrames(inner, parentType.Name, testName);
-                    failed++;
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Error,
+                        Message = $"{inner!.GetType().Name}: {inner.Message}",
+                        StackTrace = FormatStackFrames(inner)
+                    });
                 }
                 else
                 {
-                    Console.WriteLine($"FAIL  {testName}");
-                    Console.WriteLine($"      {inner!.Message}");
-                    PrintStackFrames(inner, parentType.Name, testName);
-                    failed++;
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Fail,
+                        Message = inner!.Message,
+                        StackTrace = FormatStackFrames(inner)
+                    });
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"FAIL  {testName}");
-                Console.WriteLine($"      {ex.Message}");
-                PrintStackFrames(ex, parentType.Name, testName);
-                failed++;
+                results.Add(new AlRunner.TestResult
+                {
+                    Name = testName,
+                    Status = AlRunner.TestStatus.Fail,
+                    Message = ex.Message,
+                    StackTrace = FormatStackFrames(ex)
+                });
             }
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"Results: {passed} passed, {failed} failed, {errors} errors, {passed + failed + errors} total");
-        return (failed + errors) > 0 ? 1 : 0;
+        return results;
     }
 
-    private static void PrintStackFrames(Exception ex, string parentTypeName, string testName)
+    /// <summary>Print human-readable test results to console.</summary>
+    public static void PrintResults(List<AlRunner.TestResult> results)
+    {
+        foreach (var r in results)
+        {
+            switch (r.Status)
+            {
+                case AlRunner.TestStatus.Pass:
+                    Console.WriteLine($"PASS  {r.Name} ({r.DurationMs}ms)");
+                    break;
+                case AlRunner.TestStatus.Fail:
+                    Console.WriteLine($"FAIL  {r.Name}");
+                    if (r.Message != null) Console.WriteLine($"      {r.Message}");
+                    if (r.StackTrace != null) Console.Write(r.StackTrace);
+                    break;
+                case AlRunner.TestStatus.Error:
+                    Console.WriteLine($"ERROR {r.Name}");
+                    if (r.Message != null) Console.WriteLine($"      {r.Message}");
+                    Console.WriteLine($"      Inject this dependency via an AL interface.");
+                    if (r.StackTrace != null) Console.Write(r.StackTrace);
+                    break;
+            }
+        }
+
+        var passed = results.Count(r => r.Status == AlRunner.TestStatus.Pass);
+        var failed = results.Count(r => r.Status == AlRunner.TestStatus.Fail);
+        var errors = results.Count(r => r.Status == AlRunner.TestStatus.Error);
+        Console.WriteLine();
+        Console.WriteLine($"Results: {passed} passed, {failed} failed, {errors} errors, {passed + failed + errors} total");
+    }
+
+    /// <summary>Compute exit code from test results.</summary>
+    public static int ExitCode(List<AlRunner.TestResult> results)
+    {
+        if (results.Count == 0) return 1;
+        var failedOrError = results.Count(r => r.Status != AlRunner.TestStatus.Pass);
+        return failedOrError > 0 ? 1 : 0;
+    }
+
+    private static void CaptureFieldValues(object scope, Type scopeType, string testName)
+    {
+        foreach (var field in scopeType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
+        {
+            // Skip internal fields
+            if (field.Name.StartsWith("__") || field.Name == "me") continue;
+            // Skip parent codeunit reference
+            if (field.Name == "_parent") continue;
+            // Skip ITreeObject and NavMethodScope internals
+            var typeName = field.FieldType.Name;
+            if (typeName == "ITreeObject" || typeName.StartsWith("NavMethodScope")) continue;
+
+            try
+            {
+                var value = field.GetValue(scope);
+                AlRunner.Runtime.ValueCapture.Capture(testName, field.Name, value, 0);
+            }
+            catch { /* skip fields that can't be read */ }
+        }
+    }
+
+    private static string? FormatStackFrames(Exception ex)
     {
         var frames = ex.StackTrace?.Split('\n')
             .Select(f => f.Trim())
             .Where(f => !string.IsNullOrEmpty(f))
-            .Take(3);
-        if (frames != null)
-        {
-            foreach (var f in frames)
-                Console.WriteLine($"      {f}");
-        }
+            .Take(3)
+            .ToList();
+        if (frames == null || frames.Count == 0) return null;
+        return string.Join("\n", frames.Select(f => $"      {f}")) + "\n";
     }
 
     public static int RunOnRun(Assembly assembly)
