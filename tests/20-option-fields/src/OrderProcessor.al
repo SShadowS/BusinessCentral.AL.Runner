@@ -1,4 +1,4 @@
-codeunit 50120 "Order Processor"
+codeunit 50120 "Order Status Processor"
 {
     procedure CreateOrder(OrderNo: Code[20]; Description: Text[100])
     var

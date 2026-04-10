@@ -3,7 +3,7 @@ codeunit 50920 "Option Field Tests"
     Subtype = Test;
 
     var
-        Processor: Codeunit "Order Processor";
+        Processor: Codeunit "Order Status Processor";
         Assert: Codeunit Assert;
 
     [Test]

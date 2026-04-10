@@ -1,4 +1,4 @@
-codeunit 50112 "Date Formatter"
+codeunit 50212 "Date Formatter"
 {
     procedure FormatDateISO(InputDate: Date): Text
     begin

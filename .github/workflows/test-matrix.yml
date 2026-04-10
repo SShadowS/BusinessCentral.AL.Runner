@@ -61,10 +61,7 @@ jobs:
 
       - name: Run all tests
         run: |
-          EXIT=0
-          for sample in $(ls -d tests/*/src 2>/dev/null | sed 's|tests/||;s|/src||' | grep -v '06-' | sort); do
-            dotnet run --no-build --project AlRunner -- "tests/${sample}/src" "tests/${sample}/test" || EXIT=1
-          done
-          exit $EXIT
+          DIRS=$(ls -d tests/*/src tests/*/test 2>/dev/null | grep -v '06-' | sort)
+          dotnet run --no-build --project AlRunner -- $DIRS
           done
           exit $EXIT
