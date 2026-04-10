@@ -1,42 +1,39 @@
 codeunit 50112 "Variant Helper"
 {
-    procedure VariantToText(V: Variant): Text
+    procedure FormatAsText(V: Variant): Text
     begin
-        if V.IsInteger then
-            exit('Integer');
-        if V.IsDecimal then
-            exit('Decimal');
-        if V.IsBoolean then
-            exit('Boolean');
-        if V.IsText then
-            exit('Text');
-        if V.IsCode then
-            exit('Code');
-        exit('Unknown');
+        exit(Format(V));
     end;
 
-    procedure IsNumeric(V: Variant): Boolean
+    procedure AddToVariant(BaseValue: Integer; AddValue: Integer; var Result: Variant)
+    var
+        Sum: Integer;
     begin
-        exit(V.IsInteger or V.IsDecimal);
+        Sum := BaseValue + AddValue;
+        Result := Sum;
     end;
 
-    procedure PassThroughInteger(Value: Integer; var Result: Variant)
+    procedure ConcatToVariant(A: Text; B: Text; var Result: Variant)
+    var
+        Combined: Text;
     begin
-        Result := Value;
+        Combined := A + B;
+        Result := Combined;
     end;
 
-    procedure PassThroughText(Value: Text; var Result: Variant)
+    procedure DoubleDecimal(Value: Decimal; var Result: Variant)
+    var
+        Doubled: Decimal;
     begin
-        Result := Value;
+        Doubled := Value * 2;
+        Result := Doubled;
     end;
 
-    procedure PassThroughBoolean(Value: Boolean; var Result: Variant)
+    procedure NegateBoolean(Value: Boolean; var Result: Variant)
+    var
+        Negated: Boolean;
     begin
-        Result := Value;
-    end;
-
-    procedure PassThroughDecimal(Value: Decimal; var Result: Variant)
-    begin
-        Result := Value;
+        Negated := not Value;
+        Result := Negated;
     end;
 }

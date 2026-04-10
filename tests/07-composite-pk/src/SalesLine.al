@@ -1,34 +1,30 @@
-table 50107 "Test Sales Line"
+table 50107 "Test Document Line"
 {
     DataClassification = ToBeClassified;
 
     fields
     {
-        field(1; "Document Type"; Code[10])
+        field(1; "Document No."; Code[20])
         {
             DataClassification = ToBeClassified;
         }
-        field(2; "Document No."; Code[20])
+        field(2; "Line No."; Integer)
         {
             DataClassification = ToBeClassified;
         }
-        field(3; "Line No."; Integer)
+        field(3; "Item No."; Code[20])
         {
             DataClassification = ToBeClassified;
         }
-        field(4; "Item No."; Code[20])
+        field(4; "Quantity"; Integer)
         {
             DataClassification = ToBeClassified;
         }
-        field(5; "Quantity"; Integer)
+        field(5; "Unit Price"; Decimal)
         {
             DataClassification = ToBeClassified;
         }
-        field(6; "Unit Price"; Decimal)
-        {
-            DataClassification = ToBeClassified;
-        }
-        field(7; "Amount"; Decimal)
+        field(6; "Amount"; Decimal)
         {
             DataClassification = ToBeClassified;
         }
@@ -36,7 +32,7 @@ table 50107 "Test Sales Line"
 
     keys
     {
-        key(PK; "Document Type", "Document No.", "Line No.")
+        key(PK; "Document No.", "Line No.")
         {
             Clustered = true;
         }

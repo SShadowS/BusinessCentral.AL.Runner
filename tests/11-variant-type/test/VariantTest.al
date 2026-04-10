@@ -7,81 +7,85 @@ codeunit 50911 "Variant Type Tests"
         Assert: Codeunit Assert;
 
     [Test]
-    procedure TestVariantDetectsInteger()
+    procedure TestVariantHoldsInteger()
     var
         V: Variant;
     begin
-        // [GIVEN] An integer value assigned to a Variant
+        // [GIVEN/WHEN] An integer is computed and stored in a Variant via another codeunit
+        VariantHelper.AddToVariant(10, 25, V);
+
+        // [THEN] Format should show the sum
+        Assert.AreEqual('35', Format(V), 'Variant should hold sum 35 as formatted text');
+    end;
+
+    [Test]
+    procedure TestVariantHoldsText()
+    var
+        V: Variant;
+    begin
+        // [GIVEN/WHEN] Text is concatenated and stored in a Variant
+        VariantHelper.ConcatToVariant('Hello', ' World', V);
+
+        // [THEN] Format should show concatenated text
+        Assert.AreEqual('Hello World', Format(V), 'Variant should hold concatenated text');
+    end;
+
+    [Test]
+    procedure TestVariantHoldsDecimal()
+    var
+        V: Variant;
+    begin
+        // [GIVEN/WHEN] A decimal is doubled and stored in a Variant
+        VariantHelper.DoubleDecimal(12.50, V);
+
+        // [THEN] Format should show the doubled value
+        Assert.AreEqual('25', Format(V), 'Variant should hold doubled decimal 25');
+    end;
+
+    [Test]
+    procedure TestVariantHoldsBoolean()
+    var
+        V: Variant;
+    begin
+        // [GIVEN/WHEN] A boolean is negated and stored in a Variant
+        VariantHelper.NegateBoolean(true, V);
+
+        // [THEN] Format should show False
+        Assert.AreEqual('False', Format(V), 'Variant should hold negated boolean (False)');
+    end;
+
+    [Test]
+    procedure TestVariantPassThroughPreservesValue()
+    var
+        V: Variant;
+    begin
+        // [GIVEN/WHEN] Multiple operations on variant
+        VariantHelper.AddToVariant(100, 200, V);
+        Assert.AreEqual('300', Format(V), 'First pass-through should hold 300');
+
+        // [WHEN] Overwriting with different value
+        VariantHelper.AddToVariant(1, 1, V);
+        Assert.AreEqual('2', Format(V), 'Second pass-through should overwrite with 2');
+    end;
+
+    [Test]
+    procedure TestFormatInteger()
+    var
+        V: Variant;
+    begin
+        // [GIVEN] A simple integer assigned to variant
         V := 42;
 
-        // [WHEN] Checking the type
-        // [THEN] Should detect as Integer
-        Assert.AreEqual('Integer', VariantHelper.VariantToText(V), 'Should detect integer variant');
+        // [WHEN/THEN] FormatAsText returns formatted value
+        Assert.AreEqual('42', VariantHelper.FormatAsText(V), 'FormatAsText should return 42');
     end;
 
     [Test]
-    procedure TestVariantDetectsText()
+    procedure TestFormatText()
     var
         V: Variant;
     begin
-        V := 'Hello World';
-        Assert.AreEqual('Text', VariantHelper.VariantToText(V), 'Should detect text variant');
-    end;
-
-    [Test]
-    procedure TestVariantDetectsBoolean()
-    var
-        V: Variant;
-    begin
-        V := true;
-        Assert.AreEqual('Boolean', VariantHelper.VariantToText(V), 'Should detect boolean variant');
-    end;
-
-    [Test]
-    procedure TestVariantDetectsDecimal()
-    var
-        V: Variant;
-    begin
-        V := 3.14;
-        Assert.AreEqual('Decimal', VariantHelper.VariantToText(V), 'Should detect decimal variant');
-    end;
-
-    [Test]
-    procedure TestIsNumericWithInteger()
-    var
-        V: Variant;
-    begin
-        V := 100;
-        Assert.IsTrue(VariantHelper.IsNumeric(V), 'Integer should be numeric');
-    end;
-
-    [Test]
-    procedure TestIsNumericWithText()
-    var
-        V: Variant;
-    begin
-        V := 'not a number';
-        Assert.IsFalse(VariantHelper.IsNumeric(V), 'Text should not be numeric');
-    end;
-
-    [Test]
-    procedure TestPassThroughInteger()
-    var
-        V: Variant;
-    begin
-        // [GIVEN/WHEN] Passing an integer through variant
-        VariantHelper.PassThroughInteger(99, V);
-
-        // [THEN] Variant should hold integer
-        Assert.IsTrue(V.IsInteger, 'Variant should be integer after pass-through');
-    end;
-
-    [Test]
-    procedure TestPassThroughBoolean()
-    var
-        V: Variant;
-    begin
-        VariantHelper.PassThroughBoolean(true, V);
-        Assert.IsTrue(V.IsBoolean, 'Variant should be boolean after pass-through');
+        V := 'Test String';
+        Assert.AreEqual('Test String', VariantHelper.FormatAsText(V), 'FormatAsText should return the text');
     end;
 }

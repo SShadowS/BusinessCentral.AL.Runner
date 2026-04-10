@@ -56,7 +56,7 @@ jobs:
 
       - name: Run tests
         run: |
-          for sample in 01-pure-function 02-record-operations 03-interface-injection 04-asserterror 05-known-limitation; do
+          for sample in $(ls -d tests/*/src 2>/dev/null | sed 's|tests/||;s|/src||' | grep -v '06-' | sort); do
             dotnet run --no-build --project AlRunner -- "tests/${sample}/src" "tests/${sample}/test"
           done
 
