@@ -57,6 +57,7 @@ bool showCoverage = false;
 bool verbose = false;
 var stubPaths = new List<string>();
 var alSources = new List<string>();
+var stubSources = new List<string>(); // --stubs AL sources that replace matching objects
 var assertStubSources = new List<string>(); // Assert stub AL sources to transpile separately when Assert.app is in packages
 var packagePaths = new List<string>();
 var inputPaths = new List<string>(); // track input dirs/files for auto-discovery
@@ -96,16 +97,13 @@ while (argIdx < args.Length)
             if (!Directory.Exists(stubPath)) { Console.Error.WriteLine($"Error: stubs directory not found: {stubPath}"); return 1; }
             stubPaths.Add(stubPath);
             Log.HasStubs = true;
-            // Load stub AL files as source
+            // Load stub AL files — these replace matching source objects
             var stubFiles = Directory.GetFiles(stubPath, "*.al", SearchOption.AllDirectories).OrderBy(f => f).ToList();
             Log.Info($"Loading {stubFiles.Count} stub files from {stubPath}");
             foreach (var sf in stubFiles)
             {
                 var stubSrc = File.ReadAllText(sf);
-                alSources.Add(stubSrc);
-                // Add to all input groups
-                foreach (var g in inputGroups)
-                    g.Sources.Add(stubSrc);
+                stubSources.Add(stubSrc);
             }
             argIdx++;
             break;
@@ -394,6 +392,40 @@ Timer.StartStage("AL transpilation");
 // Other groups act as additional symbol references for each compilation.
 // ---------------------------------------------------------------------------
 List<(string Name, string Code)>? generatedCSharpList;
+
+// --stubs: replace matching source objects with stub versions.
+// Extract object IDs from stubs (e.g., "codeunit 74321" → "74321") and remove
+// matching sources before compilation. Then add stubs to the source list.
+if (stubSources.Count > 0)
+{
+    var stubObjectIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var stub in stubSources)
+    {
+        // Parse "codeunit NNN", "table NNN", etc. from the start of the stub
+        var match = System.Text.RegularExpressions.Regex.Match(stub,
+            @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (match.Success)
+            stubObjectIds.Add(match.Value.ToLowerInvariant());
+    }
+
+    if (stubObjectIds.Count > 0)
+    {
+        // Remove source entries whose object declaration matches a stub
+        int removed = alSources.RemoveAll(src =>
+        {
+            var srcMatch = System.Text.RegularExpressions.Regex.Match(src,
+                @"(?:codeunit|table|page|report|xmlport|query|enum|interface)\s+(\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return srcMatch.Success && stubObjectIds.Contains(srcMatch.Value.ToLowerInvariant());
+        });
+        if (removed > 0)
+            Log.Info($"Stubs replaced {removed} source object(s)");
+    }
+
+    // Add stub sources
+    alSources.AddRange(stubSources);
+}
 
 bool hasExplicitPackages = packagePaths.Count > 0;
 // Multi-app mode only when inputs are .app files (not source directories).

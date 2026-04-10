@@ -61,5 +61,9 @@ jobs:
 
       - name: Run all tests
         run: |
-          DIRS=$(ls -d tests/*/src tests/*/test 2>/dev/null | grep -v '06-' | sort)
+          DIRS=$(ls -d tests/*/src tests/*/test 2>/dev/null | grep -v '06-' | grep -v '39-' | sort)
           dotnet run --no-build --project AlRunner -- $DIRS
+
+      - name: Run stubs test
+        run: |
+          dotnet run --no-build --project AlRunner -- --stubs tests/39-stubs/stubs tests/39-stubs/src tests/39-stubs/test
