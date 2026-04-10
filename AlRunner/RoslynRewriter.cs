@@ -197,7 +197,6 @@ public class RoslynRewriter : CSharpSyntaxRewriter
         // We need to know the enclosing class name for _parent field type.
         bool isScopeClass = false;
         bool isRecordClass = false;
-        bool isPageClass = false;
         string? enclosingClassName = null;
         if (node.BaseList != null)
         {
@@ -206,8 +205,6 @@ public class RoslynRewriter : CSharpSyntaxRewriter
                 var typeText = baseType.Type.ToString();
                 if (typeText == "NavRecord" || typeText == "NavRecordExtension")
                     isRecordClass = true;
-                if (typeText == "NavForm" || typeText == "NavFormExtension")
-                    isPageClass = true;
                 if (typeText.StartsWith("NavMethodScope<") || typeText.StartsWith("NavTriggerMethodScope<")
                     || typeText.StartsWith("NavEventMethodScope<"))
                 {
@@ -370,22 +367,6 @@ public NavValue ALGetRangeMaxSafe(int fieldNo, NavType expectedType) => Rec.ALGe
             visited = visited.WithMembers(visited.Members.AddRange(delegatingMembers));
         }
 
-        // For Page classes: add SaveRecord/Update/SetSelectionFilter/CheckType stubs
-        if (isPageClass)
-        {
-            var pageStubCode = @"
-public void SaveRecord() { }
-public void Update(bool saveRecord) { }
-public void SetSelectionFilter(MockRecordHandle record) { }
-public void CheckType(NavType actual, NavType expected) { }
-";
-            var pageMembers = CSharpSyntaxTree.ParseText(
-                $"class _Temp_ {{ {pageStubCode} }}").GetRoot()
-                .DescendantNodes().OfType<ClassDeclarationSyntax>().First().Members;
-
-            visited = visited.WithMembers(visited.Members.AddRange(pageMembers));
-        }
-
         return visited;
     }
 
@@ -477,8 +458,6 @@ public void CheckType(NavType actual, NavType expected) { }
             // private new NavRecord ParentObject => ...;
             if (name == "ParentObject")
                 return true;
-            // CurrPage: Don't remove — rewrite to MockFormHandle in VisitPropertyDeclaration
-
             // protected override uint[] IndirectPermissionList => ...;
             if (name == "IndirectPermissionList")
                 return true;
@@ -569,26 +548,6 @@ public void CheckType(NavType actual, NavType expected) { }
                             .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)))))
                 .WithInitializer(SyntaxFactory.EqualsValueClause(
                     SyntaxFactory.ParseExpression("new MockRecordHandle(0)")))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
-            return stubProp;
-        }
-
-        // Rewrite CurrPage to return a MockFormHandle(0) stub.
-        // Original: private PageXXX CurrPage => (PageXXX)this;
-        // Rewritten: public MockFormHandle CurrPage { get; } = new MockFormHandle(0);
-        if (name == "CurrPage")
-        {
-            var stubProp = SyntaxFactory.PropertyDeclaration(
-                    SyntaxFactory.ParseTypeName("MockFormHandle"),
-                    SyntaxFactory.Identifier("CurrPage"))
-                .WithModifiers(SyntaxFactory.TokenList(
-                    SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
-                .WithAccessorList(SyntaxFactory.AccessorList(
-                    SyntaxFactory.SingletonList(
-                        SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                            .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)))))
-                .WithInitializer(SyntaxFactory.EqualsValueClause(
-                    SyntaxFactory.ParseExpression("new MockFormHandle(0)")))
                 .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
             return stubProp;
         }
@@ -684,10 +643,6 @@ public void CheckType(NavType actual, NavType expected) { }
         if (text == "NavInterfaceHandle")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockInterfaceHandle"));
 
-        // NavRecordRef -> MockRecordRef (NavRecordRef requires ITreeObject -> NavSession)
-        if (text == "NavRecordRef")
-            return node.WithIdentifier(SyntaxFactory.Identifier("MockRecordRef"));
-
         // NavVariant -> MockVariant (Variant in AL needs Default/ALAssign methods)
         if (text == "NavVariant")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockVariant"));
@@ -718,22 +673,6 @@ public void CheckType(NavType actual, NavType expected) { }
         // NavEventScope -> object (event scope type used for static fields)
         if (text == "NavEventScope")
             return node.WithIdentifier(SyntaxFactory.Identifier("object"));
-
-        // NavTestPageHandle -> MockTestPageHandle (avoid ambiguity with BC runtime type)
-        if (text == "NavTestPageHandle")
-            return node.WithIdentifier(SyntaxFactory.Identifier("MockTestPageHandle"));
-
-        // NavTestFieldHandle -> MockTestFieldHandle
-        if (text == "NavTestFieldHandle")
-            return node.WithIdentifier(SyntaxFactory.Identifier("MockTestFieldHandle"));
-
-        // NavTestActionHandle -> MockTestActionHandle
-        if (text == "NavTestActionHandle")
-            return node.WithIdentifier(SyntaxFactory.Identifier("MockTestActionHandle"));
-
-        // NavFormHandle -> MockFormHandle (page handle requires ITreeObject -> NavSession)
-        if (text == "NavFormHandle")
-            return node.WithIdentifier(SyntaxFactory.Identifier("MockFormHandle"));
 
         return base.VisitIdentifierName(node);
     }
@@ -819,15 +758,6 @@ public void CheckType(NavType actual, NavType expected) { }
             }
         }
 
-        // new MockRecordRef(this, SecurityFiltering.XXX) -> new MockRecordRef()
-        // After identifier replacement, NavRecordRef is now MockRecordRef.
-        // Strip all arguments (ITreeObject and SecurityFiltering) since MockRecordRef is parameterless.
-        if (typeText == "MockRecordRef" && visited.ArgumentList != null &&
-            visited.ArgumentList.Arguments.Count >= 1)
-        {
-            return visited.WithArgumentList(SyntaxFactory.ArgumentList());
-        }
-
         // new MockDialog(this) -> new MockDialog()
         // After identifier replacement, NavDialog is now MockDialog.
         // Strip the ITreeObject 'this' argument.
@@ -838,22 +768,6 @@ public void CheckType(NavType actual, NavType expected) { }
             if (firstArgText == "this")
             {
                 return visited.WithArgumentList(SyntaxFactory.ArgumentList());
-            }
-        }
-
-        // new MockFormHandle(this, pageId) -> new MockFormHandle(pageId)
-        // After identifier replacement, NavFormHandle is now MockFormHandle.
-        // Strip the ITreeObject 'this' argument.
-        if (typeText == "MockFormHandle" && visited.ArgumentList != null &&
-            visited.ArgumentList.Arguments.Count == 2)
-        {
-            var firstArgText = visited.ArgumentList.Arguments[0].Expression.ToString();
-            if (firstArgText == "this")
-            {
-                var pageId = visited.ArgumentList.Arguments[1].Expression;
-                return visited.WithArgumentList(SyntaxFactory.ArgumentList(
-                    SyntaxFactory.SingletonSeparatedList(
-                        SyntaxFactory.Argument(pageId))));
             }
         }
 
@@ -900,22 +814,6 @@ public void CheckType(NavType actual, NavType expected) { }
                     .WithArgumentList(SyntaxFactory.ArgumentList(
                         SyntaxFactory.SingletonSeparatedList(
                             SyntaxFactory.Argument(arrCreate.Initializer.Expressions[0]))));
-            }
-        }
-
-        // new NavTestPageHandle(this, pageId) -> new MockTestPageHandle(pageId)
-        // After identifier replacement, the type is MockTestPageHandle
-        // Strip the ITreeObject 'this' argument from constructor
-        if (typeText == "MockTestPageHandle" && visited.ArgumentList != null &&
-            visited.ArgumentList.Arguments.Count == 2)
-        {
-            var firstArgText = visited.ArgumentList.Arguments[0].Expression.ToString();
-            if (firstArgText == "this")
-            {
-                var pageId = visited.ArgumentList.Arguments[1].Expression;
-                return visited.WithArgumentList(SyntaxFactory.ArgumentList(
-                    SyntaxFactory.SingletonSeparatedList(
-                        SyntaxFactory.Argument(pageId))));
             }
         }
 

@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.Dynamics.Nav.CodeAnalysis;
 using Microsoft.Dynamics.Nav.CodeAnalysis.Diagnostics;
@@ -248,6 +247,29 @@ if (packagePaths.Count > 0 && inputGroups.Any(g => g.Path.EndsWith(".app", Strin
 // Step 0: Register kernel32 shim (needed for BC DLLs on Linux)
 // ---------------------------------------------------------------------------
 Kernel32Shim.EnsureRegistered();
+
+// ---------------------------------------------------------------------------
+// Auto-include AL stubs (e.g., Library Assert) from the stubs/ directory
+// These provide AL declarations for runtime-mocked codeunits so user code compiles.
+// ---------------------------------------------------------------------------
+{
+    var stubsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "stubs");
+    if (!Directory.Exists(stubsDir))
+        stubsDir = Path.Combine(AppContext.BaseDirectory, "stubs");
+    if (Directory.Exists(stubsDir))
+    {
+        foreach (var stubFile in Directory.GetFiles(stubsDir, "*.al", SearchOption.TopDirectoryOnly).OrderBy(f => f))
+        {
+            var src = File.ReadAllText(stubFile);
+            alSources.Add(src);
+            // Add to the first input group (or create one) so stubs compile with all groups
+            if (inputGroups.Count > 0)
+                inputGroups[0].Sources.Add(src);
+            else
+                inputGroups.Add((stubsDir, new List<string> { src }));
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Step 1: Transpile AL -> C#
@@ -1169,6 +1191,7 @@ public static class Executor
 
         int passed = 0;
         int failed = 0;
+        int errors = 0;
 
         foreach (var (testName, scopeType, parentType) in testScopes)
         {
@@ -1208,13 +1231,14 @@ public static class Executor
                     BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
                 if (onRunMethod == null)
                 {
-                    Console.WriteLine($"[FAIL] {testName} - OnRun() method not found");
+                    Console.WriteLine($"FAIL  {testName}");
+                    Console.WriteLine($"      OnRun() method not found on {scopeType.Name}");
                     failed++;
                     continue;
                 }
 
                 onRunMethod.Invoke(scope, null);
-                Console.WriteLine($"[PASS] {testName}");
+                Console.WriteLine($"PASS  {testName}");
                 passed++;
             }
             catch (TargetInvocationException ex)
@@ -1222,25 +1246,57 @@ public static class Executor
                 var inner = ex as Exception;
                 while (inner is TargetInvocationException tie && tie.InnerException != null)
                     inner = tie.InnerException;
-                Console.WriteLine($"[FAIL] {testName} - {inner!.Message}");
-                // Show first few stack frames for debugging
-                var frames = inner.StackTrace?.Split('\n').Take(3);
-                if (frames != null)
-                    foreach (var f in frames) Console.Error.WriteLine($"       {f.Trim()}");
-                failed++;
+
+                if (inner is NotSupportedException)
+                {
+                    // Unsupported feature — runner cannot execute
+                    Console.WriteLine($"ERROR {testName}");
+                    Console.WriteLine($"      {inner!.GetType().Name}: {inner.Message}");
+                    Console.WriteLine($"      Inject this dependency via an AL interface.");
+                    PrintStackFrames(inner, parentType.Name, testName);
+                    errors++;
+                }
+                else if (inner is AlRunner.Runtime.AssertException)
+                {
+                    // Assertion failure — real test failure
+                    Console.WriteLine($"FAIL  {testName}");
+                    Console.WriteLine($"      {inner!.Message}");
+                    PrintStackFrames(inner, parentType.Name, testName);
+                    failed++;
+                }
+                else
+                {
+                    Console.WriteLine($"FAIL  {testName}");
+                    Console.WriteLine($"      {inner!.Message}");
+                    PrintStackFrames(inner, parentType.Name, testName);
+                    failed++;
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FAIL] {testName} - {ex.Message}");
-                var frames = ex.StackTrace?.Split('\n').Take(3);
-                if (frames != null)
-                    foreach (var f in frames) Console.Error.WriteLine($"       {f.Trim()}");
+                Console.WriteLine($"FAIL  {testName}");
+                Console.WriteLine($"      {ex.Message}");
+                PrintStackFrames(ex, parentType.Name, testName);
                 failed++;
             }
         }
 
-        Console.WriteLine($"{passed}/{passed + failed} tests passed");
-        return failed > 0 ? 1 : 0;
+        Console.WriteLine();
+        Console.WriteLine($"Results: {passed} passed, {failed} failed, {errors} errors, {passed + failed + errors} total");
+        return (failed + errors) > 0 ? 1 : 0;
+    }
+
+    private static void PrintStackFrames(Exception ex, string parentTypeName, string testName)
+    {
+        var frames = ex.StackTrace?.Split('\n')
+            .Select(f => f.Trim())
+            .Where(f => !string.IsNullOrEmpty(f))
+            .Take(3);
+        if (frames != null)
+        {
+            foreach (var f in frames)
+                Console.WriteLine($"      {f}");
+        }
     }
 
     public static int RunOnRun(Assembly assembly)
@@ -1340,165 +1396,6 @@ public static class Executor
     }
 }
 
-// ===========================================================================
-// C# Source Rewriter (LEGACY — OUT OF SCOPE — see CLAUDE.md)
-// RegexRewriter is dead code, superseded by RoslynRewriter (AST-based).
-// The regex approach was fragile and broke on edge cases. Kept here only for
-// reference. Stefan will decide whether to delete it.
-// ===========================================================================
-public static class RegexRewriter
-{
-    public static string Rewrite(string csharp)
-    {
-        // Remove BC usings that reference runtime types we don't need
-        // KEEP: Microsoft.Dynamics.Nav.Types (for Decimal18, NavText, etc.)
-        // KEEP: Microsoft.Dynamics.Nav.Runtime (for ALCompiler which is used in generated code)
-        csharp = Regex.Replace(csharp, @"^\s*using Microsoft\.Dynamics\.Nav\.Runtime\.Extensions.*?;\s*$", "", RegexOptions.Multiline);
-        csharp = Regex.Replace(csharp, @"^\s*using Microsoft\.Dynamics\.Nav\.Runtime\.Report.*?;\s*$", "", RegexOptions.Multiline);
-        csharp = Regex.Replace(csharp, @"^\s*using Microsoft\.Dynamics\.Nav\.EventSubscription.*?;\s*$", "", RegexOptions.Multiline);
-        csharp = Regex.Replace(csharp, @"^\s*using Microsoft\.Dynamics\.Nav\.Common\.Language.*?;\s*$", "", RegexOptions.Multiline);
-
-        // Add our runtime using (right after the namespace opening)
-        csharp = Regex.Replace(csharp,
-            @"(namespace\s+\S+\s*\{)",
-            "$1\n    using AlRunner.Runtime;");
-
-        // Remove ALL BC-specific attributes (must do before class manipulation)
-        csharp = Regex.Replace(csharp, @"\s*\[NavCodeunitOptions[^\]]*\]\s*", "\n    ");
-        csharp = Regex.Replace(csharp, @"\s*\[NavFunctionVisibility[^\]]*\]\s*", "\n    ");
-        csharp = Regex.Replace(csharp, @"\s*\[NavCaption[^\]]*\]\s*", "\n    ");
-        csharp = Regex.Replace(csharp, @"\s*\[NavName[^\]]*\]\s*", "\n        ");
-        csharp = Regex.Replace(csharp, @"\s*\[NavTest[^\]]*\]\s*", "\n    ");
-        csharp = Regex.Replace(csharp, @"\s*\[SignatureSpan[^\]]*\]\s*", "\n        ");
-        csharp = Regex.Replace(csharp, @"\s*\[SourceSpans[^\]]*\]\s*", "");
-        csharp = Regex.Replace(csharp, @"\s*\[ReturnValue\]\s*", "\n    ");
-        csharp = Regex.Replace(csharp, @"\[NavObjectId[^\]]*\]", "");
-        csharp = Regex.Replace(csharp, @"\[NavByReferenceAttribute\]", "");
-
-        // Remove base class for codeunit: ": NavCodeunit" or ": NavTestCodeunit"
-        csharp = Regex.Replace(csharp, @"\s*:\s*Nav(?:Test)?Codeunit\b", "");
-
-        // Remove base class for record: ": NavRecord"
-        csharp = Regex.Replace(csharp, @"\s*:\s*NavRecord\b", "");
-
-        // Replace scope base class: ": NavMethodScope<XXX>" or ": NavTriggerMethodScope<XXX>" -> ": AlScope"
-        csharp = Regex.Replace(csharp, @":\s*Nav(?:Trigger)?MethodScope<\w+>", ": AlScope");
-
-        // Replace NavDialog.ALMessage(this.Session, System.Guid.Parse("..."), format, args...)
-        csharp = Regex.Replace(csharp,
-            @"NavDialog\.ALMessage\(this\.Session,\s*System\.Guid\.Parse\(""[^""]*""\),\s*",
-            "AlDialog.Message(");
-
-        // Replace NavDialog.ALError(this.Session, System.Guid.Parse("..."), format, args...)
-        csharp = Regex.Replace(csharp,
-            @"NavDialog\.ALError\(this\.Session,\s*System\.Guid\.Parse\(""[^""]*""\),\s*",
-            "AlDialog.Error(");
-
-        // Remove StmtHit(n); lines
-        csharp = Regex.Replace(csharp, @"^\s*StmtHit\(\d+\);\s*$", "", RegexOptions.Multiline);
-
-        // Replace CStmtHit(n) with true
-        csharp = Regex.Replace(csharp, @"CStmtHit\(\d+\)", "true");
-
-        // Remove constructor: public CodeunitXXX(ITreeObject parent) : base(parent, NNNNN) { ... }
-        csharp = Regex.Replace(csharp,
-            @"\s*public \w+\(ITreeObject parent\)\s*:\s*base\(parent,\s*\d+\)\s*\{[^}]*\}",
-            "");
-
-        // Remove Record constructor: public RecordXXX(ITreeObject parent, NCLMetaTable ...) : base(...) { ... }
-        csharp = Regex.Replace(csharp,
-            @"\s*public \w+\(ITreeObject parent,\s*NCLMetaTable[^)]*\)\s*:\s*base\([^)]*\)\s*\{[^}]*\}",
-            "");
-
-        // Remove __Construct methods (both codeunit and record variants)
-        csharp = Regex.Replace(csharp,
-            @"\s*public static \w+ __Construct\([^)]*\)\s*\{[^}]*\}",
-            "");
-
-        // Remove OnInvoke method
-        csharp = Regex.Replace(csharp,
-            @"\s*protected override object OnInvoke\(int memberId, object\[\] args\)\s*\{.*?\n\s*return default;\s*\}",
-            "",
-            RegexOptions.Singleline);
-
-        // Remove ObjectName and IsCompiledForOnPremise overrides
-        csharp = Regex.Replace(csharp, @"\s*public override string ObjectName\s*=>\s*""[^""]*"";", "");
-        csharp = Regex.Replace(csharp, @"\s*public override bool IsCompiledForOnPremise\s*=>\s*\w+;", "");
-
-        // Remove Rec and xRec properties on record classes
-        csharp = Regex.Replace(csharp, @"\s*private \w+ Rec\s*=>.*?;", "");
-        csharp = Regex.Replace(csharp, @"\s*private \w+ xRec\s*=>.*?;", "");
-
-        // Remove the OnRun(INavRecordHandle) method on the codeunit class (not the scope's OnRun())
-        // The codeunit's OnRun has parameters; the scope's OnRun() has none.
-        csharp = Regex.Replace(csharp,
-            @"\s*protected override void OnRun\([^\)]+\)\s*\{[^}]*\}",
-            "");
-
-        // Remove scope RawScopeId property
-        csharp = Regex.Replace(csharp,
-            @"\s*protected override uint RawScopeId\s*\{[^}]*\}",
-            "");
-
-        // Remove static αscopeId field
-        csharp = Regex.Replace(csharp, @"\s*public static uint \u03b1scopeId;", "");
-
-        // Rewrite scope constructors: remove ": base(...)" call but keep body
-        csharp = Regex.Replace(csharp,
-            @"(internal \w+\([^)]*\))\s*:\s*base\([^)]*\)\s*(\{[^}]*\})",
-            "$1 $2");
-
-        // Replace ALCompiler.ToNavValue -> AlCompat.ToNavValue ONLY for simple Message/Error scenarios
-        // For multi-object projects, ALCompiler.ToNavValue returns NavValue which is needed by SetFieldValueSafe.
-        // We keep ALCompiler calls when BC service tier DLLs are available.
-        // Only replace if the code doesn't use NavRecord/INavRecordHandle (i.e., simple codeunits only)
-        if (!csharp.Contains("INavRecordHandle") && !csharp.Contains("NavRecord"))
-        {
-            csharp = csharp.Replace("ALCompiler.ToNavValue(", "AlCompat.ToNavValue(");
-            csharp = csharp.Replace("ALCompiler.ObjectToDecimal(", "AlCompat.ObjectToDecimal(");
-        }
-
-        // Replace ALCompiler.ObjectToExactINavRecordHandle -> cast
-        csharp = Regex.Replace(csharp,
-            @"ALCompiler\.ObjectToExactINavRecordHandle\(([^)]+)\)",
-            "(MockRecordHandle)$1");
-
-        // --- Record handle rewrites ---
-        // Replace INavRecordHandle with MockRecordHandle
-        csharp = csharp.Replace("INavRecordHandle", "MockRecordHandle");
-
-        // Replace NavRecordHandle constructor: new NavRecordHandle(this, 50100, false, SecurityFiltering.XXX)
-        csharp = Regex.Replace(csharp,
-            @"new NavRecordHandle\(this,\s*(\d+),\s*false,\s*SecurityFiltering\.\w+\)",
-            "new MockRecordHandle($1)");
-
-        // Remove .Target. from record operations (MockRecordHandle exposes methods directly)
-        // Handles: xxx.Target.ALInit(), xxx.Target.SetFieldValueSafe(...), etc.
-        csharp = Regex.Replace(csharp, @"(\w+)\.Target\.(AL\w+|SetFieldValueSafe|GetFieldValueSafe|GetFieldRefSafe)", "$1.$2");
-
-        // --- Codeunit handle rewrites ---
-        // Replace NavCodeunitHandle with MockCodeunitHandle
-        csharp = csharp.Replace("NavCodeunitHandle", "MockCodeunitHandle");
-
-        // Replace constructor: new MockCodeunitHandle(this, 50100) -> MockCodeunitHandle.Create(50100)
-        csharp = Regex.Replace(csharp,
-            @"new MockCodeunitHandle\(this,\s*(\d+)\)",
-            "MockCodeunitHandle.Create($1)");
-
-        // Remove .Target. from codeunit Invoke calls
-        csharp = Regex.Replace(csharp, @"(\w+)\.Target\.Invoke\(", "$1.Invoke(");
-
-        // Remove NavRuntimeHelpers references
-        csharp = Regex.Replace(csharp,
-            @"NavRuntimeHelpers\.CompilationError\([^;]*\);",
-            "throw new InvalidOperationException(\"Compilation error\");");
-
-        // Clean up multiple blank lines
-        csharp = Regex.Replace(csharp, @"\n{3,}", "\n\n");
-
-        return csharp;
-    }
-}
 
 // ===========================================================================
 // C# Capture Outputter (from TranspilerSpike)

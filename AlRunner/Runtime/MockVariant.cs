@@ -70,7 +70,7 @@ public class MockVariant
     public bool ALIsGuid => _value is NavGuid or Guid;
     public bool ALIsOption => _value is NavOption;
     public bool ALIsRecord => _value is MockRecordHandle;
-    public bool ALIsRecordRef => _value is MockRecordRef;
+    public bool ALIsRecordRef => false;
     public bool ALIsRecordId => false;
     public bool ALIsBigInteger => _value is NavBigInteger or long;
     public bool ALIsDuration => false;
