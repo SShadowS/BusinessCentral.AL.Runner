@@ -95,14 +95,16 @@ static int DownloadServiceTier(string version, string outputDir)
     var artifactUrl = $"https://bcartifacts-exdbf9fwegejdqak.b02.azurefd.net/onprem/{version}/platform";
     Directory.CreateDirectory(outputDir);
 
-    using var http = new HttpClient();
+    using var handler = new HttpClientHandler();
+    using var http = new HttpClient(handler);
     http.Timeout = TimeSpan.FromMinutes(5);
 
     Console.Error.WriteLine($"Resolving artifact size for BC {version}...");
-    using var headReq = new HttpRequestMessage(HttpMethod.Head, artifactUrl);
-    using var headResp = http.Send(headReq);
+    var headReq = new HttpRequestMessage(HttpMethod.Head, artifactUrl);
+    var headResp = http.Send(headReq);
     headResp.EnsureSuccessStatusCode();
     var totalSize = headResp.Content.Headers.ContentLength ?? 0;
+    headResp.Dispose();
     if (totalSize == 0) { Console.Error.WriteLine("Error: unknown size"); return 1; }
     Console.Error.WriteLine($"Platform artifact: {totalSize / 1048576} MB");
 
@@ -197,13 +199,26 @@ static int DownloadServiceTier(string version, string outputDir)
 
 static byte[] DownloadRange(HttpClient http, string url, long from, long to)
 {
-    using var req = new HttpRequestMessage(HttpMethod.Get, url);
-    req.Headers.Range = new RangeHeaderValue(from, to);
-    using var resp = http.Send(req);
-    resp.EnsureSuccessStatusCode();
-    using var ms = new MemoryStream();
-    resp.Content.ReadAsStream().CopyTo(ms);
-    return ms.ToArray();
+    // Retry once on transient failures
+    for (int attempt = 0; attempt < 2; attempt++)
+    {
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Range = new RangeHeaderValue(from, to);
+            var resp = http.Send(req);
+            resp.EnsureSuccessStatusCode();
+            using var ms = new MemoryStream();
+            resp.Content.ReadAsStream().CopyTo(ms);
+            resp.Dispose();
+            return ms.ToArray();
+        }
+        catch when (attempt == 0)
+        {
+            Console.Error.WriteLine("  Retrying download...");
+        }
+    }
+    throw new Exception($"Failed to download range {from}-{to}");
 }
 
 static int Error(string msg) { Console.Error.WriteLine($"Error: {msg}"); return 1; }
