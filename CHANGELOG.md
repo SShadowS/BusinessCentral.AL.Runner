@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] — 2026-04-11
+
+### Added
+- `NavApp.GetModuleInfo` / `GetCurrentModuleInfo` / `GetCallerModuleInfo`
+  routed through a new `MockNavApp` stub. The real `ALNavApp` loads
+  `Microsoft.Dynamics.Nav.CodeAnalysis` (not shipped with al-runner),
+  so any code path that reached NavApp metadata crashed with an
+  assembly-load failure. The stub returns `false` for every lookup
+  and leaves the ByRef `ModuleInfo` untouched, matching BC's
+  "not found" contract. ([#22](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/22))
+
+### Fixed
+- **Multi-field FlowField `exist(...)`** now works. 1.0.3 covered the
+  single-field case but the multi-condition variant
+  (`exist(Child where(C1 = field(X), C2 = field(Y)))`) silently
+  returned false: the `CalcFormulaRegistry` regex was non-greedy and
+  stopped at the first `)` — the one closing `field(X)` — so the
+  second clause was lost. Parser now paren-walks the `exist(...)`
+  body manually, splits top-level commas in the `where(...)` body,
+  and resolves child field IDs through a new transpile-time
+  `TableFieldRegistry` (previously relied on runtime
+  `RegisterFieldName`, which only fired when generated code referenced
+  `ALFieldNo(name)` explicitly).
+  ([#15](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/15) follow-up)
+
 ## [1.0.3] — 2026-04-11
 
 ### Added
@@ -169,6 +194,7 @@ for pure-logic codeunits. No BC service tier, no Docker, no SQL, no
 license. Test runner with `Subtype = Test` discovery and `Assert`
 codeunit mock.
 
+[1.0.4]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.4
 [1.0.3]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.3
 [1.0.2]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.2
 [1.0.1]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.1
