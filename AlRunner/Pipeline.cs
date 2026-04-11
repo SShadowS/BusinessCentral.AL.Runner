@@ -535,7 +535,8 @@ public class AlRunnerPipeline
                 }
 
                 var objectToFile = CoverageReport.MapObjectsToFiles(generatedCSharpList!, alFilePaths);
-                CoverageReport.WriteCobertura("cobertura.xml", sourceSpans, hitStmts, totalStmts, objectToFile);
+                var scopeToObject = CoverageReport.BuildScopeToObjectMap(generatedCSharpList!);
+                CoverageReport.WriteCobertura("cobertura.xml", sourceSpans, hitStmts, totalStmts, objectToFile, scopeToObject);
                 Log.Info("Coverage report: cobertura.xml");
             }
         }

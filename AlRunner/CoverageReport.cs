@@ -121,6 +121,27 @@ public static class CoverageReport
     }
 
     /// <summary>
+    /// Build a mapping from scope class name to AL object name.
+    /// Each (Name, Code) pair in generatedCSharp has Name = AL object name.
+    /// We find all scope classes in each Code block and map them to that Name.
+    /// </summary>
+    public static Dictionary<string, string> BuildScopeToObjectMap(
+        List<(string Name, string Code)> generatedCSharp)
+    {
+        var map = new Dictionary<string, string>();
+        var scopePattern = new Regex(@"class\s+(\w+_Scope(?:_\w+)?)");
+
+        foreach (var (name, code) in generatedCSharp)
+        {
+            foreach (Match m in scopePattern.Matches(code))
+            {
+                map[m.Groups[1].Value] = name;
+            }
+        }
+        return map;
+    }
+
+    /// <summary>
     /// Write a Cobertura XML coverage report.
     /// </summary>
     public static void WriteCobertura(
@@ -128,32 +149,42 @@ public static class CoverageReport
         Dictionary<(string Scope, int StmtIndex), int> sourceSpans,
         HashSet<(string Type, int Id)> hitStatements,
         HashSet<(string Type, int Id)> totalStatements,
-        Dictionary<string, string> objectToFile)
+        Dictionary<string, string> objectToFile,
+        Dictionary<string, string>? scopeToObject = null)
     {
         // Group coverage data by source file
-        // scope name format: MethodName_Scope_NNNN — extract the parent object
         var fileLines = new Dictionary<string, Dictionary<int, int>>(); // file -> line -> hitCount
 
         foreach (var ((scope, stmtIdx), line) in sourceSpans)
         {
-            // Find which file this scope belongs to
+            // Only include lines that correspond to actual executable statements
+            // (i.e., statements with StmtHit/CStmtHit calls in the generated C#).
+            // This filters out variable declarations, blank lines, and structural
+            // keywords that the BC compiler includes in SourceSpans for error mapping.
+            if (!totalStatements.Contains((scope, stmtIdx)))
+                continue;
+
+            // Find which file this scope belongs to using the scope→object→file chain
             string? filePath = null;
-            foreach (var (objName, path) in objectToFile)
+            if (scopeToObject != null && scopeToObject.TryGetValue(scope, out var objectName))
             {
-                // Scope classes are nested in Codeunit/Record classes
-                // Try matching by checking if the generated code contains this scope
-                if (scope.Contains(objName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
-                {
-                    filePath = path;
-                    break;
-                }
+                objectToFile.TryGetValue(objectName, out filePath);
             }
             if (filePath == null)
             {
-                // Fall back: use the scope name to guess the file
+                // Fallback: try legacy string matching
                 foreach (var (objName, path) in objectToFile)
-                    filePath ??= path;
+                {
+                    if (scope.Contains(objName.Replace(" ", ""), StringComparison.OrdinalIgnoreCase))
+                    {
+                        filePath = path;
+                        break;
+                    }
+                }
             }
+            // If scope doesn't match any user file, skip it entirely.
+            // This prevents library/stub scopes (Assert, etc.) from
+            // bleeding into the user's coverage report.
             if (filePath == null) continue;
 
             if (!fileLines.TryGetValue(filePath, out var lines))
