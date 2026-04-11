@@ -1050,18 +1050,30 @@ public class MockRecordHandle
     /// <summary>
     /// Evaluate a filter expression against a field value.
     /// Supports: equality, range (FROM..TO), or-list (V1|V2|V3),
-    /// wildcards (* for any), case-insensitive (@), not-equal (&lt;&gt;),
-    /// comparison operators (&gt;, &gt;=, &lt;, &lt;=).
-    /// Pipe-separated alternatives are OR-combined.
+    /// and-list (V1&amp;V2&amp;V3 — all must match), wildcards (*/?),
+    /// case-insensitive (@), not-equal (&lt;&gt;), comparison operators
+    /// (&gt;, &gt;=, &lt;, &lt;=). AND binds tighter than OR, matching BC's
+    /// filter grammar.
     /// </summary>
     private static bool MatchesFilterExpression(NavValue? fieldValue, string fieldStr, string expression)
     {
-        // Split on | for OR alternatives (but not inside quotes)
-        var alternatives = SplitOrAlternatives(expression);
+        // BC filter precedence: | (OR) is top-level, & (AND) nests inside.
+        // Split on | first, then each alternative on &.
+        var alternatives = SplitOnOperator(expression, '|');
 
         foreach (var alt in alternatives)
         {
-            if (MatchesSingleExpression(fieldValue, fieldStr, alt.Trim()))
+            var conjuncts = SplitOnOperator(alt, '&');
+            bool allMatch = true;
+            foreach (var conj in conjuncts)
+            {
+                if (!MatchesSingleExpression(fieldValue, fieldStr, conj.Trim()))
+                {
+                    allMatch = false;
+                    break;
+                }
+            }
+            if (allMatch)
                 return true;
         }
         return false;
@@ -1187,10 +1199,11 @@ public class MockRecordHandle
     }
 
     /// <summary>
-    /// Split a filter expression on | (pipe) for OR alternatives.
-    /// Respects single-quoted strings (pipe inside quotes is literal).
+    /// Split a filter expression on a single-character operator (| or &amp;),
+    /// respecting single-quoted string literals so separators inside
+    /// quotes stay literal.
     /// </summary>
-    private static List<string> SplitOrAlternatives(string expression)
+    private static List<string> SplitOnOperator(string expression, char op)
     {
         var parts = new List<string>();
         bool inQuotes = false;
@@ -1202,7 +1215,7 @@ public class MockRecordHandle
             {
                 inQuotes = !inQuotes;
             }
-            else if (expression[i] == '|' && !inQuotes)
+            else if (expression[i] == op && !inQuotes)
             {
                 parts.Add(expression.Substring(start, i - start));
                 start = i + 1;
