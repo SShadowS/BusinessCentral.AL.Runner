@@ -117,6 +117,45 @@ public class AlScope : IDisposable
     /// Stores the last error message from asserterror blocks.
     /// </summary>
     public static string LastErrorText { get; set; } = "";
+
+    /// <summary>
+    /// AL's [TryFunction] attribute. BC emits
+    /// <c>TryInvoke(() =&gt; base.Parent.TryMethod())</c> at call sites.
+    /// Executes the delegate; returns true if it completes without throwing,
+    /// false if any exception escapes. The method's own return value is
+    /// discarded — BC always reports TryFunction status via true/false.
+    /// </summary>
+    protected static bool TryInvoke(Action action)
+    {
+        try
+        {
+            action();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Overload for TryFunction wrappers that return a value (AL's TryFunction
+    /// always returns Boolean to the caller, but the underlying lambda may
+    /// return the wrapped method's own value — BC's generated C# uses
+    /// <c>Func&lt;T&gt;</c> when the method had a non-void signature).
+    /// </summary>
+    protected static bool TryInvoke<T>(Func<T> func)
+    {
+        try
+        {
+            func();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
 
 /// <summary>
