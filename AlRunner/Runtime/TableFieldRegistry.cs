@@ -21,6 +21,11 @@ public static class TableFieldRegistry
         @"\bfield\s*\(\s*(\d+)\s*;\s*(?:""([^""]+)""|([A-Za-z_][A-Za-z0-9_]*))\s*;",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // key(Name; Field1, "Quoted Field 2", Field3)  — only the fields we need.
+    private static readonly Regex KeyDecl = new(
+        @"\bkey\s*\(\s*[^;]+;\s*([^)]+)\)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     // tableId -> (fieldName -> fieldId)
     private static readonly Dictionary<int, Dictionary<string, int>> _byTable = new();
 
@@ -53,6 +58,27 @@ public static class TableFieldRegistry
                 if (!int.TryParse(fm.Groups[1].Value, out var fieldId)) continue;
                 var name = fm.Groups[2].Success ? fm.Groups[2].Value : fm.Groups[3].Value;
                 fields[name] = fieldId;
+            }
+
+            // Extract the first declared key (typically Clustered PK) and
+            // register its field numbers so MockRecordHandle.ALInsert can
+            // enforce uniqueness. BC's registration path only fires for
+            // tables whose generated code references ALFieldNo / a runtime
+            // PK helper; synthetic test fixtures often skip that path.
+            var firstKey = KeyDecl.Match(body);
+            if (firstKey.Success)
+            {
+                var keyList = firstKey.Groups[1].Value;
+                var pkFieldIds = new List<int>();
+                foreach (var rawPart in keyList.Split(','))
+                {
+                    var part = rawPart.Trim().Trim('"').Trim();
+                    if (part.Length == 0) continue;
+                    if (fields.TryGetValue(part, out var fid))
+                        pkFieldIds.Add(fid);
+                }
+                if (pkFieldIds.Count > 0)
+                    MockRecordHandle.RegisterPrimaryKey(tableId, pkFieldIds.ToArray());
             }
         }
     }

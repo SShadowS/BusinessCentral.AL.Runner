@@ -1110,6 +1110,69 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
             return base.VisitInvocationExpression(node);
         }
 
+        // `NavOption.Create(existing.NavOptionMetadata, V)` — reassignment
+        // pattern BC emits when an AL enum variable is re-assigned. Route
+        // through AlCompat.CloneTaggedOption so the new instance inherits
+        // the source enum-id tag.
+        if (node.ArgumentList.Arguments.Count == 2 &&
+            node.Expression is MemberAccessExpressionSyntax cloneCallMa &&
+            cloneCallMa.Expression is IdentifierNameSyntax cloneCallIdent &&
+            cloneCallIdent.Identifier.Text == "NavOption" &&
+            cloneCallMa.Name.Identifier.Text == "Create" &&
+            node.ArgumentList.Arguments[0].Expression is MemberAccessExpressionSyntax srcMetaMa &&
+            srcMetaMa.Name.Identifier.Text == "NavOptionMetadata")
+        {
+            // Visit the captured sub-expressions so `.Target` strips and
+            // other nested rewrites land on them before we embed them in
+            // the outer helper call. Without this, an expression like
+            // `this.r.Target.GetFieldValueSafe(...)` survives with the
+            // `.Target` still attached and Roslyn rejects it later.
+            var existingExpr = (ExpressionSyntax)Visit(srcMetaMa.Expression)!;
+            var ordinalExpr = (ExpressionSyntax)Visit(node.ArgumentList.Arguments[1].Expression)!;
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName("CloneTaggedOption")),
+                SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+                {
+                    SyntaxFactory.Argument(existingExpr),
+                    SyntaxFactory.Argument(ordinalExpr)
+                })));
+        }
+
+        // Special-case: `NavOption.Create(NCLEnumMetadata.Create(N), V)`
+        // must be rewritten to `AlCompat.CreateTaggedOption(N, V)` so the
+        // NavOption instance remembers its source enum — later calls to
+        // `.ALOrdinals` / `.ALNames` can then resolve it via the tagged
+        // ConditionalWeakTable. Match on the pre-visit tree because the
+        // inner NCLEnumMetadata.Create rewrite would otherwise erase N.
+        if (node.ArgumentList.Arguments.Count == 2 &&
+            node.Expression is MemberAccessExpressionSyntax optCreateMa &&
+            optCreateMa.Expression is IdentifierNameSyntax optIdent &&
+            optIdent.Identifier.Text == "NavOption" &&
+            optCreateMa.Name.Identifier.Text == "Create" &&
+            node.ArgumentList.Arguments[0].Expression is InvocationExpressionSyntax optMetaInv &&
+            optMetaInv.Expression is MemberAccessExpressionSyntax optMetaMa &&
+            optMetaMa.Expression is IdentifierNameSyntax optMetaIdent &&
+            optMetaIdent.Identifier.Text == "NCLEnumMetadata" &&
+            optMetaMa.Name.Identifier.Text == "Create" &&
+            optMetaInv.ArgumentList.Arguments.Count == 1)
+        {
+            var enumIdArg = (ExpressionSyntax)Visit(optMetaInv.ArgumentList.Arguments[0].Expression)!;
+            var ordinalArg = (ExpressionSyntax)Visit(node.ArgumentList.Arguments[1].Expression)!;
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName("CreateTaggedOption")),
+                SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+                {
+                    SyntaxFactory.Argument(enumIdArg),
+                    SyntaxFactory.Argument(ordinalArg)
+                })));
+        }
+
         // Special-case: `NCLEnumMetadata.Create(N).GetOrdinals()` / `.Names()`
         // must be intercepted BEFORE recursing into children, because the
         // inner NCLEnumMetadata.Create rewrite would otherwise erase the
@@ -1779,6 +1842,22 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
                     SyntaxKind.SimpleMemberAccessExpression,
                     SyntaxFactory.IdentifierName("AlCompat"),
                     SyntaxFactory.IdentifierName(memberName)),
+                SyntaxFactory.ArgumentList(
+                    SyntaxFactory.SingletonSeparatedList(
+                        SyntaxFactory.Argument(visited.Expression))));
+        }
+
+        // NavOption.ALNames / NavOption.ALOrdinals — property getters that
+        // reach into NCLOptionMetadata native code. Redirect to AlCompat
+        // helpers which look up the tagged enum id via ConditionalWeakTable.
+        if (memberName == "ALNames" || memberName == "ALOrdinals")
+        {
+            var helper = memberName == "ALNames" ? "GetNamesForOption" : "GetOrdinalsForOption";
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName(helper)),
                 SyntaxFactory.ArgumentList(
                     SyntaxFactory.SingletonSeparatedList(
                         SyntaxFactory.Argument(visited.Expression))));

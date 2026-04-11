@@ -300,6 +300,65 @@ public static class AlCompat
     }
 
     /// <summary>
+    /// ConditionalWeakTable mapping a NavOption instance to the AL enum
+    /// object id it was constructed with. Used by
+    /// <see cref="GetOrdinalsForOption"/> / <see cref="GetNamesForOption"/>
+    /// so <c>someEnumVar.Ordinals() / .Names()</c> (which BC lowers to
+    /// <c>navOption.ALOrdinals / .ALNames</c> and hits NCLOptionMetadata
+    /// native code) can resolve the enum without the now-lost metadata.
+    /// </summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<NavOption, object> _optionEnumId = new();
+
+    /// <summary>
+    /// Create a NavOption and remember its source enum object ID so later
+    /// calls to <see cref="GetOrdinalsForOption"/> / <see cref="GetNamesForOption"/>
+    /// can resolve back to the AL enum. Emitted by the rewriter as the
+    /// replacement for <c>NavOption.Create(NCLEnumMetadata.Create(N), V)</c>.
+    /// </summary>
+    public static NavOption CreateTaggedOption(int enumObjectId, int ordinal)
+    {
+        var opt = AlRunner.Runtime.MockRecordHandle.CreateOptionValue(ordinal);
+        _optionEnumId.AddOrUpdate(opt, enumObjectId);
+        return opt;
+    }
+
+    /// <summary>
+    /// Create a NavOption that inherits the enum-id tag from an existing
+    /// NavOption. Emitted by the rewriter for
+    /// <c>NavOption.Create(existing.NavOptionMetadata, V)</c>
+    /// reassignments so the new instance keeps its enum-id lineage.
+    /// </summary>
+    public static NavOption CloneTaggedOption(NavOption existing, int ordinal)
+    {
+        var opt = AlRunner.Runtime.MockRecordHandle.CreateOptionValue(ordinal);
+        if (_optionEnumId.TryGetValue(existing, out var id))
+            _optionEnumId.AddOrUpdate(opt, id);
+        return opt;
+    }
+
+    /// <summary>
+    /// Called by the rewriter for <c>navOption.ALOrdinals</c> property
+    /// access. Looks up the tagged enum id and returns its declared
+    /// ordinals via <see cref="GetEnumOrdinals"/>; falls back to the
+    /// first registered enum that matches the option's own ordinal so
+    /// untagged NavOptions still have a chance at the right answer.
+    /// </summary>
+    public static NavList<int> GetOrdinalsForOption(NavOption opt)
+    {
+        if (_optionEnumId.TryGetValue(opt, out var idObj) && idObj is int id)
+            return GetEnumOrdinals(id);
+        return NavList<int>.Default;
+    }
+
+    /// <summary>Mirror of <see cref="GetOrdinalsForOption"/> for the Names() path.</summary>
+    public static NavList<NavText> GetNamesForOption(NavOption opt)
+    {
+        if (_optionEnumId.TryGetValue(opt, out var idObj) && idObj is int id)
+            return GetEnumNames(id);
+        return NavList<NavText>.Default;
+    }
+
+    /// <summary>
     /// Replacement for ALCompiler.ToNavValue - wraps a value as NavValue.
     /// NavValue is abstract; we create the appropriate concrete subtype.
     /// The original goes through NavValueFormatter/NavSession; we construct directly.
