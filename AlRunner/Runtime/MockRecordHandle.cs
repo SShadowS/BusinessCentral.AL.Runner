@@ -215,6 +215,14 @@ public class MockRecordHandle
     {
         var table = _tables[_tableId];
 
+        // Run the AL `trigger OnInsert()` body if requested. The generated
+        // Record<N> class overrides a protected OnInsert() that creates a
+        // scope and runs the trigger body against `this.Rec` — we reflect
+        // over it, create an instance whose field bag is this handle's
+        // bag, and invoke OnInsert() directly.
+        if (runTrigger)
+            TryFireRecordTrigger("OnInsert");
+
         // Enforce primary-key uniqueness only when the PK is *registered*.
         // GetPrimaryKeyFields() falls back to `[1]` otherwise, which would
         // reject legitimate composite-key inserts whose first field
@@ -236,6 +244,67 @@ public class MockRecordHandle
         var row = new Dictionary<int, NavValue>(_fields);
         table.Add(row);
         return true;
+    }
+
+    /// <summary>
+    /// Invoke a <c>trigger On{Name}()</c> body on the generated Record
+    /// class if one exists, passing this MockRecordHandle through so
+    /// the trigger's <c>Rec.SetFieldValueSafe(…)</c> calls mutate this
+    /// instance's field bag in place.
+    /// </summary>
+    private void TryFireRecordTrigger(string triggerName)
+    {
+        var assembly = MockCodeunitHandle.CurrentAssembly;
+        if (assembly == null) return;
+
+        var recordTypeName = $"Record{_tableId}";
+        Type? recordType = null;
+        foreach (var t in assembly.GetTypes())
+        {
+            if (t.Name == recordTypeName) { recordType = t; break; }
+        }
+        if (recordType == null) return;
+
+        // Generated Record classes are plain classes (post-rewrite) with
+        // a `public MockRecordHandle Rec { get; } = new MockRecordHandle(N)`
+        // auto-property. The trigger body does `this.Rec.SetFieldValueSafe`
+        // etc. — we create an uninitialized instance and overwrite the
+        // compiler-generated `<Rec>k__BackingField` so the trigger sees
+        // THIS MockRecordHandle.
+        object instance;
+        try { instance = System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(recordType); }
+        catch { return; }
+
+        var recBackingField = recordType.GetField("<Rec>k__BackingField",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (recBackingField != null && recBackingField.FieldType.IsInstanceOfType(this))
+        {
+            recBackingField.SetValue(instance, this);
+        }
+        // Also wire xRec to this handle so `xRec.<something>` reads still
+        // round-trip — in real BC xRec is the previous row, but for
+        // trigger purposes most code only uses Rec.
+        var xRecBackingField = recordType.GetField("<xRec>k__BackingField",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (xRecBackingField != null && xRecBackingField.FieldType.IsInstanceOfType(this))
+        {
+            xRecBackingField.SetValue(instance, this);
+        }
+
+        var method = recordType.GetMethod(triggerName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.Instance);
+        if (method == null) return;
+
+        try
+        {
+            method.Invoke(instance, null);
+        }
+        catch (System.Reflection.TargetInvocationException tie)
+        {
+            if (tie.InnerException != null) throw tie.InnerException;
+            throw;
+        }
     }
 
     private string TableName() => $"Record Table {_tableId}";
