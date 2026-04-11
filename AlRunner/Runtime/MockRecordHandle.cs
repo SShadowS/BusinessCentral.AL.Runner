@@ -278,7 +278,7 @@ public class MockRecordHandle
                 var fieldNo = pkFields[i];
                 var rowVal = row.TryGetValue(fieldNo, out var rv) ? NavValueToString(rv) : "";
                 var keyVal = NavValueToString(keyValues[i]);
-                if (rowVal != keyVal) { match = false; break; }
+                if (!PkValuesEqual(rowVal, keyVal)) { match = false; break; }
             }
             if (match)
             {
@@ -291,6 +291,28 @@ public class MockRecordHandle
             var keyStr = string.Join(", ", keyValues.Select(v => NavValueToString(v)));
             throw new Exception($"Record not found in table {_tableId} for key ({keyStr})");
         }
+        return false;
+    }
+
+    /// <summary>
+    /// Compare two stringified primary-key values with cross-type tolerance.
+    /// The string forms already match 99% of the time, but Guid values can
+    /// arrive in multiple serialisations (with/without braces, upper/lower
+    /// case) when they've round-tripped through a Text[N] field. Fall back
+    /// to parsing both sides as Guid / decimal / int and comparing structurally
+    /// so the common "Guid -&gt; Text[100] -&gt; Get" pattern works.
+    /// </summary>
+    private static bool PkValuesEqual(string a, string b)
+    {
+        if (string.Equals(a, b, StringComparison.Ordinal)) return true;
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return true;
+        if (Guid.TryParse(a, out var ga) && Guid.TryParse(b, out var gb))
+            return ga == gb;
+        if (decimal.TryParse(a, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var da) &&
+            decimal.TryParse(b, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var db))
+            return da == db;
         return false;
     }
 
