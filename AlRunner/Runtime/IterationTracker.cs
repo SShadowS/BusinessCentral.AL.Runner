@@ -25,7 +25,7 @@ public static class IterationTracker
         _nextLoopId = 0;
     }
 
-    public static int EnterLoop(int sourceStartLine, int sourceEndLine)
+    public static int EnterLoop(string scopeName, int sourceStartLine, int sourceEndLine)
     {
         if (!_enabled) return -1;
 
@@ -36,6 +36,7 @@ public static class IterationTracker
         var record = new LoopRecord
         {
             LoopId = loopId,
+            ScopeName = scopeName,
             SourceStartLine = sourceStartLine,
             SourceEndLine = sourceEndLine,
             ParentLoopId = parentLoopId,
@@ -120,6 +121,7 @@ public static class IterationTracker
     public class LoopRecord
     {
         public int LoopId { get; init; }
+        public string ScopeName { get; init; } = "";
         public int SourceStartLine { get; init; }
         public int SourceEndLine { get; init; }
         public int? ParentLoopId { get; init; }

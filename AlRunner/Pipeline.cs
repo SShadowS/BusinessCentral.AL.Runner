@@ -183,8 +183,8 @@ public class AlRunnerPipeline
                 ? iterations.Select(loop => new
                 {
                     loopId = $"L{loop.LoopId}",
-                    loopLine = loop.SourceStartLine,
-                    loopEndLine = loop.SourceEndLine,
+                    loopLine = SourceLineMapper.GetAlLineFromStatement(loop.ScopeName, loop.SourceStartLine) ?? loop.SourceStartLine,
+                    loopEndLine = SourceLineMapper.GetAlLineFromStatement(loop.ScopeName, loop.SourceEndLine) ?? loop.SourceEndLine,
                     parentLoopId = loop.ParentLoopId.HasValue ? $"L{loop.ParentLoopId}" : (string?)null,
                     parentIteration = loop.ParentIteration,
                     iterationCount = loop.IterationCount,
@@ -198,6 +198,10 @@ public class AlRunnerPipeline
                         }),
                         messages = step.Messages.Count > 0 ? step.Messages : null,
                         linesExecuted = step.LinesExecuted
+                            .Select(id => SourceLineMapper.GetAlLineFromStatement(loop.ScopeName, id) ?? id)
+                            .Distinct()
+                            .OrderBy(l => l)
+                            .ToList()
                     })
                 })
                 : null

@@ -74,9 +74,9 @@ public sealed class IterationInjector : CSharpSyntaxRewriter
         // Replace loop body with instrumented body
         var instrumentedLoop = ReplaceBody(loopNode, newBody);
 
-        // Build: var __alr_loopId_N = AlRunner.Runtime.IterationTracker.EnterLoop(startLine, endLine);
+        // Build: var __alr_loopId_N = AlRunner.Runtime.IterationTracker.EnterLoop(scopeName, startLine, endLine);
         var enterLoop = SyntaxFactory.ParseStatement(
-            $"var {loopIdVar} = AlRunner.Runtime.IterationTracker.EnterLoop({startLine}, {endLine});\n");
+            $"var {loopIdVar} = AlRunner.Runtime.IterationTracker.EnterLoop(\"{_currentScopeClass}\", {startLine}, {endLine});\n");
 
         // Build: AlRunner.Runtime.IterationTracker.ExitLoop(__alr_loopId_N);
         var exitLoop = SyntaxFactory.ParseStatement(
