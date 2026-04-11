@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.3] — 2026-04-11
 
 ### Added
 - `CHANGELOG.md` shipped inside the NuGet package; `<PackageReleaseNotes>`
@@ -20,6 +20,25 @@ All notable changes to this project are documented here. Format based on
   feedback. Bouncing between projects in one session no longer
   invalidates the previous entry.
   ([#10](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/10) — MVP; full dep-graph partial recompile still open)
+- **Per-statement value capture**: `--capture-values` now emits a
+  Quokka-style timeline of intermediate values, not just a
+  final-state snapshot. A new `ValueCaptureInjector` pass injects
+  `ValueCapture.Capture(...)` after each scope-field assignment,
+  keyed by the neighboring `StmtHit(N)` so captures map back to AL
+  source lines. Post-test reflection-based capture is kept as a
+  fallback for variables the injector can't reach.
+  ([#11](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/11))
+- **Server `execute` command**: new JSON-RPC command that accepts
+  either inline AL (`code`) or `sourcePaths` and runs the first
+  codeunit's `OnRun` trigger in run-mode. Response mirrors
+  `runTests` plus captured `messages` and optional `capturedValues`.
+  ([#12](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/12))
+- **Column precision in error mapping**: `TestResult` and
+  `--output-json` now include `alSourceColumn` alongside
+  `alSourceLine`. `FormatDiagnostic` emits `[AL line ~N col M in X]`.
+  The existing `CoverageReport.ParseSourceSpans` encoding already
+  carried columns; they were discarded.
+  ([#13](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/13))
 
 ### Fixed
 - `AL0791 namespace unknown` on an unused `using` directive no longer
@@ -31,6 +50,12 @@ All notable changes to this project are documented here. Format based on
   2-arg `ALValidateSafe` overload was added before the report was
   filed; this commit just locks the behavior in.
   ([#7](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/7))
+
+### Internal
+- `Pipeline.Run` now redirects both `Console.Out` and `Console.Error`
+  into the captured `StringWriter` instances for the duration of the
+  run, so `AlDialog.Message` and `PrintResults` no longer corrupt
+  the server's stdin/stdout JSON protocol.
 
 ## [1.0.2] — 2026-04-11
 
@@ -101,6 +126,7 @@ for pure-logic codeunits. No BC service tier, no Docker, no SQL, no
 license. Test runner with `Subtype = Test` discovery and `Assert`
 codeunit mock.
 
+[1.0.3]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.3
 [1.0.2]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.2
 [1.0.1]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.1
 [1.0.0]: https://github.com/StefanMaron/BusinessCentral.AL.Runner/releases/tag/v1.0.0
