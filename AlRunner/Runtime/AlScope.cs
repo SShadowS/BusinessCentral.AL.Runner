@@ -29,6 +29,9 @@ public class AlScope : IDisposable
     private static readonly HashSet<(string Type, int Id)> _hitStatements = new();
     private static readonly HashSet<(string Type, int Id)> _totalStatements = new();
 
+    public static HashSet<(string Type, int Id)> GetHitStatements()
+        => new(_hitStatements);
+
     /// <summary>Last statement hit (scope type name, statement ID) — used for error line mapping.</summary>
     [ThreadStatic] private static (string TypeName, int Id)? _lastStatementHit;
 
