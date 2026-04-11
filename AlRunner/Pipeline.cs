@@ -162,6 +162,7 @@ public class AlRunnerPipeline
 
         var output = new
         {
+            version = "1.0.8-iteration-tracking",
             tests = tests.Select(t => new
             {
                 name = t.Name,
