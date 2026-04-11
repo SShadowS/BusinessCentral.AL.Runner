@@ -200,6 +200,7 @@ public class AlRunnerPipeline
 
         // Reset per-run state that the AL parsing populates.
         Runtime.EnumRegistry.Clear();
+        Runtime.TableInitValueRegistry.Clear();
 
         // Load stubs
         foreach (var stubPath in options.StubPaths)
@@ -218,6 +219,7 @@ public class AlRunnerPipeline
                 stubSources.Add(text);
                 StubIndex.Record(sf, text);
                 Runtime.EnumRegistry.ParseAndRegister(text);
+                Runtime.TableInitValueRegistry.ParseAndRegister(text);
             }
         }
 
@@ -287,12 +289,19 @@ public class AlRunnerPipeline
             return 1;
         }
 
-        // Parse all AL sources for enum declarations so runtime Ordinals()/
-        // Names() calls can resolve without reflecting over generated C#.
+        // Parse all AL sources for enum declarations and table InitValue
+        // defaults so runtime Ordinals()/Names() and Rec.Init() can apply
+        // them without reflecting over generated C#.
         foreach (var src in alSources)
+        {
             Runtime.EnumRegistry.ParseAndRegister(src);
+            Runtime.TableInitValueRegistry.ParseAndRegister(src);
+        }
         if (options.InlineCode != null)
+        {
             Runtime.EnumRegistry.ParseAndRegister(options.InlineCode);
+            Runtime.TableInitValueRegistry.ParseAndRegister(options.InlineCode);
+        }
 
         // Auto-discover dependency .app files from --packages directories
         if (options.PackagePaths.Count > 0 && inputGroups.Any(g => g.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase)))

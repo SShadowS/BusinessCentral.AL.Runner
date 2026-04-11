@@ -83,6 +83,9 @@ public class MockRecordHandle
     public void ALInit()
     {
         _fields = new Dictionary<int, NavValue>();
+        // Apply any InitValue attributes declared on the table's fields.
+        // Registry is populated at pipeline start from the AL source.
+        TableInitValueRegistry.ApplyInitValues(_tableId, _fields);
     }
 
     /// <summary>
@@ -1292,6 +1295,29 @@ public class MockRecordHandle
             NavType.MediaSet => NavMediaSet.Default,
             _ => NavText.Default(0)
         };
+    }
+
+    /// <summary>
+    /// Build a NavOption carrying the given ordinal. Exposed for
+    /// TableInitValueRegistry which needs to turn AL enum member literals
+    /// into field-bag values matching the NavOption storage shape.
+    /// </summary>
+    public static NavOption CreateOptionValue(int ordinal)
+    {
+        var defaultOpt = CreateDefaultNavOption();
+        try
+        {
+            var createInstance = defaultOpt.GetType().GetMethod("CreateInstance",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+            if (createInstance != null)
+            {
+                var result = createInstance.Invoke(defaultOpt, new object[] { ordinal });
+                if (result is NavOption opt) return opt;
+            }
+        }
+        catch { }
+        return defaultOpt;
     }
 
     /// <summary>

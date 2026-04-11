@@ -24,8 +24,29 @@ public static class EnumRegistry
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Dictionary<int, List<(int Ordinal, string Name)>> _byId = new();
+    // Enum AL name (e.g. "IV Mode" or "Simple Enum") -> list of members.
+    // Populated alongside _byId so callers that only know the type name
+    // (typically via a field InitValue expression) can resolve members.
+    private static readonly Dictionary<string, List<(int Ordinal, string Name)>> _byName =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    public static void Clear() => _byId.Clear();
+    public static void Clear()
+    {
+        _byId.Clear();
+        _byName.Clear();
+    }
+
+    /// <summary>Resolve a specific member's ordinal by (enum name, member name).</summary>
+    public static int? GetOrdinalByName(string enumName, string memberName)
+    {
+        if (!_byName.TryGetValue(enumName, out var list)) return null;
+        foreach (var (ord, name) in list)
+        {
+            if (string.Equals(name, memberName, StringComparison.OrdinalIgnoreCase))
+                return ord;
+        }
+        return null;
+    }
 
     /// <summary>Parse a single AL source string and register any enum declarations inside it.</summary>
     public static void ParseAndRegister(string alSource)
@@ -39,6 +60,9 @@ public static class EnumRegistry
                 headerMatch = headerMatch.NextMatch();
                 continue;
             }
+            var enumName = headerMatch.Groups[2].Success
+                ? headerMatch.Groups[2].Value
+                : headerMatch.Groups[3].Value;
 
             // Scan forward from the opening brace for `value(...)` members
             // until the matching close-brace. A full AST parse would be
@@ -71,7 +95,10 @@ public static class EnumRegistry
             }
 
             if (members.Count > 0)
+            {
                 _byId[id] = members;
+                _byName[enumName] = members;
+            }
 
             headerMatch = headerMatch.NextMatch();
         }
