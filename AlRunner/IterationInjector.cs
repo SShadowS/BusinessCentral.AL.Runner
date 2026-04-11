@@ -60,15 +60,38 @@ public sealed class IterationInjector : CSharpSyntaxRewriter
         // Ensure body is a block
         var bodyBlock = body is BlockSyntax block ? block : SyntaxFactory.Block(body);
 
-        // Inject EnterIteration at start and EndIteration at end of body
+        // Inject EnterIteration at start and EndIteration after the user's code.
+        // The BC compiler structures for-loop bodies as:
+        //   { user_block }   ← inner block with StmtHit + user code
+        //   label:           ← break check (if i >= max) break;
+        //   i = i + 1;      ← increment
+        // We must place EndIteration AFTER the inner block but BEFORE the
+        // break check, otherwise the last iteration's EndIteration never fires.
         var enterIter = SyntaxFactory.ParseStatement(
             $"AlRunner.Runtime.IterationTracker.EnterIteration({loopIdVar});\n");
         var endIter = SyntaxFactory.ParseStatement(
             $"AlRunner.Runtime.IterationTracker.EndIteration({loopIdVar});\n");
 
         var newStatements = new List<StatementSyntax> { enterIter };
-        newStatements.AddRange(bodyBlock.Statements);
-        newStatements.Add(endIter);
+
+        // Find the position after the user's code block (before label/break/increment)
+        bool endIterInserted = false;
+        foreach (var stmt in bodyBlock.Statements)
+        {
+            newStatements.Add(stmt);
+            // Insert EndIteration after the first inner block (which contains the user's StmtHit calls)
+            // but before any labeled statement (the break check)
+            if (!endIterInserted && stmt is BlockSyntax)
+            {
+                newStatements.Add(endIter);
+                endIterInserted = true;
+            }
+        }
+        if (!endIterInserted)
+        {
+            // Fallback: no inner block found, append at end (simple loops without break)
+            newStatements.Add(endIter);
+        }
         var newBody = SyntaxFactory.Block(newStatements);
 
         // Replace loop body with instrumented body
