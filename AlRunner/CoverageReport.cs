@@ -71,8 +71,9 @@ public static class CoverageReport
                         for (int i = 0; i < pendingSpans.Length; i++)
                         {
                             long packed = pendingSpans[i];
-                            int startLine = (int)((packed & 0xFFFFFFFF) >> 16);
-                            int startCol = (int)(packed & 0xFFFF);
+                            // SourceSpans encode 0-based line/col; convert to 1-based
+                            int startLine = (int)((packed & 0xFFFFFFFF) >> 16) + 1;
+                            int startCol = (int)(packed & 0xFFFF) + 1;
                             if (startLine > 0)
                                 map[(scopeName, i)] = (startLine, startCol);
                         }
