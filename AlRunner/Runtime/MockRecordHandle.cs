@@ -1442,6 +1442,7 @@ public class MockRecordHandle
             NavType.Date => NavDate.Default,
             NavType.Time => NavTime.Default,
             NavType.DateTime => NavDateTime.Default,
+            NavType.DateFormula => NavDateFormula.Default,
             NavType.GUID => new NavGuid(Guid.Empty),
             NavType.Duration => NavDuration.Default,
             NavType.Media => NavMedia.Default,

@@ -742,6 +742,13 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
         if (text == "ALNavApp")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockNavApp"));
 
+        // ALSystemOperatingSystem -> MockSystemOperatingSystem
+        // The real type's ALHyperlink dispatches through NavSession to
+        // open a URL in the client — NullReferenceException under
+        // standalone mode. Mock is a no-op.
+        if (text == "ALSystemOperatingSystem")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockSystemOperatingSystem"));
+
         // NavFormHandle -> MockFormHandle
         // BC emits `Page "X"` AL variables as `NavFormHandle p` fields with
         // `new NavFormHandle(this, pageId)` initializers — both args would
