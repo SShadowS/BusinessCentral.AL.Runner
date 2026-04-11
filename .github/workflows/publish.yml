@@ -51,7 +51,7 @@ jobs:
 
       - name: Build (auto-downloads BC ${{ matrix.bc-version }} DLLs)
         run: |
-          dotnet build AlRunner/ -p:_BCVersion=${{ matrix.bc-version }}
+          dotnet build AlRunner.slnx -p:_BCVersion=${{ matrix.bc-version }}
           echo "BC_SERVICE_TIER_PATH=${HOME}/.local/share/al-runner/artifacts/${{ matrix.bc-version }}" >> "$GITHUB_ENV"
 
       - name: Run C# tests
