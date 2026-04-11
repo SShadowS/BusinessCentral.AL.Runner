@@ -1,4 +1,4 @@
-table 50440 "SAV Product"
+table 56450 "SAV Product"
 {
     fields
     {
@@ -34,7 +34,7 @@ table 50440 "SAV Product"
     }
 }
 
-codeunit 50440 "SAV Configurator"
+codeunit 56450 "SAV Configurator"
 {
     procedure ApplyPriceFromText(var Prod: Record "SAV Product"; Text: Text)
     var

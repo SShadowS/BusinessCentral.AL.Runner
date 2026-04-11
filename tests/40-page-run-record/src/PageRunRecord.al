@@ -1,4 +1,4 @@
-table 50400 "PRR Item"
+table 56400 "PRR Item"
 {
     fields
     {
@@ -11,13 +11,13 @@ table 50400 "PRR Item"
     }
 }
 
-page 50400 "PRR Item List"
+page 56400 "PRR Item List"
 {
     PageType = List;
     SourceTable = "PRR Item";
 }
 
-codeunit 50400 "PRR Caller"
+codeunit 56400 "PRR Caller"
 {
     procedure ShowItem(var Item: Record "PRR Item"): Integer
     begin

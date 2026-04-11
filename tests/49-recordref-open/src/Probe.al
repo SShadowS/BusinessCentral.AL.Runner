@@ -1,4 +1,4 @@
-codeunit 50490 "RR Open Probe"
+codeunit 56490 "RR Open Probe"
 {
     procedure ProbeCompany(CompanyName: Text): Integer
     var

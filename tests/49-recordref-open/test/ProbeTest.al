@@ -1,4 +1,4 @@
-codeunit 50491 "RR Open Tests"
+codeunit 56491 "RR Open Tests"
 {
     Subtype = Test;
 

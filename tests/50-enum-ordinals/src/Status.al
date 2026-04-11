@@ -1,4 +1,4 @@
-enum 50500 "EO Status"
+enum 56500 "EO Status"
 {
     Extensible = true;
     value(0; " ") { }
@@ -7,7 +7,7 @@ enum 50500 "EO Status"
     value(3; Archived) { }
 }
 
-codeunit 50500 "EO Inspector"
+codeunit 56500 "EO Inspector"
 {
     procedure CountOrdinals(): Integer
     var

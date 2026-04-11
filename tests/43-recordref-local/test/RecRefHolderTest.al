@@ -1,4 +1,4 @@
-codeunit 50441 "RecRef Holder Tests"
+codeunit 56441 "RecRef Holder Tests"
 {
     Subtype = Test;
 

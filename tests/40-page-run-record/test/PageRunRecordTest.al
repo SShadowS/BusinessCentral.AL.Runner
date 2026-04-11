@@ -1,4 +1,4 @@
-codeunit 50401 "PRR Page Run Tests"
+codeunit 56401 "PRR Page Run Tests"
 {
     Subtype = Test;
 
