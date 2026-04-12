@@ -68,3 +68,89 @@ public class SourceFileMapperTests
         Assert.Null(SourceFileMapper.GetFileForScope("Codeunit50020_Scope", scopeToObject));
     }
 }
+
+public class AlDeclarationParsingTests
+{
+    [Fact]
+    public void QuotedCodeunitName()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("codeunit 50 \"Loop Helper\"\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("Loop Helper", names[0]);
+    }
+
+    [Fact]
+    public void UnquotedCodeunitName()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("codeunit 50 LoopHelper\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("LoopHelper", names[0]);
+    }
+
+    [Fact]
+    public void TableDeclaration()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("table 100 \"My Table\"\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("My Table", names[0]);
+    }
+
+    [Fact]
+    public void EnumExtensionDeclaration()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("enumextension 50100 \"Status Ext\" extends Status\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("Status Ext", names[0]);
+    }
+
+    [Fact]
+    public void CaseInsensitiveKeyword()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("CODEUNIT 50 \"Foo\"\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("Foo", names[0]);
+    }
+
+    [Fact]
+    public void MultipleObjectsInOneFile()
+    {
+        var source = "codeunit 50 \"Helper\"\n{\n}\ntable 100 \"Data\"\n{\n}";
+        var names = SourceFileMapper.ParseObjectDeclarations(source);
+        Assert.Equal(2, names.Count);
+        Assert.Contains("Helper", names);
+        Assert.Contains("Data", names);
+    }
+
+    [Fact]
+    public void NameInComment_NotMatched()
+    {
+        var source = "// codeunit 50 \"Fake\"\ncodeunit 51 \"Real\"\n{\n}";
+        var names = SourceFileMapper.ParseObjectDeclarations(source);
+        Assert.Single(names);
+        Assert.Equal("Real", names[0]);
+    }
+
+    [Fact]
+    public void NameInMessageCall_NotMatched()
+    {
+        var source = "codeunit 50 \"Real\"\n{\n  trigger OnRun() begin Message('codeunit 99 \"Fake\"'); end;\n}";
+        var names = SourceFileMapper.ParseObjectDeclarations(source);
+        Assert.Single(names);
+        Assert.Equal("Real", names[0]);
+    }
+
+    [Fact]
+    public void PageExtensionDeclaration()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("pageextension 50100 \"My Page Ext\" extends \"Customer Card\"\n{\n}");
+        Assert.Single(names);
+        Assert.Equal("My Page Ext", names[0]);
+    }
+
+    [Fact]
+    public void EmptySource_ReturnsEmpty()
+    {
+        var names = SourceFileMapper.ParseObjectDeclarations("");
+        Assert.Empty(names);
+    }
+}
