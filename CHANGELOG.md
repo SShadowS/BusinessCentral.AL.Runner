@@ -4,6 +4,33 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`StrSubstNo` with `Integer` (and other `NavValue`) arguments no longer crashes.**
+  `ALSystemString.ALStrSubstNo` is now intercepted by `RoslynRewriter` and
+  redirected to `AlCompat.StrSubstNo`, which formats each `%1`/`%2`/… placeholder
+  using the session-free `AlCompat.Format()`. Prevents the
+  `NullReferenceException` in `NavIntegerFormatter.FormatWithFormatNumber` that
+  occurred when `NavSession` is null in the runner context.
+  ([#33](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/33))
+
+### Added
+- **Per-iteration tracking for loop debugging (`--iteration-tracking`).**
+  A new CLI flag instruments `for`/`while`/`do` loops at the Roslyn AST level
+  and captures, per loop and per iteration: variable values, console messages,
+  and executed statement IDs mapped back to AL source lines. Output is appended
+  to `--output-json` as an `iterations[]` array. Nested loops are tracked
+  independently with parent/child relationships preserved.
+  ([#34](https://github.com/StefanMaron/BusinessCentral.AL.Runner/pull/34))
+
+### Fixed (coverage)
+- Coverage line numbers corrected from 0-based to 1-based (off-by-one in
+  `CoverageReport`).
+- `OnRun_Scope` trigger names are now matched correctly by the scope regex.
+- Coverage scope→file mapping no longer bleeds library scopes into user
+  coverage output.
+
 ## [1.0.7] — 2026-04-11
 
 ### Added
