@@ -261,6 +261,7 @@ public class AlRunnerPipeline
         Runtime.CalcFormulaRegistry.Clear();
         Runtime.TableFieldRegistry.Clear();
         Runtime.MockNumberSequence.Reset();
+        SourceFileMapper.Clear();
 
         // Load stubs
         foreach (var stubPath in options.StubPaths)
@@ -326,6 +327,10 @@ public class AlRunnerPipeline
                     var src = File.ReadAllText(f);
                     alSources.Add(src);
                     groupSources.Add(src);
+
+                    var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), f);
+                    foreach (var objName in SourceFileMapper.ParseObjectDeclarations(src))
+                        SourceFileMapper.Register(objName, relativePath);
                 }
                 var fullPath = Path.GetFullPath(path);
                 inputPaths.Add(fullPath);
@@ -338,6 +343,10 @@ public class AlRunnerPipeline
                 var fullPath = Path.GetFullPath(Path.GetDirectoryName(path)!);
                 inputPaths.Add(fullPath);
                 inputGroups.Add((fullPath, new List<string> { src }));
+
+                var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), path);
+                foreach (var objName in SourceFileMapper.ParseObjectDeclarations(src))
+                    SourceFileMapper.Register(objName, relativePath);
             }
             else
             {
