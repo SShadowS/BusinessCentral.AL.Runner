@@ -14,8 +14,37 @@ assignees: ''
 <!-- Compilation error or runtime exception here -->
 ```
 
-**AL line / file:** <!-- e.g. "PW Batches.al line ~100" -->
 **Triggered by:** <!-- e.g. "parallel-worker-bc", "my project", inline AL -->
+
+## Reproduction
+
+<!-- Minimal AL code that causes the error. Include both source and test codeunit. -->
+
+```al
+// Source codeunit
+codeunit 50100 MyCodeunit
+{
+    procedure DoSomething()
+    begin
+        // AL that triggers the gap
+    end;
+}
+```
+
+```al
+// Test codeunit
+codeunit 50101 MyCodeunitTest
+{
+    Subtype = Test;
+    var Assert: Codeunit Assert;
+
+    [Test]
+    procedure TestDoSomething()
+    begin
+        // test that fails or errors
+    end;
+}
+```
 
 ## Root cause
 
