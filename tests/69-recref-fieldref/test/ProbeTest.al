@@ -272,4 +272,71 @@ codeunit 56681 "RF Tests"
         Assert.IsFalse(RecRef.FindFirst(), 'FindFirst on empty table must return false');
         RecRef.Close();
     end;
+
+    // --- FieldRef.SetFilter ---
+
+    [Test]
+    procedure SetFilterOnFieldRefFilters()
+    var
+        R: Record "RF Test Item";
+        RecRef: RecordRef;
+        FldRef: FieldRef;
+    begin
+        R.Id := 1; R.Name := 'Alpha'; R.Insert();
+        R.Id := 2; R.Name := 'Bravo'; R.Insert();
+        R.Id := 3; R.Name := 'Alpha'; R.Insert();
+
+        RecRef.Open(56680);
+        FldRef := RecRef.Field(2);
+        FldRef.SetFilter('Alpha');
+        Assert.AreEqual(2, RecRef.Count(), 'SetFilter must filter to 2 matching rows');
+        RecRef.Close();
+    end;
+
+    // --- Full RecRef round-trip (insert via RecRef, read via RecRef) ---
+
+    [Test]
+    procedure FullRecRefRoundTrip()
+    var
+        Probe: Codeunit "RF Probe";
+    begin
+        // [GIVEN] 3 rows inserted via RecRef
+        Probe.SetFieldAndInsert(56680, 1, 10, 2, 'First');
+        Probe.SetFieldAndInsert(56680, 1, 20, 2, 'Second');
+        Probe.SetFieldAndInsert(56680, 1, 30, 2, 'Third');
+
+        // [THEN] Iterate via RecRef returns all rows
+        Assert.AreEqual('First,Second,Third', Probe.IterateNames(56680), 'Full round-trip must work');
+    end;
+
+    // --- Negative: reading FieldRef.Value on unbound RecRef ---
+
+    [Test]
+    procedure ReadFieldOnUnopenedRecRefReturnsFieldNo()
+    var
+        RecRef: RecordRef;
+        FldRef: FieldRef;
+    begin
+        // RecRef is not opened — ALField should still work without crash
+        // FieldRef.Number returns the field number even on unbound RecRef
+        FldRef := RecRef.Field(1);
+        Assert.AreEqual(1, FldRef.Number(), 'FieldRef.Number on unbound RecRef must return the field no');
+    end;
+
+    // --- Negative: Modify non-existent record ---
+
+    [Test]
+    procedure ModifyNonExistentViaRecRefFails()
+    var
+        RecRef: RecordRef;
+        FldRef: FieldRef;
+    begin
+        RecRef.Open(56680);
+        FldRef := RecRef.Field(1);
+        FldRef.Value := 999;
+        FldRef := RecRef.Field(2);
+        FldRef.Value := 'Ghost';
+        asserterror RecRef.Modify();
+        Assert.ExpectedError('Record not found');
+    end;
 }
