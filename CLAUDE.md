@@ -84,6 +84,10 @@ These are the BC runtime types replaced in standalone mode:
 | `AlCompat` | `ALCompiler`, `NavFormatEvaluateHelper` | Type conversion helpers; ALRandomize/ALRandom. |
 | `MockRecordRef` | `NavRecordRef` | RecordRef backed by MockRecordHandle. Open/Close, Field, Insert/Modify/Delete, FindSet/Next, GetTable/SetTable. |
 | `MockFieldRef` | `NavFieldRef` | FieldRef with ALValue get/set, ALNumber, ALSetRange, ALSetFilter, ALValidate. |
+| `MockTestPageHandle` | `NavTestPageHandle` | TestPage variable mock. OpenEdit/OpenView/OpenNew/Close/Trap lifecycle; GetField for field access; GetBuiltInAction for OK/Cancel. |
+| `MockTestPageField` | TestPage field | ALSetValue/ALValue for field get/set on TestPage fields. |
+| `MockTestPageAction` | TestPage action | ALInvoke for OK/Cancel/Close built-in actions. |
+| `HandlerRegistry` | BC test framework | Dispatches ConfirmHandler/MessageHandler from [NavTest].Handlers to registered handler methods. |
 
 ### MockRecordHandle capabilities
 
@@ -103,9 +107,11 @@ These are the BC runtime types replaced in standalone mode:
 
 The following have been removed (they were stubs for unsupported features):
 
-- `MockFormHandle.cs` — Page mocking (not supported in standalone mode)
-- `NavTestPageHandle.cs` — TestPage mocking (not supported)
 - `RegexRewriter` class — dead code superseded by `RoslynRewriter`
+
+Note: `MockFormHandle.cs` provides Page variable stubs (no-op lifecycle + procedure
+dispatch). `MockTestPageHandle.cs` provides TestPage support with field get/set
+and handler dispatch. Both are active code.
 
 ---
 
@@ -228,7 +234,10 @@ test belongs in the full BC pipeline, not in the runner.
 
 - **Implicit event publishers on DB operations** — OnAfterModify, OnAfterInsert,
   OnAfterDelete, etc. are NOT fired. The DB trigger pipeline is not implemented.
-- **Page, Report, XMLPort** — NOT supported. Developer must inject via AL interfaces.
+- **Page, Report, XMLPort** — Page variables (`Page "X"`) are no-op stubs via `MockFormHandle`.
+  TestPage variables (`TestPage "X"`) support field get/set and built-in actions via
+  `MockTestPageHandle`. ConfirmHandler and MessageHandler dispatch is supported.
+  Report and XMLPort are NOT supported. Developer must inject via AL interfaces.
 - **HTTP** — NOT supported. Developer must inject via AL interfaces.
 - **Events/subscribers** — NOT supported. `RunEvent`, `ALBindSubscription`,
   `ALUnbindSubscription` are no-ops.
@@ -303,6 +312,16 @@ These have been implemented and are tested by the test suite:
     - `RecRef.Count()` / `IsEmpty()` / `Reset()` respecting active filters
     - `FieldRef.Number()` / `FieldRef.Validate()`
     Tested by `tests/69-recref-fieldref/` (23 test cases).
+
+11. **TestPage support** (`Runtime/MockTestPageHandle.cs`, `Runtime/HandlerRegistry.cs`)
+    — `NavTestPageHandle` is rewritten to `MockTestPageHandle`. Supports:
+    - `OpenEdit()` / `OpenView()` / `OpenNew()` / `Close()` / `Trap()` lifecycle
+    - `GetField(fieldHash)` returning `MockTestPageField` with `ALSetValue` / `ALValue`
+    - `GetBuiltInAction(FormResult)` returning `MockTestPageAction` with `ALInvoke()`
+    - **ConfirmHandler** dispatch: `[ConfirmHandler]` procedures intercept `Confirm()` calls
+    - **MessageHandler** dispatch: `[MessageHandler]` procedures intercept `Message()` calls
+    - Handler registration via `[NavTest].Handlers` attribute on test methods
+    Tested by `tests/71-testpage/` (13 test cases).
 
 ## Remaining Gaps
 
@@ -458,6 +477,8 @@ Follows the `BusinessCentral.AL.*` pattern:
 | `AlRunner/Runtime/MockTextBuilder.cs` | In-memory TextBuilder mock |
 | `AlRunner/Runtime/MockRecordRef.cs` | RecordRef backed by MockRecordHandle (Open, Field, Insert, FindSet, GetTable/SetTable) |
 | `AlRunner/Runtime/MockFieldRef.cs` | FieldRef with ALValue get/set, ALNumber, ALSetRange, ALSetFilter |
+| `AlRunner/Runtime/MockTestPageHandle.cs` | TestPage mock: lifecycle, field access, built-in actions |
+| `AlRunner/Runtime/HandlerRegistry.cs` | ConfirmHandler/MessageHandler dispatch for test codeunits |
 | `AlRunner/StubGenerator.cs` | `--generate-stubs` command: scaffold AL stubs from .app symbol packages |
 | `AlRunner/stubs/LibraryAssert.al` | AL stub for codeunit 130 (auto-loaded for compilation) |
 | `tests/NN-name/` | Test suites (self-documenting: `src/*.al` + `test/*.al`). Run `ls tests/` to discover. |
