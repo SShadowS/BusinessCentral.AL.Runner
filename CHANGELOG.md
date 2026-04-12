@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-04-12
+
 ### Added
 - **JSON types (`JsonObject`, `JsonArray`, `JsonToken`, `JsonValue`) now work.**
   The real BC JSON types (`NavJsonObject`, `NavJsonArray`, `NavJsonToken`,
