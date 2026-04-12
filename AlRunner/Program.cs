@@ -37,6 +37,7 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("  -v, --verbose         Show detailed transpilation and compilation output");
     Console.Error.WriteLine("  --output-json         Output results as machine-readable JSON");
     Console.Error.WriteLine("  --capture-values      Capture variable values after each test for inline display");
+    Console.Error.WriteLine("  --iteration-tracking  Track per-iteration data for loops (requires --output-json)");
     Console.Error.WriteLine("  --run <procedure>     Run only the specified procedure by name");
     Console.Error.WriteLine("  --server              Start in server mode (JSON-RPC over stdin/stdout)");
     Console.Error.WriteLine("  --guide               Print test-writing guide for AI coding agents");
@@ -92,6 +93,10 @@ while (argIdx < args.Length)
             break;
         case "--capture-values":
             options.CaptureValues = true;
+            argIdx++;
+            break;
+        case "--iteration-tracking":
+            options.IterationTracking = true;
             argIdx++;
             break;
         case "--run":
@@ -267,6 +272,7 @@ al-runner --dump-rewritten ./src ./test                   # inspect generated C#
 al-runner --output-json ./src ./test                      # machine-readable JSON output
 al-runner --run TestMyProcedure ./src ./test              # run a single test by name
 al-runner --capture-values ./src ./test                   # capture variable values after each test
+al-runner --iteration-tracking ./src ./test                   # track loop iterations
 al-runner --server                                         # long-running JSON-RPC daemon (stdin/stdout)
 ```
 
@@ -1135,7 +1141,7 @@ public static class SourceLineMapper
         var stmtPattern = new System.Text.RegularExpressions.Regex(
             @"\b(?:StmtHit|CStmtHit)\((\d+)\)");
         var classPattern = new System.Text.RegularExpressions.Regex(
-            @"class\s+(\w+_Scope_\w+)");
+            @"class\s+(\w+_Scope(?:_\w+)?)");
 
         foreach (var (name, code) in postRewriteCSharp)
         {
@@ -1648,7 +1654,7 @@ public static class Executor
         var stmtPattern = new System.Text.RegularExpressions.Regex(
             @"\b(?:StmtHit|CStmtHit)\((\d+)\)");
         var classPattern = new System.Text.RegularExpressions.Regex(
-            @"class\s+(\w+_Scope_\w+)");
+            @"class\s+(\w+_Scope(?:_\w+)?)");
 
         foreach (var (name, code) in rewrittenSources)
         {
