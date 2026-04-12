@@ -48,10 +48,15 @@ AL Runner is designed to run **before** the full BC service tier pipeline as a f
 - AL interfaces injected by test code
 - AL arrays (MockArray, MockRecordArray)
 - AL Variant (MockVariant)
+- RecordRef / FieldRef (Open, Close, Field(n).Value get/set, Insert, Modify, Delete, DeleteAll, FindSet, Next, GetTable, SetTable, SetRange, SetFilter, RecordId)
+- Built-in session functions: CompanyName, UserId, TenantId, SerialNumber (return empty string)
 - Input from .al files, directories, or .app packages
 - Partial compilation (skips unsupported object types like XMLport)
 - Stub files (`--stubs <dir>`) for replacing unsupported dependencies
+- Stub generation (`--generate-stubs`) from .app symbol packages
 - Statement-level coverage reporting (`--coverage`, outputs cobertura.xml)
+- Per-iteration loop tracking (`--iteration-tracking`)
+- Machine-readable JSON output (`--output-json`)
 
 **Not supported (by design):**
 - Page, Report, XMLPort — inject via AL interface or exclude from runner
@@ -90,8 +95,7 @@ Known gaps for real-world use:
 3. **HTTP** — not supported. Inject via AL interface.
 4. **Filter groups** (FilterGroup) — not tracked.
 5. **ALGetFilter** — returns empty string even when filters are active.
-6. **RecordRef / FieldRef** — stubs compile but do not function.
-7. **BLOB / InStream / OutStream** — not supported.
+6. **BLOB / InStream / OutStream** — not supported.
 
 ## Developer Contract
 
@@ -146,6 +150,22 @@ al-runner --stubs ./stubs ./src ./test
 
 # Verbose output (show transpilation/compilation details)
 al-runner -v ./src ./test
+
+# Machine-readable JSON output
+al-runner --output-json ./src ./test
+
+# Run a single test procedure by name
+al-runner --run TestMyProcedure ./src ./test
+
+# Track per-iteration loop data (requires --output-json)
+al-runner --iteration-tracking --output-json ./src ./test
+
+# Capture variable values after each test for inline display
+al-runner --capture-values ./src ./test
+
+# Generate stub AL files from .app symbol packages
+al-runner --generate-stubs .alpackages ./stubs
+al-runner --generate-stubs .alpackages ./stubs ./src ./test  # only referenced codeunits
 
 # Run inline AL code
 al-runner -e 'codeunit 99 X { trigger OnRun() begin Message('"'"'hi'"'"'); end; }'
@@ -216,7 +236,7 @@ All dependencies are auto-downloaded and cached. The only prerequisite is .NET 8
 
 ## Test Cases
 
-The `tests/` directory contains 23 test cases. Each is a self-contained AL project (`src/` + `test/`) that exercises a specific runner capability. Every push runs all test cases against a [matrix of BC versions](https://github.com/StefanMaron/BusinessCentral.AL.Runner/actions/workflows/test-matrix.yml) (26.0 through 27.5).
+The `tests/` directory contains 70 test cases. Each is a self-contained AL project (`src/` + `test/`) that exercises a specific runner capability. Every push runs all test cases against a [matrix of BC versions](https://github.com/StefanMaron/BusinessCentral.AL.Runner/actions/workflows/test-matrix.yml) (26.0 through 27.5).
 
 | Test case | What it covers |
 |---|---|
@@ -243,6 +263,53 @@ The `tests/` directory contains 23 test cases. Each is a self-contained AL proje
 | `21-expected-error-substring` | ExpectedError substring matching |
 | `22-record-persistence` | Record persistence across procedure calls |
 | `23-error-line-mapping` | Error line mapping in test output |
+| `24-secret-text` | SecretText type handling |
+| `25-expected-error-code` | ExpectedErrorCode assertion |
+| `26-time-format` | Time formatting |
+| `27-testfield-error` | TestField error messages |
+| `28-table-extension-fields` | Table extension field support |
+| `29-record-id` | ALRecordId support |
+| `30-modify-all` | ModifyAll on filtered records |
+| `31-interface-return` | Interface return from functions |
+| `32-interface-param` | Interface parameter passing |
+| `33-extension-validate` | OnValidate in table extensions |
+| `34-extension-parent-object` | Extension parent object access |
+| `35-validate-no-value` | Validate without explicit value |
+| `36-page-ext-no-cascade` | Page extension no-cascade behavior |
+| `37-event-scope` | Event subscriber scoping |
+| `38-page-ext-currpage` | Page extension CurrPage access |
+| `39-stubs` | Stub file loading |
+| `40-page-run-record` | Page.Run with record parameter |
+| `41-try-function` | TryFunction error handling |
+| `42-list-of-interface` | List of interface type |
+| `43-recordref-local` | RecordRef local variable |
+| `44-single-arg-validate` | Single-argument Validate |
+| `45-unknown-namespace-using` | Unknown namespace using directive |
+| `46-missing-dep-hint` | Missing dependency hint in errors |
+| `47-capture-inline` | Inline value capture |
+| `48-page-variable` | Page variable handling |
+| `49-recordref-open` | RecordRef.Open |
+| `50-enum-ordinals` | Enum ordinal values |
+| `51-init-value` | Field InitValue properties |
+| `52-setfilter-and` | SetFilter with AND conditions |
+| `53-enum-interface` | Enum implements interface |
+| `54-numbersequence` | NumberSequence support |
+| `55-flowfield-exist` | FlowField existence |
+| `56-flowfield-multi` | FlowField with multiple tables |
+| `57-navapp-moduleinfo` | NavApp.GetModuleInfo |
+| `58-hyperlink` | Hyperlink function |
+| `59-dateformula-validate` | DateFormula validation |
+| `60-guid-text-get` | GUID to Text conversion with Get |
+| `61-enum-names` | Enum.Names() support |
+| `62-pk-unique` | Primary key uniqueness on Insert |
+| `63-oninsert-trigger` | OnInsert trigger firing |
+| `64-recref-inmem` | RecordRef backed by in-memory store |
+| `65-page-helper` | Page helper dispatch |
+| `66-event-subscribers` | Event subscriber binding |
+| `67-iteration-tracking` | Per-iteration loop tracking |
+| `68-strsubstno-integer` | StrSubstNo with integer arguments |
+| `69-recref-fieldref` | RecordRef/FieldRef full runtime |
+| `70-companyname` | CompanyName/UserId/TenantId/SerialNumber |
 
 When a new scenario is encountered that should work but doesn't, it gets triaged:
 - **In scope** → add a test case, fix the runner, verify it passes across all BC versions
