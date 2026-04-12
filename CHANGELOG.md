@@ -6,6 +6,21 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **TestPage support.** `NavTestPageHandle` is rewritten to `MockTestPageHandle`.
+  Test codeunits can now use `TestPage "X"` variables with `OpenEdit()`,
+  `OpenView()`, `OpenNew()`, `Close()`, and `Trap()` lifecycle methods.
+  `GetField(hash)` returns `MockTestPageField` supporting `ALSetValue`/`ALValue`
+  for field get/set. `GetBuiltInAction(FormResult)` returns `MockTestPageAction`
+  with `ALInvoke()` for OK/Cancel actions. Tested by `tests/71-testpage/`.
+- **ConfirmHandler / MessageHandler dispatch.** Test codeunits with
+  `[HandlerFunctions('MyHandler')]` now dispatch `Confirm()` and `Message()`
+  calls to the registered `[ConfirmHandler]` and `[MessageHandler]` procedures.
+  The `HandlerRegistry` reads handler names from `[NavTest].Handlers`, finds
+  matching `[NavHandler]` methods on the test codeunit, and wires them to
+  `MockDialog.ALConfirm` and `AlDialog.Message`. `ByRef<bool>` parameters for
+  confirm reply are initialized via delegate field wiring.
+
 ### Fixed
 - **`CompanyName` / `UserId` crash** (#35). AL built-in functions `CompanyName`,
   `UserId`, `TenantId`, and `SerialNumber` caused `NullReferenceException` at
