@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+
 namespace AlRunner;
 
 /// <summary>
@@ -45,5 +48,25 @@ public static class SourceFileMapper
     public static void Clear()
     {
         _objectToFile.Clear();
+    }
+
+    private static readonly Regex ObjectDeclPattern = new(
+        @"^(?:codeunit|table|page|report|xmlport|query|enum|enumextension|tableextension|pageextension|interface|permissionset|permissionsetextension|reportextension|profile|controladdin)\s+\d+\s+(?:""([^""]+)""|(\w+))",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+    /// <summary>
+    /// Parse AL object declarations from source content.
+    /// Returns the list of object names found.
+    /// Only matches declarations at the start of a line (not in comments or strings).
+    /// </summary>
+    public static List<string> ParseObjectDeclarations(string content)
+    {
+        var names = new List<string>();
+        foreach (Match m in ObjectDeclPattern.Matches(content))
+        {
+            var name = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+            names.Add(name);
+        }
+        return names;
     }
 }
