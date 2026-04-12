@@ -6,6 +6,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **Built-in Library - Variable Storage stub** (codeunit 131004). An AL stub
+  (`stubs/LibraryVariableStorage.al`) is auto-loaded alongside the Assert stub,
+  and `MockVariableStorage` provides an in-memory FIFO queue at runtime.
+  Supports `Enqueue`, `DequeueText`, `DequeueInteger`, `DequeueDecimal`,
+  `DequeueBoolean`, `DequeueDate`, `DequeueVariant`, `AssertEmpty`, `Clear`,
+  and `IsEmpty`. Tested by `tests/75-library-variable-storage/` (9 test cases).
+  (fixes #43)
+
 ### Fixed
 - **RecordRef assignment (`:=` operator).** `MockRecordRef` was missing the
   `ALAssign` method that the BC compiler emits for `RecRef2 := RecRef1`. This
