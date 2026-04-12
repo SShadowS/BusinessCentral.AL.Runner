@@ -41,8 +41,11 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("  --run <procedure>     Run only the specified procedure by name");
     Console.Error.WriteLine("  --server              Start in server mode (JSON-RPC over stdin/stdout)");
     Console.Error.WriteLine("  --generate-stubs <packages-dir> <output-dir> [<src-dir> ...]");
-    Console.Error.WriteLine("                        Generate empty AL stub files from .app symbol packages");
-    Console.Error.WriteLine("                        When source dirs given, only referenced codeunits are emitted");
+    Console.Error.WriteLine("                        Scaffold empty AL stub files from .app symbol packages.");
+    Console.Error.WriteLine("                        <packages-dir>  required  directory of .app files to read");
+    Console.Error.WriteLine("                        <output-dir>    required  where to write the .al stub files");
+    Console.Error.WriteLine("                        <src-dir> ...   optional  when given, only codeunits actually");
+    Console.Error.WriteLine("                                                  referenced in those dirs are emitted");
     Console.Error.WriteLine("  --guide               Print test-writing guide for AI coding agents");
     Console.Error.WriteLine("  -h, --help            Show this help");
     Console.Error.WriteLine();
@@ -53,6 +56,10 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("  al-runner --output-json ./src ./test          Get JSON results for tooling");
     Console.Error.WriteLine("  al-runner --run TestMyThing ./src ./test      Run a single test procedure");
     Console.Error.WriteLine("  al-runner --server                            Start JSON-RPC daemon");
+    Console.Error.WriteLine("  al-runner --generate-stubs .alpackages ./stubs ./src ./test");
+    Console.Error.WriteLine("                                                Scaffold stubs for referenced codeunits");
+    Console.Error.WriteLine("  al-runner --generate-stubs .alpackages ./stubs");
+    Console.Error.WriteLine("                                                Scaffold stubs for all codeunits in packages");
     Console.Error.WriteLine();
     Console.Error.WriteLine("Test codeunits (Subtype = Test) are auto-detected.");
     Console.Error.WriteLine("BC Service Tier DLLs are auto-downloaded on first run.");
