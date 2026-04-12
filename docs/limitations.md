@@ -1,0 +1,119 @@
+# AL Runner — Limitations
+
+AL Runner trades full fidelity for speed. Understanding what it fundamentally cannot
+do helps you decide what to test here and what to send to the full BC pipeline.
+
+---
+
+## Architectural limits — cannot be fixed
+
+### No BC service tier
+
+The runner has no SQL Server, no BC server process, and no license. It runs your AL
+as .NET code in a single process. This rules out anything that is inherently tied to
+the BC runtime environment:
+
+- **Permissions and entitlements** — there is no permission system. All field/table
+  access succeeds unconditionally.
+- **Company context** — `CompanyName()` returns an empty string. Code that branches
+  on company name will take the "empty" branch.
+- **Base app data** — no standard BC tables are populated. Code that reads
+  `G/L Account`, `Customer`, `Vendor`, or any other base app table finds them empty
+  unless your test inserts data.
+- **Setup tables** — `General Ledger Setup`, `Sales Setup`, etc. are empty.
+  Code that reads setup fields gets type defaults.
+
+### No transaction semantics
+
+There is one flat, in-memory record store shared across the entire test run.
+`Commit()` and `Rollback()` are no-ops. As a result:
+
+- Code that detects whether a nested codeunit called `Commit()` will not work.
+- Code that relies on rollback to undo partial writes will not work.
+- The isolation between a "worker session" and its caller does not exist.
+
+### No parallel session execution
+
+`StartSession` runs the target codeunit **synchronously, inline**, before returning.
+The implications:
+
+- `IsSessionActive` always returns `false` — the session is already done.
+- Session timeout logic never fires — there is no wall-clock timer or background thread.
+- Tests that poll until a session finishes see all results already present from the first call.
+- Workers share the same record store as the caller — there is no cross-session isolation.
+
+Libraries built around parallel execution (e.g. parallel-worker-bc) can have their
+pure-logic tests pass, but any test that exercises the parallel contract itself — timeout
+enforcement, transaction isolation between workers, async completion detection — cannot
+pass here.
+
+### No event subscribers
+
+Integration events and business events are stripped. Subscribers never fire.
+
+A test that calls `Rec.Modify()` and then asserts on state that is normally set by an
+`[EventSubscriber]` on `OnAfterModify` will pass silently, because the subscriber
+never ran. This is a **silent false positive** — al-runner says PASS, the full BC
+pipeline would say FAIL.
+
+Always run the full pipeline after al-runner for code that relies on event subscribers.
+
+### No UI rendering
+
+Pages are not rendered. There is no layout engine, no field visibility evaluation, and
+no report dataset. `TestPage` provides field get/set and handler dispatch, but:
+
+- Field `Visible`, `Enabled`, and `Editable` are not evaluated against page metadata.
+- Actions beyond OK/Cancel/Close are not bound to real page action triggers.
+- `Page.Run()` is a no-op. `Page.RunModal()` dispatches to `[ModalPageHandler]` if
+  registered, otherwise throws.
+
+### No HTTP
+
+The runner has no network access. `HttpClient`, `HttpRequestMessage`, and similar
+calls will fail. Inject these dependencies via an AL interface if you want to unit
+test the logic around HTTP calls.
+
+---
+
+## Behavioural differences — same API, different semantics
+
+These don't crash, but they behave differently from real BC. Tests that assert on
+the exact value will see different results.
+
+| AL call | Real BC | al-runner |
+|---|---|---|
+| `CompanyName()` | Active company name | `""` |
+| `UserId()` | Authenticated user | `""` |
+| `IsSessionActive(id)` | True while session runs | Always `false` |
+| `GuiAllowed()` | False in background sessions | `false` |
+| `GetFilter(field)` | Serialised filter expression | `""` (not yet serialised) |
+| `Record.FieldCount` via RecordRef | Schema field count | Count of fields written at runtime |
+| Field `InitValue` | Applied on `Init()` | Not applied — type default only |
+| `FieldRef.Caption` / `.Name` | Field metadata from schema | `"FieldNN"` stub |
+| `Commit()` | Commits current transaction | No-op |
+
+---
+
+## The right scope
+
+al-runner is designed for **pure-logic codeunits**: code that reads and writes
+in-memory records, calls other codeunits, and produces a result that can be
+asserted in a test.
+
+If the correctness of the code depends on any of the following, test it in the
+full BC service tier pipeline instead:
+
+- Event subscribers firing in response to record operations
+- Real company or setup data being present
+- Parallel sessions running concurrently
+- Transaction boundaries (commit / rollback)
+- Page or report rendering
+- HTTP calls to external services
+- Permissions or entitlements
+
+```
+al-runner  →  pure-logic failures in seconds
+    ↓ (only if al-runner passes)
+Full BC pipeline  →  full fidelity, 45+ minutes
+```
