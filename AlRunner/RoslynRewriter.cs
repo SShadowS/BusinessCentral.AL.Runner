@@ -211,6 +211,7 @@ public class RoslynRewriter : CSharpSyntaxRewriter
         bool isScopeClass = false;
         bool isRecordClass = false;
         bool isPageExtensionClass = false;
+        bool isPageClass = false;
         string? enclosingClassName = null;
         if (node.BaseList != null)
         {
@@ -221,6 +222,8 @@ public class RoslynRewriter : CSharpSyntaxRewriter
                     isRecordClass = true;
                 if (typeText == "NavFormExtension")
                     isPageExtensionClass = true;
+                if (typeText == "NavForm")
+                    isPageClass = true;
                 if (typeText.StartsWith("NavMethodScope<") || typeText.StartsWith("NavTriggerMethodScope<")
                     || typeText.StartsWith("NavEventMethodScope<"))
                 {
@@ -401,6 +404,27 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
 ";
             var pageMembers = CSharpSyntaxTree.ParseText(
                 $"class _Temp_ {{ {parentObjectCode} }}").GetRoot()
+                .DescendantNodes().OfType<ClassDeclarationSyntax>().First().Members;
+            visited = visited.WithMembers(visited.Members.AddRange(pageMembers));
+        }
+
+        // Standalone page classes (NavForm → removed base) need CurrPage methods injected
+        // because CurrPage is (PageNNNN)this — calling CurrPage.Update() calls Page.Update().
+        // Also inject extension-dispatch stubs that NavForm provided as virtual methods.
+        if (isPageClass)
+        {
+            var pageMemberCode = @"
+public void Update(bool saveRecord = true) { }
+public void Close() { }
+public void Activate() { }
+public void SaveRecord() { }
+public void SetTableView(MockRecordHandle rec) { }
+protected bool CallGetDecimalPlacesExtensionMethod(int fieldNo, ref string result) { return false; }
+protected bool CallGetTableRelationExtensionMethod(int fieldNo, MockRecordHandle rec, ref bool result) { return false; }
+protected bool CallGetFormatExtensionMethod(int fieldNo, ref string result) { return false; }
+";
+            var pageMembers = CSharpSyntaxTree.ParseText(
+                $"class _Temp_ {{ {pageMemberCode} }}").GetRoot()
                 .DescendantNodes().OfType<ClassDeclarationSyntax>().First().Members;
             visited = visited.WithMembers(visited.Members.AddRange(pageMembers));
         }
@@ -1879,6 +1903,21 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
             innerAccess2.Name.Identifier.Text == "Parent" &&
             innerAccess2.Expression is BaseExpressionSyntax)
         {
+            // Special case: base.Parent.__ThisHandle -> MockCodeunitHandle.FromInstance(_parent)
+            // BC compiler emits __ThisHandle for exit(this) in codeunit-returning methods.
+            // __ThisHandle is a NavCodeunitHandle property on NavCodeunit; after stripping the
+            // base class it is undefined. Replace with a factory call that wraps the instance.
+            if (visited.Name.Identifier.Text == "__ThisHandle")
+            {
+                return SyntaxFactory.InvocationExpression(
+                    SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("MockCodeunitHandle"),
+                        SyntaxFactory.IdentifierName("FromInstance")),
+                    SyntaxFactory.ArgumentList(
+                        SyntaxFactory.SingletonSeparatedList(
+                            SyntaxFactory.Argument(SyntaxFactory.IdentifierName("_parent")))));
+            }
             // Replace base.Parent.xxx with _parent.xxx
             return visited.WithExpression(SyntaxFactory.IdentifierName("_parent"));
         }

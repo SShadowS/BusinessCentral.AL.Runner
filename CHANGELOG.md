@@ -6,6 +6,15 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- **`exit(this)` in fluent-chaining codeunits now works.** The BC compiler emits
+  `__ThisHandle` for codeunit methods that return `Codeunit "Self"` (fluent builder
+  pattern). After the rewriter stripped the `NavCodeunit` base class, `__ThisHandle`
+  was undefined, causing `CS1061` compilation errors. The rewriter now replaces
+  `__ThisHandle` access with `MockCodeunitHandle.FromInstance()`, which wraps the
+  live codeunit instance. Tested by `tests/79-exit-this/` (3 test cases).
+  ([#45](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/45))
+
 ### Added
 - **`MockFormHandle` page variable stubs.** `SetTableView(rec)`, `LookupMode`
   (bool property, default false), `Editable` (bool property, default true),

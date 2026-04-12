@@ -24,6 +24,16 @@ public class MockCodeunitHandle
     }
 
     /// <summary>
+    /// 2-arg constructor: (parent, codeunitId).
+    /// BC emits this form for codeunit return values (e.g. exit(this) / fluent-builder pattern).
+    /// The parent object is unused in standalone mode.
+    /// </summary>
+    public MockCodeunitHandle(object? parent, int codeunitId)
+    {
+        _codeunitId = codeunitId;
+    }
+
+    /// <summary>
     /// Resets the handle (no-op for standalone execution).
     /// Called from OnClear() in generated codeunit classes.
     /// </summary>
@@ -59,6 +69,26 @@ public class MockCodeunitHandle
     }
 
     /// <summary>
+    /// Creates a MockCodeunitHandle that wraps an existing codeunit instance.
+    /// Used for exit(this) in fluent-builder codeunits: the BC compiler emits
+    /// __ThisHandle which references the codeunit itself as a NavCodeunitHandle.
+    /// The codeunit ID is extracted from the class name (e.g. "Codeunit50100" -> 50100).
+    /// </summary>
+    public static MockCodeunitHandle FromInstance(object instance)
+    {
+        // Extract codeunit ID from class name "CodeunitNNNNN"
+        var typeName = instance.GetType().Name;
+        int id = 0;
+        if (typeName.StartsWith("Codeunit"))
+        {
+            int.TryParse(typeName.Substring("Codeunit".Length), out id);
+        }
+        var handle = new MockCodeunitHandle(id);
+        handle._codeunitInstance = instance;
+        return handle;
+    }
+
+    /// <summary>
     /// Invoke a method by its member ID. The generated codeunit has public methods
     /// like ApplyDiscount(...) that create scope objects internally.
     /// We find the matching public method by looking at the scope class name which
@@ -66,8 +96,8 @@ public class MockCodeunitHandle
     /// </summary>
     public object? Invoke(int memberId, object[] args)
     {
-        // Route codeunit 130 (Library Assert) and 130000 (Assert from BC test toolkit) to MockAssert
-        if (_codeunitId is 130 or 130000)
+        // Route codeunit 130 ("Library Assert"), 131 ("Assert" alias stub), and 130000 (Assert from BC test toolkit) to MockAssert
+        if (_codeunitId is 130 or 131 or 130000)
             return InvokeAssert(memberId, args);
 
         // Route codeunit 131004 (Library - Variable Storage) to MockVariableStorage
@@ -355,7 +385,7 @@ public class MockCodeunitHandle
         var assembly = CurrentAssembly;
         if (assembly == null) return null;
 
-        var codeunitType = assembly.GetTypes().FirstOrDefault(t => t.Name == "Codeunit130");
+        var codeunitType = assembly.GetTypes().FirstOrDefault(t => t.Name == "Codeunit130" || t.Name == "Codeunit131");
         if (codeunitType == null) return null;
 
         var memberIdStr = memberId.ToString();

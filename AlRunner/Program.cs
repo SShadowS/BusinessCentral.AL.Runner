@@ -231,6 +231,7 @@ test executor that needs no BC service tier, Docker, SQL Server, or license.
 - Built-in session functions: CompanyName, UserId, TenantId, SerialNumber (return empty string)
 - Partial compilation (skips unsupported object types like XMLport)
 - Coverage reporting via `--coverage` (statement-level, outputs cobertura.xml)
+- Fluent builder pattern: `exit(this)` in codeunit methods returning `Codeunit "Self"`
 - Test handler functions: [ConfirmHandler], [MessageHandler], [ModalPageHandler]
   - ConfirmHandler intercepts Confirm() calls, receives question text, sets reply
   - MessageHandler intercepts Message() calls, receives message text
@@ -248,7 +249,7 @@ test executor that needs no BC service tier, Docker, SQL Server, or license.
 ### Writing a compatible test codeunit
 
 1. Use `Subtype = Test` on the codeunit
-2. Reference `Assert` as `Codeunit Assert` (not `Library Assert`)
+2. Reference `Assert` as `Codeunit "Library Assert"` or `Codeunit Assert` (both are supported)
 3. Reference `Library - Variable Storage` as `Codeunit ""Library - Variable Storage""` for
    passing values between test setup and handler functions (Enqueue/DequeueText/etc.)
 4. Mark each test procedure with `[Test]`
