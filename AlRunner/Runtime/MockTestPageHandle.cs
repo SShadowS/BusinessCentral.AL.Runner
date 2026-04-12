@@ -14,12 +14,20 @@ namespace AlRunner.Runtime;
 /// - ALTrap() — marks page as expecting modal open (no-op)
 /// - GetField(fieldHash) — returns MockTestPageField for value get/set
 /// - GetBuiltInAction(FormResult) — returns MockTestPageAction for OK/Cancel/Close
+/// - ModalResult — tracks the FormResult set by action invocation (OK/Cancel)
 /// </summary>
 public class MockTestPageHandle
 {
     public int PageId { get; }
 
     private readonly Dictionary<int, MockTestPageField> _fields = new();
+
+    /// <summary>
+    /// The modal result set by invoking a built-in action (OK, Cancel, etc.).
+    /// Defaults to LookupOK (3) — same as BC when the handler completes without
+    /// explicitly invoking Cancel.
+    /// </summary>
+    public FormResult ModalResult { get; set; } = FormResult.LookupOK;
 
     public MockTestPageHandle() { }
 
@@ -53,10 +61,12 @@ public class MockTestPageHandle
     /// <summary>
     /// Returns a MockTestPageAction for built-in actions (OK, Cancel, Close, etc.).
     /// BC casts FormResult enum values: GetBuiltInAction((FormResult)1) for OK.
+    /// The action is linked back to this handle so ALInvoke() can set the ModalResult.
     /// </summary>
     public MockTestPageAction GetBuiltInAction(object formResult)
     {
-        return new MockTestPageAction();
+        var fr = (FormResult)formResult;
+        return new MockTestPageAction(this, fr);
     }
 }
 
@@ -96,8 +106,38 @@ public class MockTestPageField
 /// <summary>
 /// Mock for TestPage built-in actions (OK, Cancel, Close).
 /// BC generates: tP.GetBuiltInAction((FormResult)1).ALInvoke()
+///
+/// When ALInvoke() is called, sets the parent MockTestPageHandle's ModalResult
+/// to the corresponding FormResult. This allows RunModal interception to return
+/// the correct result based on whether the handler invoked OK or Cancel.
 /// </summary>
 public class MockTestPageAction
 {
-    public void ALInvoke() { }
+    private readonly MockTestPageHandle? _parent;
+    private readonly FormResult _result;
+
+    /// <summary>Parameterless ctor for backward compat (non-modal usage).</summary>
+    public MockTestPageAction() { _result = FormResult.LookupOK; }
+
+    /// <summary>Create an action linked to a TestPage handle with a specific result.</summary>
+    public MockTestPageAction(MockTestPageHandle parent, FormResult result)
+    {
+        _parent = parent;
+        _result = result;
+    }
+
+    public void ALInvoke()
+    {
+        if (_parent != null)
+        {
+            // Map the "page action" FormResult to the "modal return" FormResult.
+            // BC maps OK (1) -> LookupOK (3), Cancel (2) -> LookupCancel (4).
+            _parent.ModalResult = _result switch
+            {
+                FormResult.OK => FormResult.LookupOK,
+                FormResult.Cancel => FormResult.LookupCancel,
+                _ => _result
+            };
+        }
+    }
 }

@@ -5,12 +5,12 @@ using Microsoft.Dynamics.Nav.Types;
 namespace AlRunner.Runtime;
 
 /// <summary>
-/// Registry for test handler functions (ConfirmHandler, MessageHandler, etc.).
+/// Registry for test handler functions (ConfirmHandler, MessageHandler, ModalPageHandler, etc.).
 ///
 /// In BC, test codeunits declare handler functions with attributes like
-/// [ConfirmHandler] and [MessageHandler]. When the code under test calls
-/// Confirm() or Message(), the BC test framework dispatches to the registered
-/// handler instead of showing UI.
+/// [ConfirmHandler], [MessageHandler], and [ModalPageHandler]. When the code
+/// under test calls Confirm(), Message(), or Page.RunModal(), the BC test
+/// framework dispatches to the registered handler instead of showing UI.
 ///
 /// The Executor registers handlers before each test by reading the Handlers
 /// property from the [NavTest] attribute and finding matching [NavHandler]
@@ -26,6 +26,9 @@ public static class HandlerRegistry
 
     // Registered message handler: method that takes (NavText msg)
     private static MethodInfo? _messageHandler;
+
+    // Registered modal page handler: method that takes (MockTestPageHandle testPage)
+    private static MethodInfo? _modalPageHandler;
 
     /// <summary>
     /// Register handlers for the current test. Called by the Executor before each test.
@@ -65,6 +68,8 @@ public static class HandlerRegistry
                         _confirmHandler = method;
                     else if (handlerTypeName == "Message")
                         _messageHandler = method;
+                    else if (handlerTypeName == "ModalPage")
+                        _modalPageHandler = method;
                 }
             }
         }
@@ -153,6 +158,34 @@ public static class HandlerRegistry
     }
 
     /// <summary>
+    /// Invoke the registered modal page handler for the given page ID.
+    /// Creates a MockTestPageHandle, passes it to the handler, and returns
+    /// the FormResult set by the handler (via OK/Cancel action invocation).
+    /// Throws if no handler is registered.
+    /// </summary>
+    public static FormResult InvokeModalPageHandler(int pageId)
+    {
+        if (_modalPageHandler == null || _parentInstance == null)
+            throw new Exception($"No ModalPageHandler registered for page {pageId}. " +
+                "Add [HandlerFunctions('YourHandler')] to the test and a " +
+                "[ModalPageHandler] procedure.");
+
+        // Create a TestPage handle for the modal page
+        var testPage = new MockTestPageHandle(pageId);
+
+        try
+        {
+            _modalPageHandler.Invoke(_parentInstance, new object[] { testPage });
+        }
+        catch (TargetInvocationException tie) when (tie.InnerException != null)
+        {
+            throw tie.InnerException;
+        }
+
+        return testPage.ModalResult;
+    }
+
+    /// <summary>
     /// Check if a confirm handler is registered.
     /// </summary>
     public static bool HasConfirmHandler => _confirmHandler != null;
@@ -163,6 +196,11 @@ public static class HandlerRegistry
     public static bool HasMessageHandler => _messageHandler != null;
 
     /// <summary>
+    /// Check if a modal page handler is registered.
+    /// </summary>
+    public static bool HasModalPageHandler => _modalPageHandler != null;
+
+    /// <summary>
     /// Reset all registered handlers. Called between tests.
     /// </summary>
     public static void Reset()
@@ -170,5 +208,6 @@ public static class HandlerRegistry
         _parentInstance = null;
         _confirmHandler = null;
         _messageHandler = null;
+        _modalPageHandler = null;
     }
 }

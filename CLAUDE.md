@@ -84,10 +84,11 @@ These are the BC runtime types replaced in standalone mode:
 | `AlCompat` | `ALCompiler`, `NavFormatEvaluateHelper` | Type conversion helpers; ALRandomize/ALRandom. |
 | `MockRecordRef` | `NavRecordRef` | RecordRef backed by MockRecordHandle. Open/Close, Field, Insert/Modify/Delete, FindSet/Next, GetTable/SetTable. |
 | `MockFieldRef` | `NavFieldRef` | FieldRef with ALValue get/set, ALNumber, ALSetRange, ALSetFilter, ALValidate. |
-| `MockTestPageHandle` | `NavTestPageHandle` | TestPage variable mock. OpenEdit/OpenView/OpenNew/Close/Trap lifecycle; GetField for field access; GetBuiltInAction for OK/Cancel. |
+| `MockTestPageHandle` | `NavTestPageHandle` | TestPage variable mock. OpenEdit/OpenView/OpenNew/Close/Trap lifecycle; GetField for field access; GetBuiltInAction for OK/Cancel. Tracks ModalResult for RunModal interception. |
 | `MockTestPageField` | TestPage field | ALSetValue/ALValue for field get/set on TestPage fields. |
-| `MockTestPageAction` | TestPage action | ALInvoke for OK/Cancel/Close built-in actions. |
-| `HandlerRegistry` | BC test framework | Dispatches ConfirmHandler/MessageHandler from [NavTest].Handlers to registered handler methods. |
+| `MockTestPageAction` | TestPage action | ALInvoke for OK/Cancel/Close built-in actions. Sets parent handle's ModalResult (OK→LookupOK, Cancel→LookupCancel). |
+| `MockFormHandle` | `NavFormHandle` | Page variable mock. RunModal() dispatches to ModalPageHandler via HandlerRegistry, returns FormResult. |
+| `HandlerRegistry` | BC test framework | Dispatches ConfirmHandler/MessageHandler/ModalPageHandler from [NavTest].Handlers to registered handler methods. |
 
 ### MockRecordHandle capabilities
 
@@ -109,8 +110,9 @@ The following have been removed (they were stubs for unsupported features):
 
 - `RegexRewriter` class — dead code superseded by `RoslynRewriter`
 
-Note: `MockFormHandle.cs` provides Page variable stubs (no-op lifecycle + procedure
-dispatch). `MockTestPageHandle.cs` provides TestPage support with field get/set
+Note: `MockFormHandle.cs` provides Page variable stubs (lifecycle + procedure
+dispatch + RunModal interception via HandlerRegistry). `MockTestPageHandle.cs`
+provides TestPage support with field get/set, built-in action result tracking,
 and handler dispatch. Both are active code.
 
 ---
@@ -234,10 +236,11 @@ test belongs in the full BC pipeline, not in the runner.
 
 - **Implicit event publishers on DB operations** — OnAfterModify, OnAfterInsert,
   OnAfterDelete, etc. are NOT fired. The DB trigger pipeline is not implemented.
-- **Page, Report, XMLPort** — Page variables (`Page "X"`) are no-op stubs via `MockFormHandle`.
+- **Page, Report, XMLPort** — Page variables (`Page "X"`) are stubs via `MockFormHandle`.
+  `RunModal()` dispatches to `[ModalPageHandler]` when registered; otherwise throws.
   TestPage variables (`TestPage "X"`) support field get/set and built-in actions via
-  `MockTestPageHandle`. ConfirmHandler and MessageHandler dispatch is supported.
-  Report and XMLPort are NOT supported. Developer must inject via AL interfaces.
+  `MockTestPageHandle`. ConfirmHandler, MessageHandler, and ModalPageHandler dispatch
+  is supported. Report and XMLPort are NOT supported. Developer must inject via AL interfaces.
 - **HTTP** — NOT supported. Developer must inject via AL interfaces.
 - **Events/subscribers** — NOT supported. `RunEvent`, `ALBindSubscription`,
   `ALUnbindSubscription` are no-ops.
@@ -320,8 +323,12 @@ These have been implemented and are tested by the test suite:
     - `GetBuiltInAction(FormResult)` returning `MockTestPageAction` with `ALInvoke()`
     - **ConfirmHandler** dispatch: `[ConfirmHandler]` procedures intercept `Confirm()` calls
     - **MessageHandler** dispatch: `[MessageHandler]` procedures intercept `Message()` calls
+    - **ModalPageHandler** dispatch: `[ModalPageHandler]` procedures intercept `Page.RunModal()`
+      calls. `MockFormHandle.RunModal()` creates a `MockTestPageHandle`, invokes the handler,
+      and returns the `FormResult` set by OK/Cancel action invocation. Missing handler throws
+      a descriptive error.
     - Handler registration via `[NavTest].Handlers` attribute on test methods
-    Tested by `tests/71-testpage/` (13 test cases).
+    Tested by `tests/71-testpage/` (13 test cases) and `tests/73-modal-handler/` (3 test cases).
 
 ## Remaining Gaps
 
@@ -478,7 +485,7 @@ Follows the `BusinessCentral.AL.*` pattern:
 | `AlRunner/Runtime/MockRecordRef.cs` | RecordRef backed by MockRecordHandle (Open, Field, Insert, FindSet, GetTable/SetTable) |
 | `AlRunner/Runtime/MockFieldRef.cs` | FieldRef with ALValue get/set, ALNumber, ALSetRange, ALSetFilter |
 | `AlRunner/Runtime/MockTestPageHandle.cs` | TestPage mock: lifecycle, field access, built-in actions |
-| `AlRunner/Runtime/HandlerRegistry.cs` | ConfirmHandler/MessageHandler dispatch for test codeunits |
+| `AlRunner/Runtime/HandlerRegistry.cs` | ConfirmHandler/MessageHandler/ModalPageHandler dispatch for test codeunits |
 | `AlRunner/StubGenerator.cs` | `--generate-stubs` command: scaffold AL stubs from .app symbol packages |
 | `AlRunner/stubs/LibraryAssert.al` | AL stub for codeunit 130 (auto-loaded for compilation) |
 | `tests/NN-name/` | Test suites (self-documenting: `src/*.al` + `test/*.al`). Run `ls tests/` to discover. |

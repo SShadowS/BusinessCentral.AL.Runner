@@ -224,13 +224,18 @@ test executor that needs no BC service tier, Docker, SQL Server, or license.
 - Built-in session functions: CompanyName, UserId, TenantId, SerialNumber (return empty string)
 - Partial compilation (skips unsupported object types like XMLport)
 - Coverage reporting via `--coverage` (statement-level, outputs cobertura.xml)
+- Test handler functions: [ConfirmHandler], [MessageHandler], [ModalPageHandler]
+  - ConfirmHandler intercepts Confirm() calls, receives question text, sets reply
+  - MessageHandler intercepts Message() calls, receives message text
+  - ModalPageHandler intercepts Page.RunModal() calls, receives a TestPage handle,
+    can set field values and invoke OK/Cancel actions; returns FormResult to caller
 
 ### What al-runner does NOT support
 
 - Pages, Reports, XMLports — stub them via `--stubs <dir>` or inject via AL interface
 - HTTP / REST calls — inject via AL interface
 - Event subscribers — OnAfterModify, OnAfterInsert, etc. do not fire
-- Confirm() returns true always; StrMenu is not supported
+- StrMenu is not supported
 - BLOB / InStream / OutStream operations
 - Filter groups (FilterGroup)
 

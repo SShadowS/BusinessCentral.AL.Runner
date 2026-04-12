@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Dynamics.Nav.Types;
 
 namespace AlRunner.Runtime;
 
@@ -31,7 +32,17 @@ public class MockFormHandle
     public MockFormHandle(int pageId) { PageId = pageId; }
 
     public void Run() { }
-    public void RunModal() { }
+
+    /// <summary>
+    /// Intercepts Page.RunModal(). If a ModalPageHandler is registered for this page,
+    /// creates a MockTestPageHandle, invokes the handler, and returns the FormResult
+    /// set by the handler (via OK/Cancel action invocation). If no handler is registered,
+    /// throws an error so tests fail clearly instead of silently returning a default.
+    /// </summary>
+    public FormResult RunModal()
+    {
+        return HandlerRegistry.InvokeModalPageHandler(PageId);
+    }
     public void SetRecord(object? record) { }
     public object? GetRecord() => null;
     public void Update(bool saveRecord = true) { }

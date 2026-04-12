@@ -13,6 +13,13 @@ All notable changes to this project are documented here. Format based on
   RecordRef to another. Tested by `tests/72-recref-assign/`. (fixes #35, #36)
 
 ### Added
+- **ModalPageHandler dispatch.** `[ModalPageHandler]` procedures now intercept
+  `Page.RunModal()` calls. When production code calls `RunModal()` on a page
+  variable, `MockFormHandle.RunModal()` looks up the registered handler via
+  `HandlerRegistry`, creates a `MockTestPageHandle`, invokes the handler, and
+  returns the `FormResult` set by the handler's OK/Cancel action invocation
+  (OK maps to `LookupOK`, Cancel maps to `LookupCancel`). Missing handler
+  throws a descriptive error. Tested by `tests/73-modal-handler/` (3 test cases).
 - **TestPage support.** `NavTestPageHandle` is rewritten to `MockTestPageHandle`.
   Test codeunits can now use `TestPage "X"` variables with `OpenEdit()`,
   `OpenView()`, `OpenNew()`, `Close()`, and `Trap()` lifecycle methods.
