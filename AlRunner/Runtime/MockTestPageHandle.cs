@@ -141,6 +141,30 @@ public class MockTestPageField
     /// BC emits <c>tP.GetField(hash).ALCaption</c> for TestPage field Caption reads.
     /// </summary>
     public NavText ALCaption => new NavText("");
+
+    /// <summary>
+    /// ALVisible — whether the field is visible on the page. Stub: always true.
+    /// BC emits <c>tP.GetField(hash).ALVisible()</c> as a method call for reads.
+    /// </summary>
+    public bool ALVisible() => true;
+
+    /// <summary>
+    /// ALEditable — whether the field is editable on the page. Stub: always true.
+    /// BC emits <c>tP.GetField(hash).ALEditable()</c> as a method call for reads.
+    /// </summary>
+    public bool ALEditable() => true;
+
+    /// <summary>
+    /// ALLookup — triggers the lookup action on the field. No-op in standalone mode.
+    /// BC emits <c>tP.GetField(hash).ALLookup()</c>.
+    /// </summary>
+    public void ALLookup() { }
+
+    /// <summary>
+    /// ALDrilldown — triggers the drilldown action on the field. No-op in standalone mode.
+    /// BC emits <c>tP.GetField(hash).ALDrilldown()</c>.
+    /// </summary>
+    public void ALDrilldown() { }
 }
 
 /// <summary>

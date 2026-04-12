@@ -6,6 +6,28 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+- **`RecordRef.FieldIndex(n)`** returns a `MockFieldRef` for the nth registered
+  field (sorted by field number). Out-of-range index returns a stub with field
+  number 0.
+- **`RecordRef.Caption`** returns the table caption (delegates to
+  `MockRecordHandle.ALTableCaption`).
+- **`TestPage field Visible`** — `ALVisible()` method on `MockTestPageField`
+  returning `true` (stub).
+- **`TestPage field Editable`** — `ALEditable()` method on `MockTestPageField`
+  returning `true` (stub).
+- **`TestPage field Lookup()`** — `ALLookup()` no-op method on `MockTestPageField`.
+- **`TestPage field DrillDown()`** — `ALDrilldown()` no-op method on `MockTestPageField`.
+- **`FieldRef.SetRange(MockVariant)`** — explicit overload preventing C# implicit
+  conversion to `NavValue?` (which returned null for non-NavValue variant contents).
+- **`FieldRef.SetRange(object)`** — overload for `NavComplexValue → object` rewritten
+  parameters.
+- **`FieldRef.ValidateSafe()`** — no-arg overload (re-validates current value).
+- **`FieldRef.CalcField(DataError)`** — overload accepting DataError parameter (no-op).
+- **`FieldRef.Clear()`** — resets field value to default.
+
+  Tested by `tests/82-recref-fieldindex/` (10 test cases).
+
 ### Fixed
 - **`IsInWriteTransaction()` no longer crashes with NullReferenceException.**
   `ALDatabase.ALIsInWriteTransaction()` calls into `NavSession` which is null in

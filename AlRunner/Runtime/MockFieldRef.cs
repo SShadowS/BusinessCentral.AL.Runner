@@ -103,6 +103,9 @@ public class MockFieldRef
     /// <summary>ALValidateSafe — safe variant of Validate.</summary>
     public void ALValidateSafe(NavValue value) => ALValidate(value);
 
+    /// <summary>ALValidateSafe — no-arg overload (re-validate current value).</summary>
+    public void ALValidateSafe() => ALValidate();
+
     /// <summary>ALSetRange — delegate to owning RecordRef's handle.</summary>
     public void ALSetRange(NavValue value)
     {
@@ -117,6 +120,39 @@ public class MockFieldRef
     public void ALSetRange()
     {
         _owner?.ClearRange(_fieldNo);
+    }
+
+    /// <summary>
+    /// ALSetRange(object) — overload for when BC emits ALSetRange(NavComplexValue)
+    /// and the rewriter replaces NavComplexValue with object. Extracts the NavValue
+    /// from known mock types (MockVariant, MockRecordRef) or casts directly.
+    /// </summary>
+    /// <summary>
+    /// ALSetRange(MockVariant) — explicit overload for MockVariant to prevent C#
+    /// implicit conversion to NavValue? (which returns null for non-NavValue contents).
+    /// Extracts the inner value and delegates to the appropriate SetRange overload.
+    /// </summary>
+    public void ALSetRange(MockVariant variant)
+    {
+        if (variant?.Value is NavValue nv)
+            ALSetRange(nv);
+        else
+            _owner?.SetRange(_fieldNo, new NavText(variant?.Value?.ToString() ?? ""));
+    }
+
+    /// <summary>
+    /// ALSetRange(object) — overload for when BC emits ALSetRange(NavComplexValue)
+    /// and the rewriter replaces NavComplexValue with object. Extracts the NavValue
+    /// from known mock types or casts directly.
+    /// </summary>
+    public void ALSetRange(object value)
+    {
+        if (value is NavValue nv)
+            ALSetRange(nv);
+        else if (value is MockVariant mv)
+            ALSetRange(mv);
+        else
+            _owner?.SetRange(_fieldNo, new NavText(value?.ToString() ?? ""));
     }
 
     /// <summary>ALSetFilter — delegate to owning RecordRef's handle.</summary>
@@ -140,6 +176,9 @@ public class MockFieldRef
     /// <summary>ALCalcField — no-op in standalone mode (FlowFields not supported).</summary>
     public void ALCalcField() { }
 
+    /// <summary>ALCalcField with DataError — no-op in standalone mode.</summary>
+    public void ALCalcField(DataError errorLevel) { }
+
     /// <summary>ALFieldError — throws a field-level error.</summary>
     public void ALFieldError(string message)
     {
@@ -149,6 +188,13 @@ public class MockFieldRef
     public void ALFieldError(string message, string secondaryMessage)
     {
         throw new Exception($"Field {_fieldNo}: {message} {secondaryMessage}");
+    }
+
+    /// <summary>Clear — resets the field value to default.</summary>
+    public void Clear()
+    {
+        if (_owner != null)
+            _owner.SetFieldValue(_fieldNo, NavText.Default(0));
     }
 
     /// <summary>ALByValue — returns value copy (no-op in mock).</summary>

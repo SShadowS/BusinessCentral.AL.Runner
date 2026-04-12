@@ -72,6 +72,15 @@ public class MockRecordRef
     public void ALSetLoadFields(params int[] fieldNos) { }
     public void ALSetLoadFields(DataError errorLevel, params int[] fieldNos) { }
 
+    // -- Caption --
+
+    /// <summary>
+    /// ALCaption — returns the table caption. Stub: delegates to handle's ALTableCaption
+    /// or returns empty string when no table is open.
+    /// BC compiler emits <c>recRef.ALCaption</c>.
+    /// </summary>
+    public NavText ALCaption => _handle != null ? new NavText(_handle.ALTableCaption) : new NavText("");
+
     // -- Field access --
 
     /// <summary>
@@ -83,6 +92,30 @@ public class MockRecordRef
         var fref = new MockFieldRef();
         fref.Bind(this, fieldNo);
         return fref;
+    }
+
+    /// <summary>
+    /// ALFieldIndex — returns a MockFieldRef for the nth field (1-based index).
+    /// BC compiler emits <c>recRef.ALFieldIndex(n)</c>.
+    /// Returns the nth field by field number order. If index is out of range,
+    /// returns a stub MockFieldRef with field number 0.
+    /// </summary>
+    public MockFieldRef ALFieldIndex(int index)
+    {
+        if (_handle != null)
+        {
+            var fieldNos = _handle.GetFieldNumbers();
+            if (index >= 1 && index <= fieldNos.Count)
+            {
+                var fref = new MockFieldRef();
+                fref.Bind(this, fieldNos[index - 1]);
+                return fref;
+            }
+        }
+        // Out of range or no handle: return stub with field 0
+        var stub = new MockFieldRef();
+        stub.Bind(this, 0);
+        return stub;
     }
 
     // -- Data operations (delegated to MockRecordHandle) --

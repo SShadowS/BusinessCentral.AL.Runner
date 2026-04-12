@@ -698,6 +698,12 @@ public class MockRecordHandle
     /// <summary>Number of fields that have been set on this record handle.</summary>
     public int FieldCount => _fields.Count;
 
+    /// <summary>
+    /// Returns the field numbers that have been set on the current record, sorted ascending.
+    /// Used by MockRecordRef.ALFieldIndex to return the nth field.
+    /// </summary>
+    internal IReadOnlyList<int> GetFieldNumbers() => _fields.Keys.OrderBy(k => k).ToList();
+
     public int ALFieldNo(string fieldName)
     {
         if (_fieldNames.TryGetValue(_tableId, out var dict) &&

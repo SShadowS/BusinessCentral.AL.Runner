@@ -76,6 +76,7 @@ public class RoslynRewriter : CSharpSyntaxRewriter
     private static readonly HashSet<string> StripFirstThisArgMethods = new(StringComparer.Ordinal)
     {
         "ALField",
+        "ALFieldIndex",
     };
 
     /// <summary>
