@@ -17,6 +17,14 @@ All notable changes to this project are documented here. Format based on
   going through BC's `TrappableOperationExecutor` / `NavEnvironment` (which
   crash in standalone mode). Tested by `tests/77-json-types/` (15 test cases).
   ([#47](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/47))
+- **BLOB / InStream / OutStream support.** `MockBlob` replaces `NavBLOB` as an
+  in-memory byte buffer. `MockInStream` and `MockOutStream` replace `NavInStream`
+  and `NavOutStream` respectively. `MockStream` replaces the static `ALStream`
+  helper class. Supports the common test pattern: write text to a BLOB field via
+  `CreateOutStream` + `WriteText`, read it back via `CreateInStream` + `ReadText`,
+  and check `HasValue`. BLOB fields on records auto-persist `MockBlob` instances
+  so writes survive across reads. Tested by `tests/78-blob-stream/` (6 test cases).
+  (fixes [#46](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/46))
 - **`TestPage.Caption`, `.First()`, `.GoToKey()`, `.Filter.SetFilter()` stubs.**
   `MockTestPageHandle` now supports `ALCaption` (returns `"TestPage"`), `ALFirst()`
   (returns `true`), `ALGoToKey(DataError, params NavValue[])` (returns `true`), and

@@ -773,6 +773,29 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
         if (text == "NavFieldRef")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockFieldRef"));
 
+        // NavBLOB -> MockBlob
+        // NavBLOB's ALCreateInStream/ALCreateOutStream pass ITreeObject to
+        // NavStream ctor which crashes with null in standalone mode.
+        // MockBlob is a NavValue subclass with in-memory byte[] storage.
+        if (text == "NavBLOB")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockBlob"));
+
+        // NavInStream -> MockInStream
+        // NavInStream's ctor requires ITreeObject; MockInStream is standalone.
+        if (text == "NavInStream")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockInStream"));
+
+        // NavOutStream -> MockOutStream
+        // NavOutStream's ctor requires ITreeObject; MockOutStream is standalone.
+        if (text == "NavOutStream")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockOutStream"));
+
+        // ALStream -> MockStream
+        // ALStream's static methods operate on INavStreamReader/INavStreamWriter
+        // which require session infrastructure. MockStream works with MockInStream/MockOutStream.
+        if (text == "ALStream")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockStream"));
+
         // NavScope -> object
         // The BC compiler adds a hidden NavScope γReturnValueParent parameter
         // to methods that return a Record or Interface. The parameter is used
@@ -1613,20 +1636,17 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
                 }
             }
 
-            // NavInStream.Default(this) -> NavInStream.Default(null!)
-            // NavOutStream.Default(this) -> NavOutStream.Default(null!)
-            // These BC types require ITreeObject but work with null in standalone mode.
-            if ((exprText == "NavInStream" || exprText == "NavOutStream")
+            // MockInStream.Default(this) -> MockInStream.Default()
+            // MockOutStream.Default(this) -> MockOutStream.Default()
+            // After VisitIdentifierName, NavInStream/NavOutStream are now MockInStream/MockOutStream.
+            // MockInStream/MockOutStream.Default() takes optional null parent — strip the arg.
+            if ((exprText == "MockInStream" || exprText == "MockOutStream")
                 && methodName == "Default")
             {
                 var args = visited.ArgumentList.Arguments;
                 if (args.Count == 1 && args[0].Expression.ToString() == "this")
                 {
-                    var nullBang = SyntaxFactory.PostfixUnaryExpression(
-                        SyntaxKind.SuppressNullableWarningExpression,
-                        SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression));
-                    return visited.WithArgumentList(SyntaxFactory.ArgumentList(
-                        SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(nullBang))));
+                    return visited.WithArgumentList(SyntaxFactory.ArgumentList());
                 }
             }
 

@@ -157,6 +157,14 @@ public class MockRecordHandle
             _fields[fieldNo] = mediaSet;
             return mediaSet;
         }
+        // For BLOB fields, auto-generate and persist a MockBlob instance
+        // so that repeated reads return the same instance (writes persist).
+        if (expectedType == NavType.BLOB)
+        {
+            var blob = new MockBlob();
+            _fields[fieldNo] = blob;
+            return blob;
+        }
         return DefaultForType(expectedType);
     }
 

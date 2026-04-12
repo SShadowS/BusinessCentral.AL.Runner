@@ -90,6 +90,10 @@ These are the BC runtime types replaced in standalone mode:
 | `MockTestPageFilter` | TestPage filter | ALSetFilter(fieldNo, filterExpression) no-op for TestPage.Filter.SetFilter() calls. |
 | `MockFormHandle` | `NavFormHandle` | Page variable mock. RunModal() dispatches to ModalPageHandler via HandlerRegistry, returns FormResult. |
 | `MockVariableStorage` | Codeunit 131004 "Library - Variable Storage" | In-memory FIFO queue: Enqueue, DequeueText/Integer/Decimal/Boolean/Date/Variant, AssertEmpty, Clear, IsEmpty. |
+| `MockBlob` | `NavBLOB` | In-memory BLOB field. CreateInStream/CreateOutStream, HasValue, Clear. |
+| `MockInStream` | `NavInStream` | In-memory InStream for reading BLOB data as text/bytes. |
+| `MockOutStream` | `NavOutStream` | In-memory OutStream for writing text/bytes to BLOB. |
+| `MockStream` | `ALStream` | Static stream helper. ALReadText/ALWriteText routing to MockInStream/MockOutStream. |
 | `HandlerRegistry` | BC test framework | Dispatches ConfirmHandler/MessageHandler/ModalPageHandler from [NavTest].Handlers to registered handler methods. |
 | `MockJsonHelper` | `NavJsonToken.ALWriteTo/ALReadFrom/ALSelectToken/ALSelectTokens` | Bypasses TrappableOperationExecutor for JSON serialization/deserialization. Real BC types used for all other JSON operations. |
 
@@ -346,6 +350,16 @@ These have been implemented and are tested by the test suite:
     `AssertEmpty`, `Clear`, and `IsEmpty`. AL stub auto-loaded alongside Assert.
     Tested by `tests/75-library-variable-storage/` (9 test cases).
 
+13. **BLOB / InStream / OutStream support** (`Runtime/MockBlob.cs`,
+    `Runtime/MockInStream.cs`, `Runtime/MockOutStream.cs`, `Runtime/MockStream.cs`)
+    — `NavBLOB` is rewritten to `MockBlob`, an in-memory `NavValue` subclass
+    storing raw `byte[]`. `NavInStream`/`NavOutStream` are rewritten to
+    `MockInStream`/`MockOutStream` (standalone, no ITreeObject). `ALStream` is
+    rewritten to `MockStream` which routes `ALReadText`/`ALWriteText` to the
+    mock streams. BLOB fields on records auto-persist `MockBlob` instances.
+    Supports: `CreateInStream`, `CreateOutStream`, `HasValue`, `WriteText`,
+    `ReadText`. Tested by `tests/78-blob-stream/` (6 test cases).
+
 ## Remaining Gaps
 
 These are gaps that remain for full production use:
@@ -355,12 +369,11 @@ These are gaps that remain for full production use:
 2. **Filter groups** (FilterGroup) — not tracked.
 3. **ALGetFilter** — returns empty string even when filters are active.
 4. **More Assert methods** — AreNearlyEqual, Fail, etc.
-5. **BLOB / InStream / OutStream** — not supported.
-6. **RecordRef/FieldRef metadata** — `FieldRef.Name`, `FieldRef.Caption`,
+5. **RecordRef/FieldRef metadata** — `FieldRef.Name`, `FieldRef.Caption`,
    `FieldRef.Type`, `FieldRef.Length`, `FieldRef.Class` return stub defaults
    (no field metadata infrastructure). `FieldCount` returns the number of
    fields that have been set on the current record, not the table schema count.
-7. **KeyRef** — not implemented.
+6. **KeyRef** — not implemented.
 
 ---
 
@@ -505,6 +518,10 @@ Follows the `BusinessCentral.AL.*` pattern:
 | `AlRunner/Runtime/HandlerRegistry.cs` | ConfirmHandler/MessageHandler/ModalPageHandler dispatch for test codeunits |
 | `AlRunner/StubGenerator.cs` | `--generate-stubs` command: scaffold AL stubs from .app symbol packages |
 | `AlRunner/Runtime/MockVariableStorage.cs` | In-memory FIFO queue mock for Library - Variable Storage (codeunit 131004) |
+| `AlRunner/Runtime/MockBlob.cs` | In-memory BLOB field replacement for NavBLOB |
+| `AlRunner/Runtime/MockInStream.cs` | In-memory InStream replacement for NavInStream |
+| `AlRunner/Runtime/MockOutStream.cs` | In-memory OutStream replacement for NavOutStream |
+| `AlRunner/Runtime/MockStream.cs` | Static ALStream replacement routing to MockInStream/MockOutStream |
 | `AlRunner/stubs/LibraryAssert.al` | AL stub for codeunit 130 (auto-loaded for compilation) |
 | `AlRunner/stubs/LibraryVariableStorage.al` | AL stub for codeunit 131004 (auto-loaded for compilation) |
 | `tests/NN-name/` | Test suites (self-documenting: `src/*.al` + `test/*.al`). Run `ls tests/` to discover. |
