@@ -440,9 +440,9 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
                     return true;
             }
 
-            // Remove OnRun with parameters (the codeunit's OnRun, not the scope's)
-            if (name == "OnRun" && method.ParameterList.Parameters.Count > 0)
-                return true;
+            // Keep OnRun with parameters (the codeunit's outer OnRun wrapper).
+            // It creates the scope and calls Run(), which is needed for Codeunit.Run() dispatch.
+            // The override keyword and BC-specific parameter types are handled by other rewriter passes.
 
             // Remove GetMethodScopeFlags (BC runtime permission checking, irrelevant for standalone)
             if (name == "GetMethodScopeFlags")
@@ -1337,13 +1337,15 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
                 return visited;
             }
 
-            // NavCodeunit.RunCodeunit(DataError, id, record) -> MockCodeunitHandle.RunCodeunit(id)
+            // NavCodeunit.RunCodeunit(DataError, id, record) -> MockCodeunitHandle.RunCodeunit(errorLevel, id)
             // NavCodeunit.RunCodeunit is a static dispatch method requiring NavSession
             if (exprText == "NavCodeunit" && methodName == "RunCodeunit")
             {
                 var args = visited.ArgumentList.Arguments;
                 if (args.Count >= 2)
                 {
+                    // First argument is DataError (TrapError or ThrowError)
+                    var errorLevelArg = args[0].Expression;
                     // The second argument is the codeunit ID
                     var codeunitIdArg = args[1].Expression;
                     return SyntaxFactory.InvocationExpression(
@@ -1352,8 +1354,10 @@ public MockCurrPage CurrPage { get; } = new MockCurrPage();
                             SyntaxFactory.IdentifierName("MockCodeunitHandle"),
                             SyntaxFactory.IdentifierName("RunCodeunit")),
                         SyntaxFactory.ArgumentList(
-                            SyntaxFactory.SingletonSeparatedList(
-                                SyntaxFactory.Argument(codeunitIdArg))));
+                            SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] {
+                                SyntaxFactory.Argument(errorLevelArg),
+                                SyntaxFactory.Argument(codeunitIdArg)
+                            })));
                 }
             }
 

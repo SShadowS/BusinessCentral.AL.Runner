@@ -184,8 +184,33 @@ public class MockCodeunitHandle
     /// <summary>
     /// Static dispatch: run a codeunit's OnRun trigger by ID.
     /// Replacement for NavCodeunit.RunCodeunit(DataError, codeunitId, record).
+    /// When errorLevel is TrapError, exceptions are caught and false is returned.
+    /// When errorLevel is ThrowError, exceptions propagate and true is returned on success.
+    /// </summary>
+    public static bool RunCodeunit(DataError errorLevel, int codeunitId)
+    {
+        try
+        {
+            RunCodeunitCore(codeunitId);
+            return true;
+        }
+        catch
+        {
+            if (errorLevel == DataError.TrapError)
+                return false;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Backward-compatible overload (no DataError). Always throws on error.
     /// </summary>
     public static void RunCodeunit(int codeunitId)
+    {
+        RunCodeunitCore(codeunitId);
+    }
+
+    private static void RunCodeunitCore(int codeunitId)
     {
         var handle = new MockCodeunitHandle(codeunitId);
         // Invoke the OnRun scope (member ID 0 or find OnRun explicitly)
@@ -206,8 +231,10 @@ public class MockCodeunitHandle
         initMethod?.Invoke(instance, null);
 
         // Find and invoke the OnRun method (parameterless or with record parameter)
+        // Search both public and non-public since the rewriter may keep OnRun as protected.
+        var bindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         var onRunMethod = codeunitType.GetMethod("OnRun",
-            BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+            bindingFlags, null, Type.EmptyTypes, null);
         if (onRunMethod != null)
         {
             onRunMethod.Invoke(instance, null);
@@ -215,7 +242,7 @@ public class MockCodeunitHandle
         }
 
         // Try finding OnRun with parameters
-        var onRunMethods = codeunitType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+        var onRunMethods = codeunitType.GetMethods(bindingFlags)
             .Where(m => m.Name == "OnRun").ToArray();
         if (onRunMethods.Length > 0)
         {

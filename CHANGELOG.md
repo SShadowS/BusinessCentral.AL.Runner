@@ -24,6 +24,16 @@ All notable changes to this project are documented here. Format based on
   the existing `Page.Update()` no-op (#41)).
 
 ### Fixed
+- **`Codeunit.Run()` bool return value.** `MockCodeunitHandle.RunCodeunit` now
+  accepts a `DataError` parameter and returns `bool`. When the BC compiler emits
+  `NavCodeunit.RunCodeunit(DataError.TrapError, id, rec)` for
+  `if Codeunit.Run(id) then`, the `&` operator no longer fails with CS0019
+  (`Operator '&' cannot be applied to operands of type 'bool' and 'void'`).
+  The rewriter now passes `DataError` through; `TrapError` catches exceptions
+  and returns `false`, `ThrowError` propagates. Also keeps the outer `OnRun`
+  wrapper method so `RunCodeunit` can dispatch to it via reflection.
+  Tested by `tests/75-codeunit-run-bool/`.
+  ([#42](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/42))
 - **RecordRef assignment (`:=` operator).** `MockRecordRef` was missing the
   `ALAssign` method that the BC compiler emits for `RecRef2 := RecRef1`. This
   caused a CS1061 compilation error excluding any codeunit that assigns one
