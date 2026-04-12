@@ -1859,6 +1859,7 @@ public static class Executor
             AlRunner.Runtime.MockRecordHandle.ResetAll();
             AlRunner.Runtime.MockIsolatedStorage.ResetAll();
             AlRunner.Runtime.AlScope.ResetLastStatement();
+            AlRunner.Runtime.HandlerRegistry.Reset();
 
             try
             {
@@ -1870,6 +1871,25 @@ public static class Executor
                     BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
                 if (initMethod != null)
                     initMethod.Invoke(parent, null);
+
+                // Register test handlers (ConfirmHandler, MessageHandler, etc.)
+                // The [NavTest] attribute has a Handlers property with comma-separated handler names.
+                var testMethod = parentType.GetMethod(testName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                if (testMethod != null)
+                {
+                    var navTestAttr = testMethod.GetCustomAttributes()
+                        .FirstOrDefault(a => a.GetType().Name == "NavTestAttribute");
+                    if (navTestAttr != null)
+                    {
+                        var handlersProp = navTestAttr.GetType().GetProperty("Handlers");
+                        var handlers = handlersProp?.GetValue(navTestAttr) as string;
+                        if (!string.IsNullOrWhiteSpace(handlers))
+                        {
+                            AlRunner.Runtime.HandlerRegistry.RegisterHandlers(parent, parentType, handlers);
+                        }
+                    }
+                }
 
                 // Find the scope constructor
                 var ctors = scopeType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);

@@ -193,11 +193,13 @@ public class MockDialog
     public MockDialog Value => this;
 
     /// <summary>
-    /// AL's CONFIRM dialog — returns true (user confirmed) in standalone mode.
+    /// AL's CONFIRM dialog. If a ConfirmHandler is registered, dispatches to it.
+    /// Otherwise returns true (user confirmed) in standalone mode.
     /// </summary>
     public static bool ALConfirm(string question, bool defaultButton = false, params object?[] args)
     {
-        return true; // Always confirm in standalone mode
+        var (handled, reply) = HandlerRegistry.InvokeConfirmHandler(question);
+        return handled ? reply : true;
     }
 
     /// <summary>
@@ -205,7 +207,8 @@ public class MockDialog
     /// </summary>
     public static bool ALConfirm(NavText question, bool defaultButton = false)
     {
-        return true;
+        var (handled, reply) = HandlerRegistry.InvokeConfirmHandler(question.ToString());
+        return handled ? reply : true;
     }
 
     /// <summary>
@@ -213,7 +216,8 @@ public class MockDialog
     /// </summary>
     public static bool ALConfirm(Guid dialogId, NavText question, bool defaultButton)
     {
-        return true;
+        var (handled, reply) = HandlerRegistry.InvokeConfirmHandler(question.ToString());
+        return handled ? reply : true;
     }
 }
 
@@ -232,6 +236,11 @@ public static class AlDialog
             formatted = string.Format(netFormat, stringArgs);
         else
             formatted = format;
+
+        // If a MessageHandler is registered, dispatch to it instead of printing
+        if (HandlerRegistry.InvokeMessageHandler(formatted))
+            return;
+
         Console.WriteLine(formatted);
         MessageCapture.Capture(formatted);
     }

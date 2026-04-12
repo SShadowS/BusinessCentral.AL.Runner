@@ -23,3 +23,18 @@ page 56700 "TP Test Card"
         }
     }
 }
+
+codeunit 56701 "TP Confirm Logic"
+{
+    procedure DoSomethingWithConfirm(): Boolean
+    begin
+        if not Confirm('Are you sure?') then
+            exit(false);
+        exit(true);
+    end;
+
+    procedure ShowMessage()
+    begin
+        Message('Hello from codeunit');
+    end;
+}

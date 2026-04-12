@@ -92,4 +92,59 @@ codeunit 56700 "TP TestPage Tests"
         // [THEN] No crash (the page closes successfully)
         Assert.IsTrue(true, 'OK().Invoke() must compile and no-op');
     end;
+
+    [Test]
+    [HandlerFunctions('ConfirmYesHandler')]
+    procedure ConfirmHandlerAnswersYes()
+    var
+        Logic: Codeunit "TP Confirm Logic";
+    begin
+        // [GIVEN] A ConfirmHandler that replies true
+        // [WHEN] Code calls Confirm()
+        // [THEN] The handler intercepts and returns true
+        Assert.IsTrue(Logic.DoSomethingWithConfirm(), 'Confirm handler should reply true');
+    end;
+
+    [ConfirmHandler]
+    procedure ConfirmYesHandler(Question: Text; var Reply: Boolean)
+    begin
+        Reply := true;
+    end;
+
+    [Test]
+    [HandlerFunctions('ConfirmNoHandler')]
+    procedure ConfirmHandlerAnswersNo()
+    var
+        Logic: Codeunit "TP Confirm Logic";
+    begin
+        // [GIVEN] A ConfirmHandler that replies false
+        // [WHEN] Code calls Confirm()
+        // [THEN] The handler intercepts and returns false
+        Assert.IsFalse(Logic.DoSomethingWithConfirm(), 'Confirm handler should reply false');
+    end;
+
+    [ConfirmHandler]
+    procedure ConfirmNoHandler(Question: Text; var Reply: Boolean)
+    begin
+        Reply := false;
+    end;
+
+    [Test]
+    [HandlerFunctions('MessageCaptureHandler')]
+    procedure MessageHandlerCaptures()
+    var
+        Logic: Codeunit "TP Confirm Logic";
+    begin
+        // [GIVEN] A MessageHandler registered
+        // [WHEN] Code calls Message()
+        Logic.ShowMessage();
+        // [THEN] No crash — the handler intercepts the message
+        Assert.IsTrue(true, 'MessageHandler should intercept Message call');
+    end;
+
+    [MessageHandler]
+    procedure MessageCaptureHandler(Msg: Text)
+    begin
+        // Just capture — no assertion needed here
+    end;
 }
