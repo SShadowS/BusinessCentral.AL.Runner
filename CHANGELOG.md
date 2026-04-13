@@ -7,6 +7,10 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- `MockOutStream.ALAssign` — enables `OutStr2 := OutStr1` stream assignment in AL code
+- `MockStream.ALWrite`/`ALRead` overloads for `Integer`, `Boolean`, `Decimal18` — binary read/write via `OStr.Write(value)` / `IStr.Read(value)` in AL
+- `MockStream.ALCopyStream` — implements `COPYSTREAM(OutStr, InStr)` in AL; rewriter redirects `ALSystemVariable.ALCopyStream` to `MockStream.ALCopyStream`
+- Test suite `tests/79-stream-surface` (10 cases) covering OutStream assignment, InStream assignment, CopyStream, EOS detection, binary integer/boolean/decimal read/write, and passing streams as `var` parameters
 - **Picture-string tokens in `Format()`** — `Format(value, 0, formatString)` now
   handles AL decimal and time picture strings:
   - `<Precision,min:max>` — rounds a decimal to at most `max` decimal places and
@@ -19,6 +23,17 @@ All notable changes to this project are documented here. Format based on
 - **Invariant-culture decimal formatting** — `AlCompat.Format()` for decimal values
   now always uses `.` as the decimal separator regardless of OS locale, matching
   real BC behavior.
+- **Differentiated exit codes for CI integration** — al-runner now returns distinct
+  exit codes so CI scripts can distinguish real failures from runner gaps:
+  - `0` — all tests passed
+  - `1` — test assertion failures (real bugs in code) or usage/argument error
+  - `2` — runner limitations only (no assertion failures; all blocked tests are due
+    to Roslyn compilation gaps or missing mock support)
+  - `3` — AL compilation error (the AL source itself does not compile)
+
+  Previously, all non-success outcomes returned `1`. This change enables incremental
+  CI adoption: tolerate exit code `2` while treating `1` and `3` as hard failures.
+  ([#46](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/46))
 
 ### Changed
 - **Source files with compilation errors are no longer silently excluded** — Previously,
@@ -27,6 +42,15 @@ All notable changes to this project are documented here. Format based on
   that was missing whole codeunits. Now, any compilation error causes an immediate hard
   failure: all errors are printed to stderr and the runner exits. This ensures you always
   compile the full app or get a clear error — no silent partial results.
+
+### Fixed
+- **`Dialog` variable type now compiles and runs** — AL codeunits that declare a
+  `Dialog` variable and call `Open`, `Update`, and `Close` on it previously failed
+  with `CS1503: cannot convert from 'string' to 'NavText'` when the BC compiler
+  emitted string literals for the dialog format string. `MockDialog.ALOpen` and
+  `ALUpdate` now accept both `string` and `NavText`/`NavValue` overloads, matching
+  all patterns emitted by the BC compiler. Tested by `tests/85-dialog/` (4 test cases).
+  Fixes #63.
 
 ## [1.0.11] — 2026-04-13
 

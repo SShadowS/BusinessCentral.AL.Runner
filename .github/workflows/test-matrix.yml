@@ -72,7 +72,12 @@ jobs:
           #        fails without --stubs; covered by C# MissingDepHintTests
           for s in $(ls -d tests/*/src | sed 's|tests/||;s|/src||' | grep -v '06-' | grep -v '39-' | grep -v '46-' | sort); do
             echo "--- $s ---"
-            dotnet run --no-build --project AlRunner -- "tests/$s/src" "tests/$s/test"
+            # Exit 0 = all pass, Exit 2 = runner limitation (expected for some suites)
+            # Exit 1 = real test failure, Exit 3 = AL compile error — both block CI
+            dotnet run --no-build --project AlRunner -- "tests/$s/src" "tests/$s/test" || {
+              exit_code=$?
+              [ $exit_code -eq 2 ] || exit $exit_code
+            }
           done
 
       - name: Run stubs test

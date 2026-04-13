@@ -70,4 +70,30 @@ public class InlineCaptureTests
             .Any(c => c.GetProperty("statementId").GetInt32() > 0);
         Assert.True(anyNonZero, "JSON output must include per-statement statementIds");
     }
+
+    [Fact]
+    public void CaptureValues_JsonOutput_IncludesSourceFile()
+    {
+        var pipeline = new AlRunnerPipeline();
+        var result = pipeline.Run(new PipelineOptions
+        {
+            InputPaths = { TestPath("47-capture-inline", "src"), TestPath("47-capture-inline", "test") },
+            CaptureValues = true,
+            OutputJson = true
+        });
+
+        Assert.Equal(0, result.ExitCode);
+        var doc = JsonDocument.Parse(result.StdOut.Trim());
+        var caps = doc.RootElement.GetProperty("capturedValues");
+        Assert.True(caps.GetArrayLength() > 0);
+
+        // Every captured value should have a sourceFile property ending in .al
+        foreach (var cap in caps.EnumerateArray())
+        {
+            Assert.True(cap.TryGetProperty("sourceFile", out var sf),
+                $"Expected sourceFile on captured value (scope={cap.GetProperty("scopeName").GetString()})");
+            var sourceFile = sf.GetString()!;
+            Assert.EndsWith(".al", sourceFile);
+        }
+    }
 }

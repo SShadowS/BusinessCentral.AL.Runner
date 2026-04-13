@@ -136,4 +136,79 @@ public class RunnerErrorClassificationTests
         Assert.Contains("Runner limitation", output);
         Assert.Contains("github.com/StefanMaron/BusinessCentral.AL.Runner/issues", output);
     }
+
+    // ---------------------------------------------------------------------------
+    // ExitCode() differentiation tests
+    // ---------------------------------------------------------------------------
+
+    /// <summary>All tests pass → exit 0.</summary>
+    [Fact]
+    public void ExitCode_AllPass_Returns0()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Pass }
+        };
+        Assert.Equal(0, Executor.ExitCode(results));
+    }
+
+    /// <summary>Any Status=Fail → exit 1 (real assertion failure).</summary>
+    [Fact]
+    public void ExitCode_AssertionFailure_Returns1()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Fail, Message = "Expected 1, got 2" }
+        };
+        Assert.Equal(1, Executor.ExitCode(results));
+    }
+
+    /// <summary>Only runner errors (no failures) → exit 2.</summary>
+    [Fact]
+    public void ExitCode_OnlyRunnerErrors_Returns2()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Error, IsRunnerBug = true, Message = "Codeunit 99 not found" }
+        };
+        Assert.Equal(2, Executor.ExitCode(results));
+    }
+
+    /// <summary>Any Fail trumps runner errors — mixed results → exit 1.</summary>
+    [Fact]
+    public void ExitCode_FailAndError_Returns1()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Fail,  Message = "assertion" },
+            new() { Name = "T2", Status = TestStatus.Error, IsRunnerBug = true, Message = "not found" }
+        };
+        Assert.Equal(1, Executor.ExitCode(results));
+    }
+
+    /// <summary>Empty result list → exit 1 (nothing ran, treat as error).</summary>
+    [Fact]
+    public void ExitCode_EmptyResults_Returns1()
+    {
+        Assert.Equal(1, Executor.ExitCode(new List<TestResult>()));
+    }
+
+    /// <summary>
+    /// Pipeline with a real assertion failure returns exit 1.
+    /// </summary>
+    [Fact]
+    public void Pipeline_AssertionFailure_Returns1()
+    {
+        var pipeline = new AlRunnerPipeline();
+        var result = pipeline.Run(new PipelineOptions
+        {
+            InputPaths = { TestPath("06-intentional-failure", "src"), TestPath("06-intentional-failure", "test") }
+        });
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(result.Tests, t => t.Status == TestStatus.Fail);
+    }
 }

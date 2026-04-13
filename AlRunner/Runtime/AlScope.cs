@@ -185,7 +185,15 @@ public class MockDialog
 
     public void ALOpen(Guid id, NavText text) { }
     public void ALOpen(Guid id, NavText text, NavText text2) { }
+    // BC compiler emits string literals directly in some ALOpen calls
+    public void ALOpen(Guid id, string text) { }
+    public void ALOpen(Guid id, string text, string text2) { }
+    public void ALOpen(Guid id, string text, NavText text2) { }
+    public void ALOpen(Guid id, NavText text, string text2) { }
     public void ALUpdate(int fieldNo, NavValue value) { }
+    public void ALUpdate(int fieldNo, string value) { }
+    public void ALUpdate(int fieldNo, int value) { }
+    public void ALUpdate(int fieldNo, NavText value) { }
     public void ALClose() { }
     public void ALAssign(MockDialog other) { }
 

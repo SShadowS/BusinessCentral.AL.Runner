@@ -65,6 +65,12 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("Test codeunits (Subtype = Test) are auto-detected.");
     Console.Error.WriteLine("BC Service Tier DLLs are auto-downloaded on first run.");
     Console.Error.WriteLine();
+    Console.Error.WriteLine("Exit codes:");
+    Console.Error.WriteLine("  0  All tests passed");
+    Console.Error.WriteLine("  1  Test assertion failures (real bugs in code) or usage error");
+    Console.Error.WriteLine("  2  Runner limitations only (no real failures; compilation gaps or missing mocks)");
+    Console.Error.WriteLine("  3  AL compilation error (the AL source itself does not compile)");
+    Console.Error.WriteLine();
     Console.Error.WriteLine("For AI agents: run `al-runner --guide` for a complete test-writing reference.");
     return args.Length == 0 ? 1 : 0;
 }
@@ -237,6 +243,7 @@ test executor that needs no BC service tier, Docker, SQL Server, or license.
 - Table procedures (custom procedures on table objects)
 - IsolatedStorage (in-memory key-value store: Set, Get, Delete, Contains)
 - TextBuilder (Append, AppendLine, ToText)
+- Dialog variable (Open, Update, Close — all no-ops in standalone mode)
 - RecordRef / FieldRef — Open, Close, Field(n).Value get/set, Insert, Modify,
   Delete, DeleteAll, FindSet+Next iteration, GetTable/SetTable, SetRange/SetFilter,
   RecRef := OtherRecRef assignment, SetLoadFields (no-op)
@@ -482,6 +489,28 @@ Commands:
 - `{"command":"shutdown"}` — exit cleanly
 
 Optional fields: `packagePaths`, `stubPaths`.
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All tests passed |
+| 1 | Test assertion failures (real bugs in the code) or usage error |
+| 2 | Runner limitations only (no real failures — all blocked tests are due to compilation gaps or missing mocks) |
+| 3 | AL compilation error (the AL source itself does not compile) |
+
+Use exit codes in CI to distinguish runner gaps from real failures:
+
+```bash
+al-runner --packages .alpackages ./src ./test
+rc=$?
+if [ $rc -eq 2 ]; then
+  echo "Runner limitations only — not a build failure"
+  exit 0
+elif [ $rc -ne 0 ]; then
+  exit $rc
+fi
+```
 
 ### Tips for AI agents
 
@@ -1949,7 +1978,7 @@ public static class Executor
 
                 // Capture variable values from scope fields if enabled
                 if (captureValues)
-                    CaptureFieldValues(scope, scopeType, testName);
+                    CaptureFieldValues(scope, scopeType, testName, AlRunner.SourceFileMapper.GetObjectForClass(parentType.Name));
 
                 results.Add(new AlRunner.TestResult
                 {
@@ -2081,15 +2110,19 @@ public static class Executor
         Console.WriteLine($"Results: {passed} passed, {failed} failed, {errors} errors, {passed + failed + errors} total");
     }
 
-    /// <summary>Compute exit code from test results.</summary>
+    /// <summary>
+    /// Compute exit code from test results.
+    /// 0 = all passed; 1 = assertion failures (real bugs); 2 = runner limitations only (no failures).
+    /// </summary>
     public static int ExitCode(List<AlRunner.TestResult> results)
     {
         if (results.Count == 0) return 1;
-        var failedOrError = results.Count(r => r.Status != AlRunner.TestStatus.Pass);
-        return failedOrError > 0 ? 1 : 0;
+        if (results.Any(r => r.Status == AlRunner.TestStatus.Fail)) return 1;
+        if (results.Any(r => r.Status != AlRunner.TestStatus.Pass)) return 2;
+        return 0;
     }
 
-    private static void CaptureFieldValues(object scope, Type scopeType, string testName)
+    private static void CaptureFieldValues(object scope, Type scopeType, string testName, string objectName)
     {
         foreach (var field in scopeType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
         {
@@ -2097,14 +2130,18 @@ public static class Executor
             if (field.Name.StartsWith("__") || field.Name == "me") continue;
             // Skip parent codeunit reference
             if (field.Name == "_parent") continue;
-            // Skip ITreeObject and NavMethodScope internals
+            // Skip internal runtime types — codeunit/record handles, variants, etc.
+            // Their .ToString() returns implementation details, not user-meaningful values.
             var typeName = field.FieldType.Name;
             if (typeName == "ITreeObject" || typeName.StartsWith("NavMethodScope")) continue;
+            if (typeName.StartsWith("Mock")) continue;
+            // Skip BC plumbing fields (β/γ prefixed)
+            if (field.Name.Length > 0 && (field.Name[0] == '\u03b2' || field.Name[0] == '\u03b3')) continue;
 
             try
             {
                 var value = field.GetValue(scope);
-                AlRunner.Runtime.ValueCapture.Capture(testName, field.Name, value, 0);
+                AlRunner.Runtime.ValueCapture.Capture(testName, objectName, field.Name, value, 0);
             }
             catch { /* skip fields that can't be read */ }
         }
@@ -2237,7 +2274,7 @@ public static class Executor
         {
             onRunMethod.Invoke(scope, null);
             if (captureValues)
-                CaptureFieldValues(scope, scopeType, "OnRun");
+                CaptureFieldValues(scope, scopeType, "OnRun", AlRunner.SourceFileMapper.GetObjectForClass(parentType.Name));
             return 0;
         }
         catch (TargetInvocationException ex)

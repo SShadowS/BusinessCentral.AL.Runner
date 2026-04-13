@@ -49,6 +49,7 @@ public class TestResult
 public class CapturedValue
 {
     public required string ScopeName { get; init; }
+    public required string ObjectName { get; init; }
     public required string VariableName { get; init; }
     public string? Value { get; init; }
     public int StatementId { get; init; }
@@ -74,6 +75,8 @@ public class PipelineResult
 
 public class AlRunnerPipeline
 {
+    private Dictionary<string, string>? _scopeToObject;
+
     /// <summary>
     /// Run the full AL Runner pipeline: transpile → rewrite → compile → execute.
     /// Returns a structured result instead of writing to stdout/stderr directly.
@@ -110,11 +113,12 @@ public class AlRunnerPipeline
         var capturedValues = new List<CapturedValue>();
         if (options.CaptureValues)
         {
-            foreach (var (scopeName, variableName, value, stmtId) in Runtime.ValueCapture.GetCaptures())
+            foreach (var (scopeName, objectName, variableName, value, stmtId) in Runtime.ValueCapture.GetCaptures())
             {
                 capturedValues.Add(new CapturedValue
                 {
                     ScopeName = scopeName,
+                    ObjectName = objectName,
                     VariableName = variableName,
                     Value = value,
                     StatementId = stmtId
@@ -136,7 +140,7 @@ public class AlRunnerPipeline
         if (options.OutputJson && (testResults.Count > 0 || messages.Count > 0))
         {
             Dictionary<string, List<string>>? compilationErrors = null; // file exclusion removed in #80
-            stdoutStr = SerializeJsonOutput(testResults, exitCode, capturedValues: capturedValues, messages: messages, iterations: iterationLoops, compilationErrors: compilationErrors);
+            stdoutStr = SerializeJsonOutput(testResults, exitCode, capturedValues: capturedValues, messages: messages, iterations: iterationLoops, compilationErrors: compilationErrors, scopeToObject: _scopeToObject);
         }
 
         return new PipelineResult
@@ -155,12 +159,14 @@ public class AlRunnerPipeline
         List<TestResult> tests, int exitCode, bool indented = true,
         List<CapturedValue>? capturedValues = null, List<string>? messages = null,
         List<Runtime.IterationTracker.LoopRecord>? iterations = null,
-        IReadOnlyDictionary<string, List<string>>? compilationErrors = null)
+        IReadOnlyDictionary<string, List<string>>? compilationErrors = null,
+        Dictionary<string, string>? scopeToObject = null)
     {
         object? capturedValuesObj = capturedValues?.Count > 0
             ? capturedValues.Select(c => new
             {
                 scopeName = c.ScopeName,
+                sourceFile = SourceFileMapper.GetFile(c.ObjectName),
                 variableName = c.VariableName,
                 value = c.Value,
                 statementId = c.StatementId
@@ -200,6 +206,9 @@ public class AlRunnerPipeline
                 ? iterations.Select(loop => new
                 {
                     loopId = $"L{loop.LoopId}",
+                    sourceFile = scopeToObject != null
+                        ? SourceFileMapper.GetFileForScope(loop.ScopeName, scopeToObject)
+                        : null,
                     loopLine = SourceLineMapper.GetAlLineFromStatement(loop.ScopeName, loop.SourceStartLine) ?? loop.SourceStartLine,
                     loopEndLine = SourceLineMapper.GetAlLineFromStatement(loop.ScopeName, loop.SourceEndLine) ?? loop.SourceEndLine,
                     parentLoopId = loop.ParentLoopId.HasValue ? $"L{loop.ParentLoopId}" : (string?)null,
@@ -261,6 +270,7 @@ public class AlRunnerPipeline
         Runtime.CalcFormulaRegistry.Clear();
         Runtime.TableFieldRegistry.Clear();
         Runtime.MockNumberSequence.Reset();
+        SourceFileMapper.Clear();
 
         // Load stubs
         foreach (var stubPath in options.StubPaths)
@@ -304,6 +314,10 @@ public class AlRunnerPipeline
                     Log.Info($"  {name}");
                     alSources.Add(source);
                     groupSources.Add(source);
+
+                    // Register extracted objects with SourceFileMapper using the .app-relative name
+                    foreach (var objName in SourceFileMapper.ParseObjectDeclarations(source))
+                        SourceFileMapper.Register(objName, name);
                 }
                 var fullPath = Path.GetFullPath(path);
                 inputPaths.Add(fullPath);
@@ -326,6 +340,10 @@ public class AlRunnerPipeline
                     var src = File.ReadAllText(f);
                     alSources.Add(src);
                     groupSources.Add(src);
+
+                    var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), f);
+                    foreach (var objName in SourceFileMapper.ParseObjectDeclarations(src))
+                        SourceFileMapper.Register(objName, relativePath);
                 }
                 var fullPath = Path.GetFullPath(path);
                 inputPaths.Add(fullPath);
@@ -338,6 +356,10 @@ public class AlRunnerPipeline
                 var fullPath = Path.GetFullPath(Path.GetDirectoryName(path)!);
                 inputPaths.Add(fullPath);
                 inputGroups.Add((fullPath, new List<string> { src }));
+
+                var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), path);
+                foreach (var objName in SourceFileMapper.ParseObjectDeclarations(src))
+                    SourceFileMapper.Register(objName, relativePath);
             }
             else
             {
@@ -373,7 +395,9 @@ public class AlRunnerPipeline
             Runtime.TableFieldRegistry.ParseAndRegister(options.InlineCode);
         }
 
-        // Auto-discover dependency .app files from --packages directories
+        // Auto-discover dependency .app files from --packages directories.
+        // Note: dependency/stub sources are intentionally NOT registered with SourceFileMapper —
+        // they are external code whose captured values and coverage should not appear in user files.
         if (options.PackagePaths.Count > 0 && inputGroups.Any(g => g.Path.EndsWith(".app", StringComparison.OrdinalIgnoreCase)))
         {
             AutoDiscoverDependencies(options.PackagePaths, inputGroups, inputPaths, alSources);
@@ -391,7 +415,7 @@ public class AlRunnerPipeline
         if (generatedCSharpList == null)
         {
             Timer.EndStage("AL transpilation");
-            return 1;
+            return 3;
         }
 
         // Compile dependency stubs separately
@@ -415,6 +439,15 @@ public class AlRunnerPipeline
                 generatedCSharpList.AddRange(stubCSharp);
                 Log.Info($"Added {stubCSharp.Count} Assert stub(s) for runtime dispatch");
             }
+        }
+
+        // Register C# class names → AL object names for captured value resolution
+        var outerClassPattern = new System.Text.RegularExpressions.Regex(@"^\s*public\s+(?:\w+\s+)*class\s+(\w+)", System.Text.RegularExpressions.RegexOptions.Multiline);
+        foreach (var (name, code) in generatedCSharpList)
+        {
+            var classMatch = outerClassPattern.Match(code);
+            if (classMatch.Success)
+                SourceFileMapper.RegisterClass(classMatch.Groups[1].Value, name);
         }
 
         Log.Info($"\nTranspiled {generatedCSharpList.Count} AL objects to C#");
@@ -443,7 +476,7 @@ public class AlRunnerPipeline
             // The capture function no-ops when ValueCapture.Enabled is false,
             // so we can run this unconditionally and avoid a separate code
             // path for capture vs non-capture runs.
-            var injectedRoot = ValueCaptureInjector.Inject(tree.GetRoot());
+            var injectedRoot = ValueCaptureInjector.Inject(tree.GetRoot(), name);
             if (options.IterationTracking)
                 injectedRoot = IterationInjector.Inject(injectedRoot);
             tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.Create((Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode)injectedRoot);
@@ -493,7 +526,7 @@ public class AlRunnerPipeline
                 }
             }
             Timer.EndStage("Roslyn compilation");
-            return 1;
+            return 2;
         }
         Timer.EndStage("Roslyn compilation");
 
@@ -535,6 +568,15 @@ public class AlRunnerPipeline
             if (options.IterationTracking)
                 Runtime.IterationTracker.Disable();
             Runtime.MessageCapture.Disable();
+
+            Dictionary<string, string>? scopeToObject = null;
+            if (options.IterationTracking || options.ShowCoverage)
+            {
+                scopeToObject = CoverageReport.BuildScopeToObjectMap(generatedCSharpList!);
+            }
+
+            _scopeToObject = scopeToObject;
+
             if (options.ShowCoverage)
             {
                 Executor.PrintCoverageReport();
@@ -542,18 +584,7 @@ public class AlRunnerPipeline
                 var sourceSpans = CoverageReport.ParseSourceSpans(generatedCSharpList!);
                 var (hitStmts, totalStmts) = Runtime.AlScope.GetCoverageSets();
 
-                var alFilePaths = new List<string>();
-                foreach (var inputPath in inputPaths)
-                {
-                    if (Directory.Exists(inputPath))
-                        alFilePaths.AddRange(Directory.GetFiles(inputPath, "*.al", SearchOption.AllDirectories));
-                    else if (File.Exists(inputPath))
-                        alFilePaths.Add(inputPath);
-                }
-
-                var objectToFile = CoverageReport.MapObjectsToFiles(generatedCSharpList!, alFilePaths);
-                var scopeToObject = CoverageReport.BuildScopeToObjectMap(generatedCSharpList!);
-                CoverageReport.WriteCobertura("cobertura.xml", sourceSpans, hitStmts, totalStmts, objectToFile, scopeToObject);
+                CoverageReport.WriteCobertura("cobertura.xml", sourceSpans, hitStmts, totalStmts, scopeToObject!);
                 Log.Info("Coverage report: cobertura.xml");
             }
         }
@@ -577,6 +608,11 @@ public class AlRunnerPipeline
             if (options.IterationTracking)
                 Runtime.IterationTracker.Disable();
             Runtime.MessageCapture.Disable();
+
+            if (options.IterationTracking || options.ShowCoverage)
+            {
+                _scopeToObject = CoverageReport.BuildScopeToObjectMap(generatedCSharpList!);
+            }
         }
         Timer.EndStage("Test execution");
         Timer.Print();
