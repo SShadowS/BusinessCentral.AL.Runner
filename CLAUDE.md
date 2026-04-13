@@ -183,6 +183,32 @@ workflow gates NuGet release on all tests passing across all versions.
 
 ---
 
+## Agent Working Rules
+
+These rules apply to every task performed by an AI agent in this repo:
+
+1. **Strict red/green TDD** — Write the failing test first (RED), verify it fails,
+   then implement the fix (GREEN). Never write implementation code without a
+   failing test. This applies to every feature, fix, and mock addition.
+
+2. **Documentation must always be current** — Every change that affects behaviour,
+   CLI flags, mock capabilities, or known limitations must be reflected in:
+   - `README.md`
+   - `--help` / `-h` output (`Program.cs`)
+   - `--guide` output (`PrintGuide()` in `Program.cs`)
+   - `CHANGELOG.md`
+   - The Known Limitations / Implemented Features sections in this file
+
+3. **Best solution, not easiest** — Always choose the highest-quality solution
+   regardless of refactoring scope. Avoid shortcuts that create technical debt.
+   Do not settle for "good enough" when a clearly better design is available.
+
+4. **SOLID & DRY** — Apply SOLID principles to a reasonable degree. Avoid
+   duplicating logic; extract shared behaviour into well-named, single-purpose
+   helpers. Prefer composition over inheritance. Keep classes focused.
+
+---
+
 ## Developer Contract
 
 **What you can unit-test with al-runner:**
@@ -501,6 +527,8 @@ Follows the `BusinessCentral.AL.*` pattern:
 | File | Role |
 |---|---|
 | `AlRunner/Program.cs` | Main CLI + AlTranspiler + RoslynCompiler + Executor + AppPackageReader + Kernel32Shim + PrintGuide |
+| `AlRunner/DiagnosticClassifier.cs` | AL diagnostic message parser; `IsSelfDuplicateAmbiguity` detects AL0275 self-duplicate packages |
+| `AlRunner/PackageScanner.cs` | Scans package dirs for `.app` files; two-pass deduplication (by GUID then by publisher+name+version) |
 | `AlRunner/RoslynRewriter.cs` | BC→mock type transformations (AST-level) |
 | `AlRunner/Runtime/AlScope.cs` | Base scope, AlDialog, AlCompat, MockDialog |
 | `AlRunner/Runtime/MockRecordHandle.cs` | In-memory record store with filtering, composite PKs, sort ordering |

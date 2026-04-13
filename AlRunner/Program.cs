@@ -509,7 +509,8 @@ public static class AlTranspiler
         // This avoids conflicts when compiling self-contained multi-project spikes from source.
         bool hasExplicitPackages = packagePaths != null && packagePaths.Count > 0;
         var allPackagePaths = hasExplicitPackages ? ResolvePackagePaths(packagePaths, inputPaths) : new List<string>();
-        var appsByGuid = new Dictionary<Guid, (string Publisher, string Name, Version Version)>();
+        // Populated during the "load all packages" path for use in the reactive conflict resolver.
+        var loadedPackageSpecs = new List<PackageSpec>();
         Microsoft.Dynamics.Nav.CodeAnalysis.ISymbolReferenceLoader? refLoader = null;
 
         if (hasExplicitPackages)
@@ -539,47 +540,26 @@ public static class AlTranspiler
                     // No explicit dependencies in app.json — load all .app files from
                     // the packages directory as symbol references. This handles the BC
                     // convention where Application/System dependencies are implicit.
-                    // Deduplicates by app GUID, keeping the highest version.
+                    // PackageScanner deduplicates: first by GUID (keeping highest version),
+                    // then by (publisher+name+version) to eliminate self-duplicates that
+                    // would otherwise produce AL0275 "ambiguous reference" errors.
                     Log.Info("No explicit dependencies found. Loading all .app packages as symbols...");
-                    // Exclude the app being compiled (its source is already in the syntax trees)
-                    var selfName = appIdentity.Name.ToLowerInvariant();
-                    var selfGuid = appIdentity.AppId;
-                    appsByGuid.Clear();
-                    foreach (var pkgDir in allPackagePaths)
-                    {
-                        foreach (var appFile in Directory.GetFiles(pkgDir, "*.app", SearchOption.AllDirectories))
-                        {
-                            try
-                            {
-                                var doc = LoadNavxManifest(appFile);
-                                if (doc == null) continue;
-                                XNamespace ns = "http://schemas.microsoft.com/navx/2015/manifest";
-                                var appElement = doc.Root?.Element(ns + "App");
-                                var idStr = appElement?.Attribute("Id")?.Value;
-                                var appName = appElement?.Attribute("Name")?.Value ?? "";
-                                var appPublisher = appElement?.Attribute("Publisher")?.Value ?? "";
-                                var appVersionStr = appElement?.Attribute("Version")?.Value ?? "1.0.0.0";
-                                if (idStr != null && Guid.TryParse(idStr, out var appGuid)
-                                    && appGuid != selfGuid
-                                    && !string.Equals(appName, appIdentity.Name, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    var ver = Version.Parse(appVersionStr);
-                                    if (!appsByGuid.TryGetValue(appGuid, out var existing) || ver > existing.Version)
-                                        appsByGuid[appGuid] = (appPublisher, appName, ver);
-                                }
-                            }
-                            catch { }
-                        }
-                    }
 
-                    if (appsByGuid.Count > 0)
+                    var scannedSpecs = PackageScanner.ScanForSpecs(
+                        allPackagePaths,
+                        excludeGuid: appIdentity.AppId,
+                        excludeName: appIdentity.Name);
+
+                    loadedPackageSpecs.AddRange(scannedSpecs);
+
+                    if (loadedPackageSpecs.Count > 0)
                     {
-                        var allAppSpecs = appsByGuid.Select(kv =>
-                            new SymbolReferenceSpecification(
-                                kv.Value.Publisher, kv.Value.Name, kv.Value.Version,
-                                false, kv.Key, false, ImmutableArray<Guid>.Empty))
+                        var allAppSpecs = loadedPackageSpecs
+                            .Select(s => new SymbolReferenceSpecification(
+                                s.Publisher, s.Name, s.Version,
+                                false, s.AppId, false, ImmutableArray<Guid>.Empty))
                             .ToArray();
-                        Log.Info($"  Loaded {allAppSpecs.Length} symbol packages (deduplicated by app ID, latest version)");
+                        Log.Info($"  Loaded {allAppSpecs.Length} symbol packages (deduplicated by identity)");
                         compilation = compilation
                             .WithReferenceLoader(refLoader)
                             .AddReferences(allAppSpecs);
@@ -610,42 +590,94 @@ public static class AlTranspiler
             .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
             .ToList();
 
-        // When stubs are loaded: detect ambiguity conflicts (AL0275/AL0197) and resolve
-        // by removing the conflicting symbol package, then retrying compilation
-        if (Log.HasStubs && declErrors.Any(d => d.Id is "AL0275" or "AL0197"))
+        // Reactive conflict resolution for AL0275/AL0197 ambiguous reference errors.
+        //
+        // Two distinct cases:
+        //
+        // 1. Self-duplicate (always handled): both sides of the AL0275 message name the
+        //    same extension identity.  This happens when the packages directory contains
+        //    copies of the same .app with different GUIDs.  PackageScanner already removes
+        //    these proactively, but this path handles packages loaded via explicit
+        //    SymbolReferenceSpecification (depSpecs) that bypass PackageScanner.
+        //    Fix: rebuild with a PackageScanner-deduped spec list.
+        //
+        // 2. Stubs-vs-package conflict (stubs only): a stub defines the same object as a
+        //    package. Fix: drop the conflicting package so the stub wins.
+        if (declErrors.Any(d => d.Id is "AL0275" or "AL0197") && hasExplicitPackages && allPackagePaths.Count > 0)
         {
-            // Extract conflicting extension names from error messages
-            // Format: "'X' is an ambiguous reference between 'X' defined by the extension 'AppName by Publisher (Version)' and ..."
-            var conflictingApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var d in declErrors.Where(d => d.Id is "AL0275" or "AL0197"))
+            var al0275Errors = declErrors.Where(d => d.Id is "AL0275" or "AL0197").ToList();
+
+            // Case 1: self-duplicate AL0275 (no stubs required)
+            var selfDuplicates = al0275Errors.Where(d => DiagnosticClassifier.IsSelfDuplicateAmbiguity(d.GetMessage())).ToList();
+            if (selfDuplicates.Count > 0)
             {
-                var msg = d.GetMessage();
-                // Extract extension names: 'AppName by Publisher (Version)'
-                foreach (var part in msg.Split("'"))
-                {
-                    if (part.Contains(" by ") && part.Contains("(") &&
-                        !part.Contains(appIdentity.Name))
-                    {
-                        // Extract just the app name before " by "
-                        var appName = part.Split(" by ")[0].Trim();
-                        conflictingApps.Add(appName);
-                    }
-                }
+                Log.Info($"Self-duplicate packages detected ({selfDuplicates.Count} AL0275 errors). Re-scanning with identity deduplication...");
+
+                var deduped = PackageScanner.ScanForSpecs(
+                    allPackagePaths,
+                    excludeGuid: appIdentity.AppId,
+                    excludeName: appIdentity.Name);
+
+                var dedupedSpecs = deduped
+                    .Select(s => new SymbolReferenceSpecification(
+                        s.Publisher, s.Name, s.Version,
+                        false, s.AppId, false, ImmutableArray<Guid>.Empty))
+                    .ToArray();
+
+                compilation = Compilation.Create(
+                    moduleName: appIdentity.Name,
+                    publisher: appIdentity.Publisher,
+                    version: appIdentity.Version,
+                    appId: appIdentity.AppId,
+                    syntaxTrees: syntaxTrees.ToArray(),
+                    options: new CompilationOptions(
+                        continueBuildOnError: true,
+                        target: CompilationTarget.OnPrem,
+                        generateOptions: CompilationGenerationOptions.All
+                    ))
+                    .WithReferenceLoader(refLoader)
+                    .AddReferences(dedupedSpecs);
+
+                // Re-check declaration diagnostics
+                declDiags = compilation.GetDeclarationDiagnostics().ToList();
+                declErrors = declDiags
+                    .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
+                    .ToList();
+
+                // Refresh al0275Errors for case 2 below
+                al0275Errors = declErrors.Where(d => d.Id is "AL0275" or "AL0197").ToList();
             }
 
-            if (conflictingApps.Count > 0 && hasExplicitPackages)
+            // Case 2: stubs-vs-package conflict (only when stubs are loaded)
+            if (Log.HasStubs && al0275Errors.Any())
             {
-                Log.Info($"Stubs override {conflictingApps.Count} package(s): {string.Join(", ", conflictingApps)}");
-
-                // Rebuild compilation without conflicting packages
-                // Re-discover dependencies excluding conflicted app names
-                if (allPackagePaths.Count > 0)
+                // Extract conflicting extension names from error messages.
+                // Format: "'X' is an ambiguous reference between 'X' defined by the extension
+                //          'AppName by Publisher (Version)' and ..."
+                var conflictingApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var d in al0275Errors)
                 {
-                    var filteredSpecs = appsByGuid
-                        .Where(kv => !conflictingApps.Contains(kv.Value.Name))
-                        .Select(kv => new SymbolReferenceSpecification(
-                            kv.Value.Publisher, kv.Value.Name, kv.Value.Version,
-                            false, kv.Key, false, ImmutableArray<Guid>.Empty))
+                    var msg = d.GetMessage();
+                    foreach (var part in msg.Split("'"))
+                    {
+                        if (part.Contains(" by ") && part.Contains("(") &&
+                            !part.Contains(appIdentity.Name))
+                        {
+                            var appName = part.Split(" by ")[0].Trim();
+                            conflictingApps.Add(appName);
+                        }
+                    }
+                }
+
+                if (conflictingApps.Count > 0)
+                {
+                    Log.Info($"Stubs override {conflictingApps.Count} package(s): {string.Join(", ", conflictingApps)}");
+
+                    var filteredSpecs = loadedPackageSpecs
+                        .Where(s => !conflictingApps.Contains(s.Name))
+                        .Select(s => new SymbolReferenceSpecification(
+                            s.Publisher, s.Name, s.Version,
+                            false, s.AppId, false, ImmutableArray<Guid>.Empty))
                         .ToArray();
 
                     compilation = Compilation.Create(
@@ -661,13 +693,13 @@ public static class AlTranspiler
                         ))
                         .WithReferenceLoader(refLoader)
                         .AddReferences(filteredSpecs);
-                }
 
-                // Re-check declaration diagnostics
-                declDiags = compilation.GetDeclarationDiagnostics().ToList();
-                declErrors = declDiags
-                    .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
-                    .ToList();
+                    // Re-check declaration diagnostics
+                    declDiags = compilation.GetDeclarationDiagnostics().ToList();
+                    declErrors = declDiags
+                        .Where(d => d.Severity == DiagnosticSeverity.Error && !ignoredErrorIds.Contains(d.Id))
+                        .ToList();
+                }
             }
         }
 

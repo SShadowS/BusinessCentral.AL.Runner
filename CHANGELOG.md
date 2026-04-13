@@ -7,7 +7,32 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Fixed
-- **Overloaded procedures with `var List of [T]` parameters** — cross-codeunit
+- **Duplicate `.app` packages no longer cause AL0275 "ambiguous reference" errors**
+  — When the packages directory contains multiple copies of the same extension
+  (same publisher/name/version) with different GUIDs, al-runner now deduplicates
+  them proactively at scan time via `PackageScanner`, keeping exactly one entry per
+  identity (deterministic: lowest GUID wins). A reactive fallback also handles
+  any residual self-duplicate AL0275 errors from explicitly specified dependency
+  specs. Genuine cross-extension AL0275 conflicts (different publishers or names)
+  are unaffected. Stubs-vs-package conflict resolution is unchanged.
+  `DiagnosticClassifier.IsSelfDuplicateAmbiguity` correctly distinguishes the two
+  cases by comparing both sides of the AL0275 message. This fixes the error
+  pattern `'X' is an ambiguous reference between 'X' defined by the extension
+  'App by Publisher (V)' and 'App by Publisher (V)'` when both sides are identical.
+
+### Added
+- **`DiagnosticClassifier`** — new public static class that parses AL compiler
+  diagnostic messages. `IsSelfDuplicateAmbiguity(message)` returns `true` when
+  both extension identity strings in an AL0275 message are identical (the
+  self-duplicate case). `ExtractAmbiguityExtensionIds(message)` returns both
+  extension identity strings or null if the message doesn't match.
+- **`PackageScanner`** — new public static class that scans package directories
+  for `.app` files and returns a deduplicated `IReadOnlyList<PackageSpec>`. Two-
+  pass deduplication: (1) by GUID keeping highest version, (2) by
+  publisher+name+version keeping lowest GUID. Replaces the inline scan loop that
+  was previously embedded in `AlTranspiler`.
+
+### Overloaded procedures with `var List of [T]` parameters
   `Invoke` now resolves the correct overload when the BC compiler emits suffixed
   C# method names (e.g., `ProcessJson_2101255952`) for overloaded AL procedures.
   Previously, `MockCodeunitHandle.Invoke` used only the base method name, picking
