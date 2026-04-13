@@ -542,7 +542,7 @@ public class AlRunnerPipeline
             Runtime.MessageCapture.Disable();
 
             Dictionary<string, string>? scopeToObject = null;
-            if (options.IterationTracking || options.ShowCoverage)
+            if (options.IterationTracking || options.ShowCoverage || options.CaptureValues)
             {
                 scopeToObject = CoverageReport.BuildScopeToObjectMap(generatedCSharpList!);
             }

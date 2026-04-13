@@ -32,14 +32,27 @@ public static class SourceFileMapper
     /// <summary>
     /// Resolve a C# scope class name to its AL source file path
     /// via the scope-to-object-to-file chain.
+    /// Falls back to prefix matching when the scope name is a method name
+    /// without the _Scope suffix (e.g. ValueCapture uses bare method names).
     /// </summary>
     public static string? GetFileForScope(
         string scopeName,
         Dictionary<string, string> scopeToObject)
     {
-        if (!scopeToObject.TryGetValue(scopeName, out var objectName))
-            return null;
-        return GetFile(objectName);
+        // Exact match first
+        if (scopeToObject.TryGetValue(scopeName, out var objectName))
+            return GetFile(objectName);
+
+        // Prefix match: scopeName might be "MethodName" while scopeToObject has
+        // "MethodName_Scope_HASH". Find any key that starts with scopeName + "_".
+        var prefix = scopeName + "_";
+        foreach (var (key, value) in scopeToObject)
+        {
+            if (key.StartsWith(prefix, StringComparison.Ordinal))
+                return GetFile(value);
+        }
+
+        return null;
     }
 
     /// <summary>
