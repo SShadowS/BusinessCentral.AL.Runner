@@ -624,10 +624,16 @@ public static class AlTranspiler
         var syntaxTrees = new List<SyntaxTree>();
         bool hasErrors = false;
 
-        foreach (var src in alSources)
+        var parsedResults = new (SyntaxTree tree, List<Diagnostic> diags)[alSources.Count];
+        Parallel.For(0, alSources.Count, i =>
         {
-            var tree = SyntaxTree.ParseObjectText(src);
-            var parseDiags = tree.GetDiagnostics().ToList();
+            var tree = SyntaxTree.ParseObjectText(alSources[i]);
+            var diags = tree.GetDiagnostics().ToList();
+            parsedResults[i] = (tree, diags);
+        });
+
+        foreach (var (tree, parseDiags) in parsedResults)
+        {
             if (parseDiags.Any(d => d.Severity == DiagnosticSeverity.Error))
             {
                 Log.Info("AL parse errors:");
@@ -1731,7 +1737,7 @@ public static class RoslynCompiler
                 Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary)
                 .WithAllowUnsafe(true));
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(512 * 1024);
         var result = compilation.Emit(ms);
 
         if (!result.Success)
