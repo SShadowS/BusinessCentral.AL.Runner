@@ -157,6 +157,9 @@ public class AlRunnerPipeline
             ? capturedValues.Select(c => new
             {
                 scopeName = c.ScopeName,
+                sourceFile = scopeToObject != null
+                    ? SourceFileMapper.GetFileForScope(c.ScopeName, scopeToObject)
+                    : null,
                 variableName = c.VariableName,
                 value = c.Value,
                 statementId = c.StatementId
