@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.9] — 2026-04-13
 
 ### Added
 - **Opt-in crash telemetry** — When an unexpected .NET exception escapes the runner
