@@ -261,6 +261,7 @@ test executor that needs no BC service tier, Docker, SQL Server, or license.
 - Session API: StartSession (dispatches codeunit synchronously, returns true), StopSession (no-op),
   IsSessionActive (returns false), Sleep (no-op)
 - Built-in session functions: CompanyName, UserId, TenantId, SerialNumber (return empty string)
+- GlobalLanguage() — returns and sets an in-memory language ID (default 1033 = ENU); reset between tests
 - Partial compilation (skips unsupported object types like XMLport)
 - Coverage reporting via `--coverage` (statement-level, outputs cobertura.xml)
 - Fluent builder pattern: `exit(this)` in codeunit methods returning `Codeunit "Self"`
@@ -1910,6 +1911,7 @@ public static class Executor
             AlRunner.Runtime.AlScope.ResetLastStatement();
             AlRunner.Runtime.HandlerRegistry.Reset();
             AlRunner.Runtime.MockSession.Reset();
+            AlRunner.Runtime.MockLanguage.Reset();
 
             try
             {

@@ -126,31 +126,22 @@ public class MockFieldRef
     /// ALSetRange(object) — overload for when BC emits ALSetRange(NavComplexValue)
     /// and the rewriter replaces NavComplexValue with object. Extracts the NavValue
     /// from known mock types (MockVariant, MockRecordRef) or casts directly.
-    /// </summary>
-    /// <summary>
-    /// ALSetRange(MockVariant) — explicit overload for MockVariant to prevent C#
-    /// implicit conversion to NavValue? (which returns null for non-NavValue contents).
-    /// Extracts the inner value and delegates to the appropriate SetRange overload.
-    /// </summary>
-    public void ALSetRange(MockVariant variant)
-    {
-        if (variant?.Value is NavValue nv)
-            ALSetRange(nv);
-        else
-            _owner?.SetRange(_fieldNo, new NavText(variant?.Value?.ToString() ?? ""));
-    }
-
-    /// <summary>
-    /// ALSetRange(object) — overload for when BC emits ALSetRange(NavComplexValue)
-    /// and the rewriter replaces NavComplexValue with object. Extracts the NavValue
-    /// from known mock types or casts directly.
+    /// Note: The MockVariant-specific overload was removed because MockVariant has
+    /// implicit conversions to/from NavValue, which caused CS0121 ambiguity when C#
+    /// could not choose between ALSetRange(NavValue) and ALSetRange(MockVariant).
+    /// The object overload handles all remaining cases safely.
     /// </summary>
     public void ALSetRange(object value)
     {
         if (value is NavValue nv)
             ALSetRange(nv);
         else if (value is MockVariant mv)
-            ALSetRange(mv);
+        {
+            if (mv.Value is NavValue mvNv)
+                ALSetRange(mvNv);
+            else
+                _owner?.SetRange(_fieldNo, new NavText(mv.Value?.ToString() ?? ""));
+        }
         else
             _owner?.SetRange(_fieldNo, new NavText(value?.ToString() ?? ""));
     }

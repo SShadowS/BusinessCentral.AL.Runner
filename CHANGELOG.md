@@ -6,6 +6,9 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- **`GlobalLanguage()` NullReferenceException in standalone mode** — `ALSystemLanguage.get_ALGlobalLanguage` and `set_ALGlobalLanguage` crashed because there is no live BC session context in the runner. The rewriter now intercepts `ALSystemLanguage.ALGlobalLanguage` (both get and set) and routes them to `MockLanguage.ALGlobalLanguage`, a static int property backed by an in-memory field defaulting to 1033 (ENU). `MockLanguage.Reset()` is called between tests to restore the default. Fixes #82. Tested by `tests/86-global-language/` (5 cases).
+
 ### Added
 - **Compact summary line at end of test runs** — After each test run, the output
   now ends with a concise one-liner analogous to pytest/jest:
@@ -68,6 +71,16 @@ All notable changes to this project are documented here. Format based on
   results on repeated identical requests.
 
 ### Fixed
+- **`GlobalLanguage()` NullReferenceException in standalone mode** — `ALSystemLanguage.get_ALGlobalLanguage` and `set_ALGlobalLanguage` crashed because there is no live BC session context in the runner. The rewriter now intercepts `ALSystemLanguage.ALGlobalLanguage` (both get and set) and routes them to `MockLanguage.ALGlobalLanguage`, a static int property backed by an in-memory field defaulting to 1033 (ENU). `MockLanguage.Reset()` is called between tests to restore the default. Fixes [#82](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/82). Tested by `tests/86-global-language/` (5 cases).
+- **`FieldRef.SetRange` CS0121 ambiguity resolved** — `MockFieldRef.ALSetRange` had
+  both `ALSetRange(NavValue)` and `ALSetRange(MockVariant)` overloads. Because
+  `MockVariant` defines implicit conversions to and from `NavValue`, C# overload
+  resolution could not pick one when the argument was a `NavValue` subtype (e.g.
+  `NavInteger`, `NavOption`, `NavDecimal`), producing `CS0121`. The
+  `ALSetRange(MockVariant)` overload has been removed; its logic is merged into the
+  existing `ALSetRange(object)` catch-all, which already handles `MockVariant`
+  correctly. Tested by `tests/87-fieldref-setrange-types/` (8 test cases).
+  Fixes [#84](https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues/84).
 - **`Insert()` now enforces primary-key uniqueness for more tables** — Previously,
   PK uniqueness was only checked when the table's key declaration had been parsed from
   AL source by `TableFieldRegistry`. Tables without an explicit `keys {}` block, or

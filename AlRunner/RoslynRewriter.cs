@@ -2163,6 +2163,21 @@ protected bool CallGetFormatExtensionMethod(int fieldNo, ref string result) { re
                         SyntaxFactory.Argument(visited.Expression))));
         }
 
+        // Pattern: ALSystemLanguage.ALGlobalLanguage -> MockLanguage.ALGlobalLanguage
+        // ALSystemLanguage.get_ALGlobalLanguage / set_ALGlobalLanguage crash because there
+        // is no live BC session context in standalone mode. Redirect both get and set to
+        // MockLanguage.ALGlobalLanguage which is a plain static property backed by an int field.
+        if (visited.Expression is IdentifierNameSyntax langId &&
+            langId.Identifier.Text == "ALSystemLanguage" &&
+            memberName == "ALGlobalLanguage")
+        {
+            return SyntaxFactory.MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                SyntaxFactory.IdentifierName("MockLanguage"),
+                SyntaxFactory.IdentifierName("ALGlobalLanguage"))
+                .WithTriviaFrom(visited);
+        }
+
         return visited;
     }
 
