@@ -209,6 +209,13 @@ if (!string.IsNullOrEmpty(result.StdOut))
 if (!string.IsNullOrEmpty(result.StdErr))
     Console.Error.Write(result.StdErr);
 
+// Print compilation gap warnings after test output so they're visible
+Executor.PrintCompilationGaps(RoslynCompiler.ExcludedFiles);
+
+// Report all pipeline gaps (compilation exclusions + runtime errors) via telemetry
+await AlRunner.TelemetryReporter.TryReportPipelineGapsAsync(
+    result.Tests, RoslynCompiler.ExcludedFiles, options.OutputJson, noTelemetry);
+
 return result.ExitCode;
 
 void PrintGuide()
@@ -2022,6 +2029,19 @@ public static class Executor
                         AlSourceColumn = FindAlSourceColumn(inner)
                     });
                 }
+                else if (IsRunnerError(inner!))
+                {
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Error,
+                        Message = inner!.Message,
+                        StackTrace = FormatStackFrames(inner),
+                        AlSourceLine = FindAlSourceLine(inner),
+                        AlSourceColumn = FindAlSourceColumn(inner),
+                        IsRunnerBug = true
+                    });
+                }
                 else
                 {
                     results.Add(new AlRunner.TestResult
@@ -2037,15 +2057,31 @@ public static class Executor
             }
             catch (Exception ex)
             {
-                results.Add(new AlRunner.TestResult
+                if (IsRunnerError(ex))
                 {
-                    Name = testName,
-                    Status = AlRunner.TestStatus.Fail,
-                    Message = ex.Message,
-                    StackTrace = FormatStackFrames(ex),
-                    AlSourceLine = FindAlSourceLine(ex),
-                    AlSourceColumn = FindAlSourceColumn(ex)
-                });
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Error,
+                        Message = ex.Message,
+                        StackTrace = FormatStackFrames(ex),
+                        AlSourceLine = FindAlSourceLine(ex),
+                        AlSourceColumn = FindAlSourceColumn(ex),
+                        IsRunnerBug = true
+                    });
+                }
+                else
+                {
+                    results.Add(new AlRunner.TestResult
+                    {
+                        Name = testName,
+                        Status = AlRunner.TestStatus.Fail,
+                        Message = ex.Message,
+                        StackTrace = FormatStackFrames(ex),
+                        AlSourceLine = FindAlSourceLine(ex),
+                        AlSourceColumn = FindAlSourceColumn(ex)
+                    });
+                }
             }
         }
 
@@ -2070,7 +2106,10 @@ public static class Executor
                 case AlRunner.TestStatus.Error:
                     Console.WriteLine($"ERROR {r.Name}");
                     if (r.Message != null) Console.WriteLine($"      {r.Message}");
-                    Console.WriteLine($"      Inject this dependency via an AL interface.");
+                    if (r.IsRunnerBug)
+                        Console.WriteLine($"      ⚑ Runner limitation — update al-runner or file an issue at https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues");
+                    else
+                        Console.WriteLine($"      Inject this dependency via an AL interface.");
                     if (r.StackTrace != null) Console.Write(r.StackTrace);
                     break;
             }
@@ -2089,6 +2128,29 @@ public static class Executor
         if (results.Count == 0) return 1;
         var failedOrError = results.Count(r => r.Status != AlRunner.TestStatus.Pass);
         return failedOrError > 0 ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Prints a visible warning block for any AL source files that were excluded
+    /// from Roslyn compilation due to rewriter gaps. Called after test output so
+    /// the user sees the reason behind any "not found in assembly" errors above.
+    /// </summary>
+    public static void PrintCompilationGaps(Dictionary<string, List<string>> excludedFiles)
+    {
+        if (excludedFiles.Count == 0) return;
+
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"WARN  {excludedFiles.Count} source file(s) excluded from compilation (rewriter gap):");
+        foreach (var (file, errors) in excludedFiles.Take(5))
+        {
+            var shortName = Path.GetFileNameWithoutExtension(file);
+            foreach (var err in errors.Take(2))
+                Console.Error.WriteLine($"      {shortName}: {err}");
+        }
+        if (excludedFiles.Count > 5)
+            Console.Error.WriteLine($"      … and {excludedFiles.Count - 5} more. Run with -v for the full list.");
+        Console.Error.WriteLine($"      ⚑ Runner limitation — these may cause ERROR results above.");
+        Console.Error.WriteLine($"        File an issue: https://github.com/StefanMaron/BusinessCentral.AL.Runner/issues");
     }
 
     private static void CaptureFieldValues(object scope, Type scopeType, string testName)
@@ -2123,6 +2185,16 @@ public static class Executor
         var (typeName, stmtId) = lastHit.Value;
         return SourceLineMapper.GetAlLineFromStatement(typeName, stmtId);
     }
+
+    /// <summary>
+    /// Returns true when the exception originates from AlRunner.Runtime mock code,
+    /// indicating a runner limitation rather than a user test logic failure.
+    /// These should be reported as <see cref="AlRunner.TestStatus.Error"/> with
+    /// <see cref="AlRunner.TestResult.IsRunnerBug"/> = true.
+    /// </summary>
+    private static bool IsRunnerError(Exception ex) =>
+        ex is InvalidOperationException &&
+        ex.StackTrace?.Contains("AlRunner.Runtime.Mock") == true;
 
     /// <summary>
     /// Get the AL source column from the last StmtHit that was executed before

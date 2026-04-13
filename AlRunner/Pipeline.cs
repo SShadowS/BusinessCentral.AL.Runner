@@ -39,6 +39,11 @@ public class TestResult
     /// tests or when the underlying source-span lacks column info).
     /// </summary>
     public int? AlSourceColumn { get; init; }
+    /// <summary>
+    /// True when the error originates from AlRunner.Runtime mock code (a runner
+    /// limitation or bug), not from user AL logic or a missing dependency injection.
+    /// </summary>
+    public bool IsRunnerBug { get; init; }
 }
 
 public class CapturedValue
@@ -170,7 +175,8 @@ public class AlRunnerPipeline
                 message = t.Message,
                 stackTrace = t.StackTrace?.TrimEnd(),
                 alSourceLine = t.AlSourceLine,
-                alSourceColumn = t.AlSourceColumn
+                alSourceColumn = t.AlSourceColumn,
+                isRunnerBug = t.IsRunnerBug ? (bool?)true : null
             }),
             passed = tests.Count(t => t.Status == TestStatus.Pass),
             failed = tests.Count(t => t.Status == TestStatus.Fail),
