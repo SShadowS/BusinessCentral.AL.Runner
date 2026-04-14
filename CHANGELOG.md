@@ -7,20 +7,6 @@ All notable changes to this project are documented here. Format based on
 ## [Unreleased]
 
 ### Fixed
-- **`ALRename` properly updates table rows** — `MockRecordHandle.ALRename()` was
-  a broken stub that only modified the handle's field bag without touching the
-  in-memory table store. Now it: (1) finds the current record by its PK,
-  (2) checks for key conflicts, (3) updates the actual table row, and
-  (4) honors `errorLevel` (throws or returns false). (#130)
-- **`ALInsert` honors `DataError` level** — `MockRecordHandle.ALInsert()` now
-  checks the `errorLevel` parameter before throwing on duplicate primary key.
-  When AL code captures the return value (`if not Rec.Insert() then …`), the
-  BC compiler passes `DataError.Never` and the method returns `false` instead
-  of throwing. Previously it always threw regardless of error level. (#128)
-- **`ALDelete` throws on missing record** — `MockRecordHandle.ALDelete()` now
-  throws when the record does not exist and `errorLevel` is `DataError.ThrowError`
-  (i.e. the return value is not captured in AL). Previously it silently returned
-  `false` regardless of error level. (#128)
 - **`ALTransferFields` skips all PK fields** — When `initPrimaryKey=false`,
   `TransferFields` now skips all registered primary key fields instead of only
   field 1. Correctly handles composite primary keys. (#113)
@@ -45,11 +31,6 @@ All notable changes to this project are documented here. Format based on
   PK handling.
 - **New test suite**: `111-record-stubs` — 8 tests covering CountApprox, Consistent,
   FieldActive, AddLink/HasLinks/DeleteLinks, WritePermission, SetPermissionFilter.
-  single and composite primary keys, non-existent record errors, key conflict
-  detection, error suppression via return value, and record count preservation.
-- **New test suite**: `106-dataerror-suppress` — 21 tests covering `DataError`
-  error-suppression behavior for Insert, Delete, Modify, Get, FindFirst,
-  FindLast, FindSet, and the real-world `if not Insert() then Modify()` pattern.
 
 ## [1.0.13] - 2026-04-14
 
@@ -84,6 +65,22 @@ All notable changes to this project are documented here. Format based on
   Subscribers can read/write publisher state through the sender handle. (#116)
 
 ### Fixed
+- **`ALRename` properly updates table rows** — `MockRecordHandle.ALRename()` was
+  a broken stub that only modified the handle's field bag without touching the
+  in-memory table store. Now it: (1) finds the current record by its PK,
+  (2) checks for key conflicts, (3) updates the actual table row, and
+  (4) honors `errorLevel` (throws or returns false). Tested by `tests/bucket-2/107-rename/`
+  (9 test cases). (#130)
+- **`ALInsert` honors `DataError` level** — `MockRecordHandle.ALInsert()` now
+  checks the `errorLevel` parameter before throwing on duplicate primary key.
+  When AL code captures the return value (`if not Rec.Insert() then …`), the
+  BC compiler passes `DataError.Never` and the method returns `false` instead
+  of throwing. Previously it always threw regardless of error level. (#128)
+- **`ALDelete` throws on missing record** — `MockRecordHandle.ALDelete()` now
+  throws when the record does not exist and `errorLevel` is `DataError.ThrowError`
+  (i.e. the return value is not captured in AL). Previously it silently returned
+  `false` regardless of error level. Tested by `tests/bucket-2/106-dataerror-suppress/`
+  (21 test cases). (#128)
 - **`CS1503` in codeunits that call `HttpContent.WriteFrom(InStream)` or `HttpContent.ReadAs(var InStream)`** —
   After the `NavInStream → MockInStream` type rename in the rewriter, calls to
   `NavHttpContent.ALLoadFrom(MockInStream)` and `NavHttpContent.ALReadAs(ITreeObject, DataError, ByRef<MockInStream>)`
