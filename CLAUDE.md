@@ -321,7 +321,7 @@ test belongs in the full BC pipeline, not in the runner.
   `rendering { ... }` blocks are stripped from report AL source before transpilation.
   XmlPort variables (`XmlPort "X"`) compile via `MockXmlPortHandle` but
   `Import()`/`Export()` throw `NotSupportedException` at runtime — XmlPort I/O requires
-  the BC service tier. Report is NOT supported. Developer must inject via AL interfaces.
+  the BC service tier. Developer must inject via AL interfaces for complex XmlPort I/O.
 - **Query data access** — Query variables (`Query "X"`) compile via `MockQueryHandle`.
   `Close()`, `SetFilter()`, `SetRange()`, `TopNumberOfRows()` are no-ops.
   `Open()`, `Read()`, `SaveAsCsv/Xml/Json/Excel()` throw `NotSupportedException` —
@@ -333,8 +333,10 @@ test belongs in the full BC pipeline, not in the runner.
   are handled by `AlCompat` helpers so they no longer produce CS1503. Pure-logic methods
   in HTTP codeunits (those that don't actually call `HttpClient.Send()`) are fully
   testable. Developer must inject HTTP send via AL interface for unit-testable code.
-- **Events/subscribers** — NOT supported. `RunEvent`, `ALBindSubscription`,
-  `ALUnbindSubscription` are no-ops.
+- **Events/subscribers** — Custom `[IntegrationEvent]`/`[BusinessEvent]` dispatch
+  works via `AlCompat.FireEvent()` + `EventSubscriberRegistry`. However, implicit
+  DB trigger events (OnBefore/AfterInsert/Modify/Delete) are NOT fired, subscriber
+  parameters are not forwarded, and `BindSubscription`/`UnbindSubscription` are no-ops.
 - **.app file loading** — NOT supported for test input. Always runs from AL source
   directories. Dependencies can be loaded from .app for symbol references only.
 - **Filter groups** (FilterGroup) — not tracked.
@@ -498,12 +500,25 @@ These are gaps that remain for full production use:
    read by the CLI.
 2. **Filter groups** (FilterGroup) — not tracked.
 3. **ALGetFilter** — returns empty string even when filters are active.
-4. **More Assert methods** — AreNearlyEqual, Fail, etc.
-5. **RecordRef/FieldRef metadata** — `FieldRef.Name`, `FieldRef.Caption`,
+4. **RecordRef/FieldRef metadata** — `FieldRef.Name`, `FieldRef.Caption`,
    `FieldRef.Type`, `FieldRef.Length`, `FieldRef.Class` return stub defaults
    (no field metadata infrastructure). `FieldCount` returns the number of
    fields that have been set on the current record, not the table schema count.
-6. **KeyRef** — not implemented.
+5. **KeyRef** — not implemented.
+6. **Codeunit OnRun with record parameter** — `RunCodeunit` only finds
+   parameterless `OnRun()` methods. Codeunits whose OnRun trigger takes a
+   record parameter will silently do nothing.
+7. **Implicit DB trigger events** — OnBefore/AfterInsert/Modify/Delete/Rename
+   are NOT fired by MockRecordHandle.
+8. **Temporary records** — `IsTemporary` always returns false; no isolated
+   partition for temp records.
+9. **FlowField formulas beyond Exist** — `Sum`, `Count`, `Lookup`, `Average`,
+   `Min`, `Max` are not computed by CalcFields.
+10. **ErrorInfo & collectible errors** — `Error(ErrorInfo)` works (throws with
+    message) but ErrorInfo property access and the collectible errors framework
+    are not implemented.
+11. **RecordId fidelity** — `ALRecordId` returns `NavRecordId.Default` instead
+    of encoding the actual table ID + primary key values.
 
 ---
 
