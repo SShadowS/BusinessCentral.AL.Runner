@@ -497,7 +497,7 @@ public class AlRunnerPipeline
             var (name, code) = generatedCSharpList[i];
 
             // Check rewrite cache — if C# output is unchanged, reuse prior tree
-            var cached = RewriteCache?.TryGet(name, code);
+            var cached = RewriteCache?.TryGet(name, code, options.IterationTracking);
             if (cached != null)
             {
                 rewrittenTrees[i] = (name, cached);
@@ -517,7 +517,7 @@ public class AlRunnerPipeline
             rewrittenTrees[i] = (name, tree);
 
             // Store in cache for next run
-            RewriteCache?.Store(name, code, tree);
+            RewriteCache?.Store(name, code, tree, options.IterationTracking);
         });
 
         if (rewriteHits > 0)

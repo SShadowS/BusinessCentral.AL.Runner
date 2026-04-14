@@ -1758,6 +1758,9 @@ public static class RoslynCompiler
         }
 
         ms.Seek(0, SeekOrigin.Begin);
+        // Collectible ALC: the assembly (and its ALC) stays alive as long as any
+        // reference to the Assembly exists (e.g., in CompilationCache). When the
+        // last reference drops (cache eviction, process exit), GC collects both.
         var alc = new System.Runtime.Loader.AssemblyLoadContext($"TestRun_{Guid.NewGuid():N}", isCollectible: true);
         return alc.LoadFromStream(ms);
     }
