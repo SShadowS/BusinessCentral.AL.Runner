@@ -45,13 +45,14 @@ public static class MockSession
     /// <summary>
     /// StartSession with record parameter.
     /// ALSession.ALStartSession(DataError, ByRef&lt;int&gt; sessionId, int codeunitId, string companyName, MockRecordHandle record)
-    /// Dispatches the codeunit synchronously and returns true.
-    /// The record parameter is accepted but not passed to OnRun (OnRun with record params
-    /// is a known limitation of the runner).
+    /// Dispatches the codeunit synchronously and forwards the record to OnRun.
     /// </summary>
     public static bool ALStartSession(DataError errorLevel, ByRef<int> sessionId, int codeunitId, string companyName, MockRecordHandle record)
     {
-        return ALStartSession(errorLevel, sessionId, codeunitId, companyName);
+        sessionId.Value = _nextSessionId++;
+        // RunCodeunit already handles TrapError (returns false) and ThrowError (throws).
+        // Return its result directly so a trapped failure is propagated as false, not true.
+        return MockCodeunitHandle.RunCodeunit(errorLevel, codeunitId, record);
     }
 
     /// <summary>
@@ -59,17 +60,7 @@ public static class MockSession
     /// </summary>
     public static bool ALStartSession(DataError errorLevel, int sessionId, int codeunitId, string companyName, MockRecordHandle record)
     {
-        try
-        {
-            MockCodeunitHandle.RunCodeunit(codeunitId);
-            return true;
-        }
-        catch
-        {
-            if (errorLevel == DataError.TrapError)
-                return false;
-            throw;
-        }
+        return MockCodeunitHandle.RunCodeunit(errorLevel, codeunitId, record);
     }
 
     /// <summary>
@@ -85,7 +76,7 @@ public static class MockSession
     /// </summary>
     public static bool ALStartSession(DataError errorLevel, ByRef<int> sessionId, int codeunitId, string companyName, MockRecordHandle record, NavDuration timeout)
     {
-        return ALStartSession(errorLevel, sessionId, codeunitId, companyName);
+        return ALStartSession(errorLevel, sessionId, codeunitId, companyName, record);
     }
 
     /// <summary>
