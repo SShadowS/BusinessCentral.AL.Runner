@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Fixed
+- **Page without SourceTable compiles cleanly** — `SetSelectionFilter` no longer
+  injects `this.Rec` into page classes that have no source table, fixing a CS1061
+  Roslyn error for pages that only define helper procedures.
+
 ### Changed
 - **Vision reframe** — project rationale updated from "pure-logic codeunits only"
   to broad AL language compatibility. Docs, guide, and limitations page updated to
