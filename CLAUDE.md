@@ -3,10 +3,13 @@
 ## Vision
 
 Run Business Central AL unit tests in milliseconds, with no BC service tier, no
-Docker, no SQL Server, and no license. The goal is a fast feedback loop for
-pure-logic codeunits that don't depend on UI, HTTP, or external services.
+Docker, no SQL Server, and no license. The goal is broad AL language compatibility —
+targeting the full functional AL surface so that any codeunit that can run without
+the BC service tier can be tested here.
 
-This works for pure-logic codeunits. See Known Limitations for the remaining gaps.
+A small number of hard architectural limits exist (parallel session contracts,
+transaction isolation, service-tier rendering, HTTP). Everything else is a gap to
+close. See Known Limitations for details.
 
 ---
 
@@ -153,9 +156,29 @@ automatically when they run `al-runner -h`.
 Without it, nobody can trust the tool.
 
 ### Test structure
-Each test case is a directory under `tests/NN-name/` with:
-- `src/*.al` — AL source code exercising the feature
-- `test/*.al` — Test codeunit (`Subtype = Test`) using `Assert: Codeunit Assert`
+
+Tests live in numbered buckets inside `tests/`:
+
+```
+tests/
+  bucket-1/     ← test suites 01–32, 71, 77, 79-gui-fieldclass
+  bucket-2/     ← test suites 33–95 (remainder)
+  stubs/        ← 39-stubs (needs --stubs flag, separate invocation)
+  excluded/     ← 06-intentional-failure, 46-missing-dep-hint (fixtures, not in main loop)
+```
+
+Each test suite inside a bucket:
+```
+tests/bucket-N/NN-descriptive-name/
+  src/   — AL source codeunit(s) exercising the feature
+  test/  — AL test codeunit (Subtype = Test) using Assert
+```
+
+**When adding a new test suite:** put it in the bucket with fewer suites and verify
+its AL object IDs don't clash with other suites already in that bucket. Object IDs
+must be unique within a bucket (suites compile together). IDs may repeat across
+buckets (separate invocations). Add `bucket-3`, `bucket-4`, etc. when a bucket
+exceeds ~50 suites.
 
 ### Positive AND negative tests
 Every test case must prove BOTH that correct input succeeds AND that incorrect
@@ -178,10 +201,18 @@ the runner actually executes the logic and catches failures.
 
 ### Running tests
 ```bash
-# All tests (auto-discovered, excludes 06-intentional-failure)
-for s in $(ls -d tests/*/src | sed 's|tests/||;s|/src||' | grep -v '06-' | sort); do
-  al-runner "tests/$s/src" "tests/$s/test"
+# Run all buckets (each bucket is one al-runner invocation)
+for bucket in tests/bucket-*/; do
+  args=""
+  for suite in "$bucket"*/; do
+    [ -d "${suite}src"  ] && args="$args ${suite}src"
+    [ -d "${suite}test" ] && args="$args ${suite}test"
+  done
+  dotnet run --project AlRunner -- $args
 done
+
+# Stubs test (separate — requires --stubs flag)
+dotnet run --project AlRunner -- --stubs tests/stubs/39-stubs/stubs tests/stubs/39-stubs/src tests/stubs/39-stubs/test
 ```
 
 ### CI
@@ -541,7 +572,7 @@ al-runner ./src ./test
 al-runner runs as a fast pre-check step before the full BC service tier pipeline
 (MsDyn365Bc.On.Linux). The recommended workflow:
 
-1. **al-runner** — run in CI in seconds for pure-logic unit tests (fast feedback)
+1. **al-runner** — run in CI in seconds for AL unit tests (fast feedback)
 2. **Full pipeline** — run the BC service tier (Docker + SQL) for integration/UI tests
 
 The full pipeline lives at:
@@ -645,7 +676,9 @@ Follows the `BusinessCentral.AL.*` pattern:
 | `AlRunner/Runtime/MockQueryHandle.cs` | Query variable and base class stub: Close/SetFilter/SetRange/TopNumberOfRows no-ops, Open/Read/SaveAs throw NotSupportedException |
 | `AlRunner/stubs/LibraryAssert.al` | AL stub for codeunit 130 (auto-loaded for compilation) |
 | `AlRunner/stubs/LibraryVariableStorage.al` | AL stub for codeunit 131004 (auto-loaded for compilation) |
-| `tests/NN-name/` | Test suites (self-documenting: `src/*.al` + `test/*.al`). Run `ls tests/` to discover. |
+| `tests/bucket-1/`, `tests/bucket-2/` | Test suites in buckets (each bucket = one al-runner invocation). `src/*.al` + `test/*.al` per suite. |
+| `tests/stubs/39-stubs/` | Stubs test — run with `--stubs` flag. |
+| `tests/excluded/` | Fixtures not in the main loop: `06-intentional-failure` (asserts exit 1), `46-missing-dep-hint`. |
 | `.github/workflows/test-matrix.yml` | CI: runs all tests across BC version matrix |
 | `.github/workflows/publish.yml` | CI: publish to NuGet on tag |
 

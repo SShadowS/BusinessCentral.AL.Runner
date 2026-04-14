@@ -6,6 +6,19 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Changed
+- **Vision reframe** — project rationale updated from "pure-logic codeunits only"
+  to broad AL language compatibility. Docs, guide, and limitations page updated to
+  reflect that unsupported AL constructs are gaps to fix, not design boundaries.
+- **CONTRIBUTING.md** — added contributor guide covering TDD requirements, CI matrix,
+  CHANGELOG policy, documentation checklist, and code-quality rules.
+- **Test folder restructured into buckets** — `tests/` now has `bucket-1/`, `bucket-2/`,
+  `stubs/`, and `excluded/` subdirectories. Each bucket is one `al-runner` invocation
+  (all suites compile and run together), eliminating per-suite startup overhead. CI
+  updated to loop over `bucket-*` directories. `39-stubs` moved to `stubs/`,
+  `06-intentional-failure` and `46-missing-dep-hint` moved to `excluded/`. The
+  `06-intentional-failure` fixture is now actively verified in CI (exit code must be 1).
+
 ### Added
 - **Report variable support** — `NavReportHandle` is rewritten to `MockReportHandle`,
   a standalone replacement that supports `SetTableView()`, `Run()` (no-op), and
