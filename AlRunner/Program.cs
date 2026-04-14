@@ -2294,13 +2294,58 @@ public static class Executor
 
     /// <summary>
     /// Returns true when the exception originates from AlRunner.Runtime mock code,
+    /// or from a missing BC runtime DLL (FileNotFoundException / FileLoadException
+    /// for a Microsoft.Dynamics.Nav.* or Microsoft.BusinessCentral.* assembly),
     /// indicating a runner limitation rather than a user test logic failure.
     /// These should be reported as <see cref="AlRunner.TestStatus.Error"/> with
     /// <see cref="AlRunner.TestResult.IsRunnerBug"/> = true.
     /// </summary>
-    private static bool IsRunnerError(Exception ex) =>
-        ex is InvalidOperationException &&
-        ex.StackTrace?.Contains("AlRunner.Runtime.Mock") == true;
+    public static bool IsRunnerError(Exception ex)
+    {
+        if (ex is InvalidOperationException &&
+            ex.StackTrace?.Contains("AlRunner.Runtime.Mock") == true)
+            return true;
+
+        if (IsMissingBcRuntimeDll(ex))
+            return true;
+
+        // Walk InnerException (e.g. TypeInitializationException wrapping FileNotFoundException)
+        if (ex.InnerException != null && IsRunnerError(ex.InnerException))
+            return true;
+
+        // AggregateException can wrap multiple load failures.
+        if (ex is AggregateException agg)
+            foreach (var inner in agg.InnerExceptions)
+                if (inner != null && IsRunnerError(inner))
+                    return true;
+
+        // ReflectionTypeLoadException exposes nested loader failures via LoaderExceptions.
+        if (ex is ReflectionTypeLoadException rtle)
+            foreach (var loader in rtle.LoaderExceptions)
+                if (loader != null && IsRunnerError(loader))
+                    return true;
+
+        return false;
+    }
+
+    public static bool IsMissingBcRuntimeAssemblyName(string? value) =>
+        value?.Contains("Microsoft.Dynamics.Nav.", StringComparison.Ordinal) == true ||
+        value?.Contains("Microsoft.BusinessCentral.", StringComparison.Ordinal) == true;
+
+    /// <summary>
+    /// Returns true when the exception represents a missing BC runtime DLL.
+    /// Prefers the structured FileName property over the (potentially localised) Message.
+    /// </summary>
+    public static bool IsMissingBcRuntimeDll(Exception ex) => ex switch
+    {
+        System.IO.FileNotFoundException fnf =>
+            IsMissingBcRuntimeAssemblyName(fnf.FileName) ||
+            IsMissingBcRuntimeAssemblyName(fnf.Message),
+        System.IO.FileLoadException fle =>
+            IsMissingBcRuntimeAssemblyName(fle.FileName) ||
+            IsMissingBcRuntimeAssemblyName(fle.Message),
+        _ => false
+    };
 
     /// <summary>
     /// Get the AL source column from the last StmtHit that was executed before
