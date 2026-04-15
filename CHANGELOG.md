@@ -17,12 +17,11 @@ All notable changes to this project are documented here. Format based on
   uses `NavDateTime + Int64` (milliseconds) arithmetic instead of
   `NavDateTime.Create(DateTime)` which triggers `Telemetry.Abstractions` loading
   in BC 28+.
-- **CI pipeline strict mode** — The test matrix no longer tolerates exit code 2
-  (runner limitations). Any non-zero exit code now fails the CI pipeline. If tests
-  are blocked, warned, or errored, the pipeline reports failure — only a fully
-  green run is considered a pass.
-
 ### Added
+- **`--strict` flag** — New CLI flag that promotes exit code 2 (runner limitations)
+  to exit code 1. In strict mode, any non-passing test fails the pipeline — use
+  in CI to catch regressions where tests go from passing to blocked. Both CI
+  workflows (test-matrix.yml and publish.yml) now use `--strict`.
 - **HTTP mock types** — `NavHttpClient`, `NavHttpResponseMessage`, `NavHttpContent`,
   `NavHttpHeaders`, and `NavHttpRequestMessage` are replaced with in-memory mocks
   (`MockHttpClient`, `MockHttpResponseMessage`, `MockHttpContent`, `MockHttpHeaders`,

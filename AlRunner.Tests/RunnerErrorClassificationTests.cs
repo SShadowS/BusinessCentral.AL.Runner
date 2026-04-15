@@ -424,6 +424,74 @@ public class RunnerErrorClassificationTests
     }
 
     // ---------------------------------------------------------------------------
+    // PrintResults --strict blocked-test summary
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// In strict mode, a consolidated blocked-test summary section should appear
+    /// right before the final summary line, grouping blocked tests by root cause.
+    /// </summary>
+    [Fact]
+    public void PrintResults_Strict_BlockedTestSummarySection()
+    {
+        var sharedMessage = "FileNotFoundException: Could not load some.dll";
+        var tests = new List<TestResult>
+        {
+            new() { Name = "PassA", Status = TestStatus.Pass, DurationMs = 1 },
+            new() { Name = "BlockedA", Status = TestStatus.Error, Message = sharedMessage, IsRunnerBug = true },
+            new() { Name = "BlockedB", Status = TestStatus.Error, Message = sharedMessage, IsRunnerBug = true },
+            new() { Name = "BlockedC", Status = TestStatus.Error, Message = "OtherError", IsRunnerBug = true },
+        };
+
+        var output = CaptureStdOut(() => Executor.PrintResults(tests, strict: true));
+
+        // Should contain the strict blocked-test summary section
+        Assert.Contains("Blocked tests (3)", output);
+        Assert.Contains("failing CI with --strict", output);
+        // Both root causes listed
+        Assert.Contains("Cause: FileNotFoundException: Could not load some.dll", output);
+        Assert.Contains("Cause: OtherError", output);
+        // All blocked test names listed
+        Assert.Contains("× BlockedA", output);
+        Assert.Contains("× BlockedB", output);
+        Assert.Contains("× BlockedC", output);
+    }
+
+    /// <summary>
+    /// Without strict mode, no blocked-test summary section should appear.
+    /// </summary>
+    [Fact]
+    public void PrintResults_NoStrict_NoBlockedSummarySection()
+    {
+        var tests = new List<TestResult>
+        {
+            new() { Name = "BlockedA", Status = TestStatus.Error, Message = "SomeError", IsRunnerBug = true },
+        };
+
+        var output = CaptureStdOut(() => Executor.PrintResults(tests, strict: false));
+
+        Assert.DoesNotContain("Blocked tests", output);
+        Assert.DoesNotContain("failing CI with --strict", output);
+    }
+
+    /// <summary>
+    /// In strict mode with no blocked tests (all pass), no summary section should appear.
+    /// </summary>
+    [Fact]
+    public void PrintResults_Strict_AllPass_NoBlockedSummarySection()
+    {
+        var tests = new List<TestResult>
+        {
+            new() { Name = "PassA", Status = TestStatus.Pass, DurationMs = 1 },
+        };
+
+        var output = CaptureStdOut(() => Executor.PrintResults(tests, strict: true));
+
+        Assert.DoesNotContain("Blocked tests", output);
+        Assert.DoesNotContain("failing CI with --strict", output);
+    }
+
+    // ---------------------------------------------------------------------------
     // IsMissingBcRuntimeDll — unit tests for the new classification helper
     // ---------------------------------------------------------------------------
 
@@ -705,6 +773,122 @@ public class RunnerErrorClassificationTests
     }
 
     // ---------------------------------------------------------------------------
+    // ExitCode() strict mode tests (#201)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>All tests pass → exit 0, regardless of strict mode.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExitCode_AllPass_Returns0_RegardlessOfStrict(bool strict)
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Pass }
+        };
+        Assert.Equal(0, Executor.ExitCode(results, strict));
+    }
+
+    /// <summary>Any Fail → exit 1, regardless of strict mode.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExitCode_Fail_Returns1_RegardlessOfStrict(bool strict)
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Fail, Message = "Expected 1, got 2" }
+        };
+        Assert.Equal(1, Executor.ExitCode(results, strict));
+    }
+
+    /// <summary>Empty results → exit 1, regardless of strict mode.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExitCode_Empty_Returns1_RegardlessOfStrict(bool strict)
+    {
+        Assert.Equal(1, Executor.ExitCode(new List<TestResult>(), strict));
+    }
+
+    /// <summary>Runner errors with strict=false → exit 2 (lenient).</summary>
+    [Fact]
+    public void ExitCode_RunnerError_NotStrict_Returns2()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Error, IsRunnerBug = true, Message = "not found" }
+        };
+        Assert.Equal(2, Executor.ExitCode(results, strict: false));
+    }
+
+    /// <summary>Runner errors with strict=true → exit 1 (promoted).</summary>
+    [Fact]
+    public void ExitCode_RunnerError_Strict_Returns1()
+    {
+        var results = new List<TestResult>
+        {
+            new() { Name = "T1", Status = TestStatus.Pass },
+            new() { Name = "T2", Status = TestStatus.Error, IsRunnerBug = true, Message = "not found" }
+        };
+        Assert.Equal(1, Executor.ExitCode(results, strict: true));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Pipeline strict mode — rewriter & compilation gaps (#201)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Rewriter gap with strict=true → exit 1 (not 2).</summary>
+    [Fact]
+    public void RewriterGap_Strict_ReturnsExitCode1()
+    {
+        var pipeline = new AlRunnerPipeline();
+        var result = pipeline.Run(new PipelineOptions
+        {
+            InlineCode = "Message('hello');",
+            Strict = true,
+            RewriterFactory = _ => throw new InvalidOperationException("simulated rewriter gap")
+        });
+
+        Assert.Equal(1, result.ExitCode);
+    }
+
+    /// <summary>Compilation gap with strict=true → exit 1 (not 2).</summary>
+    [Fact]
+    public void CompilationGap_Strict_ReturnsExitCode1()
+    {
+        var pipeline = new AlRunnerPipeline();
+        var result = pipeline.Run(new PipelineOptions
+        {
+            InlineCode = "Message('hello');",
+            Strict = true,
+            RewriterFactory = _ =>
+                Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                    "namespace AlRunner { public class Broken { NonExistentType_XYZ _f; } }")
+        });
+
+        Assert.Equal(1, result.ExitCode);
+    }
+
+    /// <summary>Rewriter gap without strict → still exit 2 (unchanged behaviour).</summary>
+    [Fact]
+    public void RewriterGap_NotStrict_StillReturnsExitCode2()
+    {
+        var pipeline = new AlRunnerPipeline();
+        var result = pipeline.Run(new PipelineOptions
+        {
+            InlineCode = "Message('hello');",
+            Strict = false,
+            RewriterFactory = _ => throw new InvalidOperationException("simulated rewriter gap")
+        });
+
+        Assert.Equal(2, result.ExitCode);
+    }
+
+    // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
 
@@ -728,5 +912,58 @@ public class RunnerErrorClassificationTests
             index += pattern.Length;
         }
         return count;
+    }
+
+    // ── LooksLikeFrameworkVersionMismatch ──
+
+    [Fact]
+    public void FrameworkMismatch_SystemTextJson_ReturnsTrue()
+    {
+        var msg = "Could not load file or assembly 'System.Text.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51'.";
+        Assert.True(Executor.LooksLikeFrameworkVersionMismatch(msg));
+    }
+
+    [Fact]
+    public void FrameworkMismatch_MicrosoftExtensions_ReturnsTrue()
+    {
+        var msg = "Could not load file or assembly 'Microsoft.Extensions.Logging, Version=10.0.0.0'.";
+        Assert.True(Executor.LooksLikeFrameworkVersionMismatch(msg));
+    }
+
+    [Fact]
+    public void FrameworkMismatch_BcDll_ReturnsFalse()
+    {
+        // BC runtime DLLs are not framework version mismatches
+        var msg = "Could not load file or assembly 'Microsoft.Dynamics.Nav.Ncl, Version=28.0.0.0'.";
+        Assert.False(Executor.LooksLikeFrameworkVersionMismatch(msg));
+    }
+
+    [Fact]
+    public void FrameworkMismatch_NullMessage_ReturnsFalse()
+    {
+        Assert.False(Executor.LooksLikeFrameworkVersionMismatch(null));
+    }
+
+    [Fact]
+    public void FrameworkMismatch_UnrelatedMessage_ReturnsFalse()
+    {
+        Assert.False(Executor.LooksLikeFrameworkVersionMismatch("Object reference not set to an instance of an object."));
+    }
+
+    [Fact]
+    public void PrintResults_FrameworkMismatch_ShowsInstallHint()
+    {
+        var results = new List<AlRunner.TestResult>
+        {
+            new()
+            {
+                Name = "TestSomething",
+                Status = AlRunner.TestStatus.Fail,
+                Message = "Could not load file or assembly 'System.Text.Json, Version=10.0.0.0'."
+            }
+        };
+        var output = CaptureStdOut(() => Executor.PrintResults(results));
+        Assert.Contains("Install .NET 10", output);
+        Assert.Contains("https://dotnet.microsoft.com/download/dotnet/10.0", output);
     }
 }
