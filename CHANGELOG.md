@@ -4,19 +4,8 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.15] - 2026-04-15
 
-### Fixed
-- **BigText mock (`MockBigText`)** — `NavBigText` is now replaced with `MockBigText`
-  by the rewriter. In BC 28+, `NavBigText`'s static initializer loads
-  `Microsoft.BusinessCentral.Telemetry.Abstractions` which is unavailable outside
-  the service tier, causing `TypeInitializationException`. `MockBigText` provides
-  the same API surface (`ALAddText`, `ALGetSubText`, `ALTextPos`, `ALLength`,
-  `ALWrite`, `ALRead`) using a plain `StringBuilder`.
-- **RoundDateTime avoids Telemetry.Abstractions** — `AlCompat.RoundDateTime` now
-  uses `NavDateTime + Int64` (milliseconds) arithmetic instead of
-  `NavDateTime.Create(DateTime)` which triggers `Telemetry.Abstractions` loading
-  in BC 28+.
 ### Added
 - **`--strict` flag** — New CLI flag that promotes exit code 2 (runner limitations)
   to exit code 1. In strict mode, any non-passing test fails the pipeline — use
@@ -31,14 +20,6 @@ All notable changes to this project are documented here. Format based on
   throw descriptive `NotSupportedException` recommending AL interface injection.
   `HttpContent.WriteFrom(InStream)` / `ReadAs(var InStream)` now round-trip content
   (previously ReadAs returned an empty stream). (#123)
-
-### Improved
-- **XmlPort & Query runtime error messages** — `MockXmlPortHandle.Import/Export`
-  and `MockQueryHandle.Open/Read` now throw descriptive `NotSupportedException`
-  messages that mention "BC service tier" and suggest "AL interface injection"
-  (XmlPort) or "Record operations" (Query) as actionable alternatives. (#124)
-
-### Added
 - **RecordRef/FieldRef API completeness** — Mark/MarkedOnly/ClearMarks are now
   functional (in-memory HashSet tracking). FieldRef.GetFilter returns the active
   filter expression. FieldRef.GetRangeMin/GetRangeMax return the active range
@@ -104,16 +85,12 @@ All notable changes to this project are documented here. Format based on
 - **MockNotification** — In-memory replacement for `NavNotification`. Message,
   Send, Recall, SetData/GetData/HasData, AddAction, Id, Scope. Send and Recall
   are no-ops; data store is in-memory; Id auto-generates a Guid. (#121)
-- **BigText support** — `NavBigText` works as-is (real BC type, no session
-  dependency). AddText, GetSubText, TextPos, Length all function correctly. (#121)
 - **MockTaskScheduler** — CreateTask dispatches codeunit synchronously via
   MockCodeunitHandle (same pattern as MockSession.StartSession), returns a Guid.
   TaskExists returns false, CancelTask/SetTaskReady are no-ops. (#121)
 - **MockDataTransfer** — Minimal stub so code using DataTransfer compiles and
   runs without error. SetTables, AddFieldValue, AddConstantValue, AddJoin,
   AddSourceFilter, CopyFields, CopyRows are all no-ops. (#121)
-- Test suite `tests/bucket-2/122-unstubbed-types/` with 21 test cases covering
-  all four types.
 - **System, Database & Session utility stubs** — `Session.LogMessage()` (no-op),
   `Session.ApplicationArea()` (returns empty string), `Session.GetExecutionContext()` /
   `GetModuleExecutionContext()` (return `ExecutionContext.Normal`),
@@ -121,10 +98,6 @@ All notable changes to this project are documented here. Format based on
   (return stub company values), `RoundDateTime(dt, precision, direction)` (full implementation
   with ms precision and direction rounding). `ProductName.Full/Short/Marketing` use
   real BC types. `NormalDate/ClosingDate` wrappers added with explicit 0D handling. (#185)
-- **NavDateTime formatting fix** — `AlCompat.Format()` now handles `NavDateTime`
-  values directly by casting to `DateTime`, avoiding the `NullReferenceException` in
-  `NavDateTimeFormatter.GetStandardFormat` that occurred when `NavSession` was null.
-  This fixes `Assert.AreEqual`/`AreNotEqual` comparisons involving DateTime values.
 - **ReportExtension scope class `Parent` property** — The rewriter now injects a
   public `Parent` property on scope classes (alongside the existing `_parent` field),
   fixing CS1061 errors when BC-generated report extension trigger scopes access
@@ -143,6 +116,28 @@ All notable changes to this project are documented here. Format based on
   extensions are now suppressed. The classifier only suppresses extension object types
   (PageExtension, TableExtension, etc.) and uses a two-pass approach to avoid hiding
   genuine codeunit/table name collisions. (#182)
+
+### Improved
+- **XmlPort & Query runtime error messages** — `MockXmlPortHandle.Import/Export`
+  and `MockQueryHandle.Open/Read` now throw descriptive `NotSupportedException`
+  messages that mention "BC service tier" and suggest "AL interface injection"
+  (XmlPort) or "Record operations" (Query) as actionable alternatives. (#124)
+
+### Fixed
+- **BigText mock (`MockBigText`)** — `NavBigText` is now replaced with `MockBigText`
+  by the rewriter. In BC 28+, `NavBigText`'s static initializer loads
+  `Microsoft.BusinessCentral.Telemetry.Abstractions` which is unavailable outside
+  the service tier, causing `TypeInitializationException`. `MockBigText` provides
+  the same API surface (`ALAddText`, `ALGetSubText`, `ALTextPos`, `ALLength`,
+  `ALWrite`, `ALRead`) using a plain `StringBuilder`.
+- **RoundDateTime avoids Telemetry.Abstractions** — `AlCompat.RoundDateTime` now
+  uses `NavDateTime + Int64` (milliseconds) arithmetic instead of
+  `NavDateTime.Create(DateTime)` which triggers `Telemetry.Abstractions` loading
+  in BC 28+.
+- **NavDateTime formatting** — `AlCompat.Format()` now handles `NavDateTime`
+  values directly by casting to `DateTime`, avoiding the `NullReferenceException` in
+  `NavDateTimeFormatter.GetStandardFormat` that occurred when `NavSession` was null.
+  This fixes `Assert.AreEqual`/`AreNotEqual` comparisons involving DateTime values.
 
 ## [1.0.14] - 2026-04-14
 
