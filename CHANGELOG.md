@@ -11,6 +11,12 @@ All notable changes to this project are documented here. Format based on
   to exit code 1. In strict mode, any non-passing test fails the pipeline — use
   in CI to catch regressions where tests go from passing to blocked. Both CI
   workflows (test-matrix.yml and publish.yml) now use `--strict`.
+- **AL language coverage map** — `docs/coverage.yaml` (machine-readable) and
+  `docs/coverage.md` (rendered table) track every AL language construct from
+  `tree-sitter-al` as covered, gap, not-possible, or out-of-scope. A generation
+  script (`scripts/coverage-gen.js`) supports `--fetch`, `--render`, and
+  `--validate` modes. CI validates that all covered entries reference existing
+  test paths.
 - **HTTP mock types** — `NavHttpClient`, `NavHttpResponseMessage`, `NavHttpContent`,
   `NavHttpHeaders`, and `NavHttpRequestMessage` are replaced with in-memory mocks
   (`MockHttpClient`, `MockHttpResponseMessage`, `MockHttpContent`, `MockHttpHeaders`,
