@@ -2237,15 +2237,24 @@ public void ClearApplicationMemberVariables()
             }
 
             // NavJsonToken/NavJsonObject/NavJsonArray/NavJsonValue: ALWriteTo, ALReadFrom,
-            // ALSelectToken, ALSelectTokens, ALGetBoolean -> MockJsonHelper static methods.
+            // ALSelectToken, ALSelectTokens, ALGetBoolean, and the object mutation/read methods
+            // -> MockJsonHelper static methods.
             // These BC methods go through TrappableOperationExecutor -> NavEnvironment
             // which crashes in standalone mode. MockJsonHelper does the same work
             // using Newtonsoft.Json directly.
             // ALAsArray/ALAsObject/ALAsValue work natively via the BC runtime without going
             // through TrappableOperationExecutor — do NOT redirect them here.
-            // Only redirect the methods that crash standalone.
+            // ALAdd/ALGet/ALContains/ALRemove/ALReplace work natively (direct Newtonsoft mutation
+            // or in-memory lookup — no TrappableOperationExecutor involved).
+            // ALKeys/ALGetText/ALGetInteger/ALGetDecimal/ALGetObject/ALGetArray go through
+            // TrappableOperationExecutor and crash in standalone mode — redirect those.
+            // NOTE: do NOT add ALGet/ALContains/ALRemove/ALReplace here — those method names
+            // also appear on record proxy classes and would cause a C# type mismatch if intercepted.
             if (methodName is "ALWriteTo" or "ALReadFrom" or "ALSelectToken" or "ALSelectTokens"
-                or "ALGetBoolean" or "ALIsArray" or "ALIsObject" or "ALIsValue" or "ALClone")
+                or "ALGetBoolean" or "ALIsArray" or "ALIsObject" or "ALIsValue" or "ALClone"
+                or "ALKeys"
+                or "ALGetText" or "ALGetInteger" or "ALGetDecimal"
+                or "ALGetObject" or "ALGetArray")
             {
                 var helperMethod = methodName switch
                 {
@@ -2258,6 +2267,12 @@ public void ClearApplicationMemberVariables()
                     "ALIsObject" => "IsObject",
                     "ALIsValue" => "IsValue",
                     "ALClone" => "Clone",
+                    "ALKeys" => "Keys",
+                    "ALGetText" => "GetText",
+                    "ALGetInteger" => "GetInteger",
+                    "ALGetDecimal" => "GetDecimal",
+                    "ALGetObject" => "GetObject",
+                    "ALGetArray" => "GetArray",
                     _ => null
                 };
                 if (helperMethod is not null)
