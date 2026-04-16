@@ -89,6 +89,7 @@ public class RoslynRewriter : CSharpSyntaxRewriter
         "ALLockTable", "ALCalcSums", "ALSetLoadFields", "ALFieldCaption", "ALSetRecFilter",
         "ALTableCaption", "ALTableName", "ALTestFieldNavValueSafe",
         "ALFilterGroup", "ALSetRangeSafe", "ALReadIsolation",
+        "ALGetView", "ALSetView", "ALGetFilter",
         "ALTransferFields", "ALMark", "ALMarkedOnly", "ALClearMarks",
         "ALGetFilters", "ALGetRangeMinSafe", "ALGetRangeMaxSafe",
         "ALHasFilter", "ALCurrentKey", "ALAscending", "ALCountApprox",
@@ -546,6 +547,7 @@ public void ALSetRangeSafe(int fieldNo, NavType expectedType, NavValue fromValue
 public void ALSetFilter(int fieldNo, string filterExpression, params NavValue[] args) => Rec.ALSetFilter(fieldNo, filterExpression, args);
 public void ALSetFilter(int fieldNo, NavType expectedType, string filterExpression, params NavValue[] args) => Rec.ALSetFilter(fieldNo, expectedType, filterExpression, args);
 public void ALCopy(MockRecordHandle source, bool shareFilters = false) => Rec.ALCopy(source, shareFilters);
+public void ALCopyFilter(int fromFieldNo, MockRecordHandle target) => Rec.ALCopyFilter(fromFieldNo, target);
 public void ALCopyFilter(int fromFieldNo, MockRecordHandle target, int toFieldNo) => Rec.ALCopyFilter(fromFieldNo, target, toFieldNo);
 public void ALCopyFilters(MockRecordHandle source) => Rec.ALCopyFilters(source);
 public void ALValidateSafe(int fieldNo, NavType expectedType, NavValue value) => Rec.ALValidateSafe(fieldNo, expectedType, value);
@@ -574,6 +576,8 @@ public void ALSetLoadFields(params int[] fieldNos) => Rec.ALSetLoadFields(fieldN
 public void ALSetAutoCalcFields(params object[] fields) => Rec.ALSetAutoCalcFields(fields);
 public string ALGetFilter() => Rec.ALGetFilter();
 public string ALGetFilter(int fieldNo) => Rec.ALGetFilter(fieldNo);
+public string ALGetView(bool useNames = true) => Rec.ALGetView(useNames);
+public void ALSetView(string view) => Rec.ALSetView(view);
 public void ALAssign(MockRecordHandle other) => Rec.ALAssign(other);
 public void ClearFieldValue(int fieldNo) => Rec.ClearFieldValue(fieldNo);
 public int ALFilterGroup { get => Rec.ALFilterGroup; set => Rec.ALFilterGroup = value; }
