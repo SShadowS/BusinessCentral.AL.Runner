@@ -1600,6 +1600,25 @@ public void ClearApplicationMemberVariables() { }
             return base.VisitInvocationExpression(node);
         }
 
+        // ALDatabase.ALSessionID() -> MockSession.GetSessionId()
+        // BC lowers SessionId() to a 0-argument static method call on ALDatabase.
+        // This must be caught before base.VisitInvocationExpression because the MemberAccess
+        // visitor would otherwise replace the callee with MockSession.GetSessionId() and produce
+        // the invalid double-call form MockSession.GetSessionId()().
+        if (node.Expression is MemberAccessExpressionSyntax sessionMa &&
+            sessionMa.Expression is IdentifierNameSyntax sessionDbIdent &&
+            sessionDbIdent.Identifier.Text == "ALDatabase" &&
+            (sessionMa.Name.Identifier.Text == "ALSessionID" || sessionMa.Name.Identifier.Text == "ALSessionId"))
+        {
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("MockSession"),
+                    SyntaxFactory.IdentifierName("GetSessionId")),
+                SyntaxFactory.ArgumentList())
+                .WithTriviaFrom(node);
+        }
+
         // `NavOption.Create(existing.NavOptionMetadata, V)` — reassignment
         // pattern BC emits when an AL enum variable is re-assigned. Route
         // through AlCompat.CloneTaggedOption so the new instance inherits
