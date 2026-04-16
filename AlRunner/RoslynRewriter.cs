@@ -1240,6 +1240,13 @@ public void ClearApplicationMemberVariables()
         if (text == "NavDataTransfer")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockDataTransfer"));
 
+        // NavFilterPageBuilder -> MockFilterPageBuilder
+        // FilterPageBuilder constructor loads BC service tier UI components unavailable
+        // outside the service tier. MockFilterPageBuilder stores registrations in memory;
+        // RunModal returns FormResult.OK without showing any dialog.
+        if (text == "NavFilterPageBuilder")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockFilterPageBuilder"));
+
         // NavEventScope -> object (event scope type used for static fields)
         // Use PredefinedType to emit the C# keyword "object" properly, avoiding
         // namespace resolution issues where "object" as an IdentifierName fails.
@@ -1488,6 +1495,14 @@ public void ClearApplicationMemberVariables()
             {
                 return visited.WithArgumentList(SyntaxFactory.ArgumentList());
             }
+        }
+
+        // new MockFilterPageBuilder(this) -> new MockFilterPageBuilder()
+        // BC emits `new NavFilterPageBuilder(this)` in scope-class field initialisers.
+        // The mock is parameterless — strip the ITreeObject parent.
+        if (typeText == "MockFilterPageBuilder" && visited.ArgumentList?.Arguments.Count == 1)
+        {
+            return visited.WithArgumentList(SyntaxFactory.ArgumentList());
         }
 
         // new NavCode(maxLen, value) -> AlCompat.CreateNavCode(maxLen, value)
