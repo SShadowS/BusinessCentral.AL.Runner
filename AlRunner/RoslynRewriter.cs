@@ -1059,6 +1059,8 @@ public void ClearApplicationMemberVariables() { }
             return node.WithIdentifier(SyntaxFactory.Identifier("MockHttpHeaders"));
         if (text == "NavHttpRequestMessage")
             return node.WithIdentifier(SyntaxFactory.Identifier("MockHttpRequestMessage"));
+        if (text == "NavCookie")
+            return node.WithIdentifier(SyntaxFactory.Identifier("MockCookie"));
 
         // NavFormHandle -> MockFormHandle
         // BC emits `Page "X"` AL variables as `NavFormHandle p` fields with
@@ -1429,7 +1431,7 @@ public void ClearApplicationMemberVariables() { }
         // scope-class field initialisers. All take a single ITreeObject parent
         // whose .Tree must not be null. Strip it — the mocks are parameterless.
         if (typeText is "MockHttpClient" or "MockHttpResponseMessage"
-            or "MockHttpContent" or "MockHttpRequestMessage"
+            or "MockHttpContent" or "MockHttpRequestMessage" or "MockCookie"
             && visited.ArgumentList?.Arguments.Count == 1)
         {
             return visited.WithArgumentList(SyntaxFactory.ArgumentList());
