@@ -3473,8 +3473,9 @@ JsonValue.AsBigInteger:
 JsonValue.AsBoolean:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native NavJsonValue.ALAsBoolean works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.AsByte:
   layer: runtime-api
@@ -3509,8 +3510,9 @@ JsonValue.AsDateTime:
 JsonValue.AsDecimal:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native NavJsonValue.ALAsDecimal works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.AsDuration:
   layer: runtime-api
@@ -3521,8 +3523,9 @@ JsonValue.AsDuration:
 JsonValue.AsInteger:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native NavJsonValue.ALAsInteger works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.AsOption:
   layer: runtime-api
@@ -3533,8 +3536,9 @@ JsonValue.AsOption:
 JsonValue.AsText:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native NavJsonValue.ALAsText works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.AsTime:
   layer: runtime-api
@@ -3557,8 +3561,9 @@ JsonValue.Clone:
 JsonValue.IsNull:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native NavJsonValue.ALIsNull works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.IsUndefined:
   layer: runtime-api
@@ -3587,14 +3592,16 @@ JsonValue.SelectToken:
 JsonValue.SetValue:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=12
+  status: covered
+  notes: overloads=12; text/integer/boolean/decimal overloads proven; BC native works standalone
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.SetValueToNull:
   layer: runtime-api
   category: JsonValue
-  status: gap
-  notes: overloads=1
+  status: covered
+  notes: overloads=1; BC native works standalone; verified with IsNull
+  test: tests/bucket-1/85-jsonvalue-conversions
 
 JsonValue.SetValueToUndefined:
   layer: runtime-api
