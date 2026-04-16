@@ -540,15 +540,21 @@ public class MockTestPageAction
 }
 
 /// <summary>
-/// Mock for TestPage.Filter property. BC emits:
-///   tP.ALFilter.ALSetFilter(fieldNo, filterValue)
+/// Mock for TestPage.Filter property. BC emits the following patterns:
+///   tP.ALFilter.ALSetFilter(fieldNo, filterValue)       — method
+///   tP.ALFilter.ALGetFilter(fieldNo) → string           — method
+///   tP.ALFilter.ALAscending = false                     — property setter
+///   tP.ALFilter.ALAscending                             — property getter
+///   tP.ALFilter.ALSetCurrentKey(DataError, fieldNo, ...) — method (DataError-prefixed)
+///   tP.ALFilter.ALCurrentKey                            — property getter
 ///
-/// Tracks per-field filter expressions in memory so that <see cref="ALGetFilter"/>
-/// can return the last value set for a given field.
+/// Tracks per-field filter expressions, sort direction, and current key in
+/// memory so assertions can verify what was last set.
 /// </summary>
 public class MockTestPageFilter
 {
     private readonly Dictionary<int, string> _filters = new();
+    private int[] _currentKeyFields = Array.Empty<int>();
 
     /// <summary>
     /// Sets a filter on the given field.
@@ -561,9 +567,48 @@ public class MockTestPageFilter
 
     /// <summary>
     /// Returns the last filter set for a field.
+    /// BC emits: ALGetFilter(fieldNo) → string
     /// </summary>
     public string ALGetFilter(int fieldNo)
     {
         return _filters.TryGetValue(fieldNo, out var filter) ? filter : "";
+    }
+
+    /// <summary>
+    /// Sort direction. Defaults to true (ascending).
+    /// BC compiles Filter.Ascending(false) → ALAscending = false (property assignment)
+    /// and Filter.Ascending() → ALAscending (property read).
+    /// </summary>
+    public bool ALAscending { get; set; } = true;
+
+    /// <summary>
+    /// Sets the current sort key by field numbers.
+    /// BC emits: ALSetCurrentKey(DataError, fieldNo, ...) — DataError is prepended
+    /// for error-handling on the sort operation.
+    /// </summary>
+    public void ALSetCurrentKey(DataError errorLevel, params int[] fieldNos)
+    {
+        _currentKeyFields = fieldNos ?? Array.Empty<int>();
+    }
+
+    /// <summary>Legacy overload without DataError (defensive — kept for compat).</summary>
+    public void ALSetCurrentKey(params int[] fieldNos)
+    {
+        _currentKeyFields = fieldNos ?? Array.Empty<int>();
+    }
+
+    /// <summary>
+    /// Returns the current sort key as a comma-separated string of field numbers.
+    /// Empty when no SetCurrentKey has been called.
+    /// BC compiles Filter.CurrentKey() → ALCurrentKey (property read).
+    /// </summary>
+    public string ALCurrentKey
+    {
+        get
+        {
+            if (_currentKeyFields.Length == 0)
+                return string.Empty;
+            return string.Join(",", _currentKeyFields);
+        }
     }
 }
