@@ -1181,7 +1181,9 @@ moveafter_modification:
 movebefore_modification:
   layer: syntax
   category: modification
-  status: gap
+  status: covered
+  tests:
+    - tests/bucket-1/82-movebefore
 
 movefirst_modification:
   layer: syntax
