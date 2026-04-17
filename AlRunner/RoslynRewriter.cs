@@ -1948,7 +1948,6 @@ public void ClearApplicationMemberVariables()
         // Now recurse into children first
         var visited = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
 
-
         // `<expr>.ToText(...)` -> `AlCompat.Format(<expr>)` or `AlCompat.GuidToText(<expr>, false)`
         // BC lowers AL's `xVar.ToText()` to either an instance `navX.ToText(...)` call
         // or a static `ALCompiler.ToText(session, value)` call (the latter is handled
@@ -2320,7 +2319,12 @@ public void ClearApplicationMemberVariables()
             // TrappableOperationExecutor and crash in standalone mode — redirect those.
             // NOTE: do NOT add ALGet/ALContains/ALRemove/ALReplace here — those method names
             // also appear on record proxy classes and would cause a C# type mismatch if intercepted.
-            if (methodName is "ALWriteTo" or "ALWriteWithSecretsTo" or "ALReadFrom" or "ALSelectToken" or "ALSelectTokens"
+            // Guard: skip JSON intercepts when receiver is a NavXml* type.
+            // NavXmlDocument.ALReadFrom() is a static XML factory method, not a JSON operation.
+            // Without this guard the JSON ALReadFrom rule rewrites it to
+            // MockJsonHelper.ReadFrom(NavXmlDocument, ...) which causes CS0119.
+            if (!exprText.StartsWith("NavXml", StringComparison.Ordinal) &&
+                methodName is "ALWriteTo" or "ALWriteWithSecretsTo" or "ALReadFrom" or "ALSelectToken" or "ALSelectTokens"
                 or "ALGetBoolean" or "ALIsArray" or "ALIsObject" or "ALIsValue" or "ALClone"
                 or "ALKeys"
                 or "ALGetText" or "ALGetInteger" or "ALGetDecimal"
