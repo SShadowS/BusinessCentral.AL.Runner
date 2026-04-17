@@ -40,4 +40,44 @@ codeunit 60261 "XPI Test"
         Assert.AreNotEqual(Src.CreateAndGetTarget(), Src.CreateAndGetData(),
             'GetTarget and GetData must not alias');
     end;
+
+    // ── WriteTo ──────────────────────────────────────────────────────────────────
+
+    [Test]
+    procedure WriteTo_ContainsTarget()
+    var
+        result: Text;
+    begin
+        // [GIVEN] A PI with a known target
+        // [WHEN] WriteTo serializes it
+        result := Src.WriteToText('xml-stylesheet', 'type="text/css"');
+        // [THEN] The serialized text contains the target name
+        Assert.IsTrue(result.Contains('xml-stylesheet'),
+            'WriteTo must serialize the PI target into the output text');
+    end;
+
+    [Test]
+    procedure WriteTo_ContainsData()
+    var
+        result: Text;
+    begin
+        // [GIVEN] A PI with known data
+        // [WHEN] WriteTo serializes it
+        result := Src.WriteToText('target', 'href="style.css"');
+        // [THEN] The serialized text contains the data
+        Assert.IsTrue(result.Contains('href="style.css"'),
+            'WriteTo must serialize the PI data into the output text');
+    end;
+
+    [Test]
+    procedure WriteTo_HasProcessingInstructionSyntax()
+    var
+        result: Text;
+    begin
+        // [GIVEN/WHEN] A PI serialized to text
+        result := Src.WriteToText('mytarget', 'mydata');
+        // [THEN] The output uses processing instruction syntax
+        Assert.IsTrue(result.Contains('<?'),
+            'WriteTo output must use processing instruction syntax starting with <?');
+    end;
 }

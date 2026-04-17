@@ -1,5 +1,5 @@
 /// Exercises XmlProcessingInstruction — Create, GetTarget, GetData,
-/// SetTarget, SetData.
+/// SetTarget, SetData, WriteTo.
 codeunit 60260 "XPI Src"
 {
     procedure CreateAndGetTarget(): Text
@@ -41,6 +41,18 @@ codeunit 60260 "XPI Src"
         pi := XmlProcessingInstruction.Create('target', 'original');
         pi.SetData(newData);
         pi.GetData(result);
+        exit(result);
+    end;
+
+    // ── WriteTo ──────────────────────────────────────────────────────────────────
+
+    procedure WriteToText(target: Text; data: Text): Text
+    var
+        pi: XmlProcessingInstruction;
+        result: Text;
+    begin
+        pi := XmlProcessingInstruction.Create(target, data);
+        pi.WriteTo(result);
         exit(result);
     end;
 }
