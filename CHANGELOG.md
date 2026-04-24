@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.0.24] - 2026-04-24
+
+### Fixed
+- skip TableNo codeunits in OnRun; add --run-codeunit; remove implicit RunOnRun
+- ALReadAs returns bool so 'if Content.ReadAs(T) then' compiles — closes #1250
+- increase GitHub Models timeout to 120s, add 2 retries on transient timeouts
+- anchor triage time window to last completed run, not last successful
+
 ## [1.0.23] - 2026-04-24
 
 ### Fixed
