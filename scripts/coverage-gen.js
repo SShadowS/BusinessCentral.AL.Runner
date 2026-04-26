@@ -298,16 +298,45 @@ function scanTestSuites() {
   if (fs.existsSync(stubsDir)) bucketDirs.push(stubsDir);
   for (const bucketDir of bucketDirs) {
     const bucketName = path.basename(bucketDir);
-    for (const suite of fs.readdirSync(bucketDir, { withFileTypes: true })) {
-      if (!suite.isDirectory()) continue;
-      const suiteDir = path.join(bucketDir, suite.name);
-      const alFiles = [
-        ...walkDir(path.join(suiteDir, "src"), ".al"),
-        ...walkDir(path.join(suiteDir, "test"), ".al"),
-      ];
-      const content = alFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
-      const relativePath = `tests/${bucketName}/${suite.name}`;
-      suites[relativePath] = { content, name: suite.name };
+    // Layout:
+    //   tests/stubs/<suite>/{src,test}              — always flat
+    //   tests/bucket-*/<category>/<suite>/{src,test} — categorized (preferred)
+    //   tests/bucket-*/<suite>/{src,test}            — flat (when a single
+    //                                                  category would be the
+    //                                                  only one)
+    // Layout is determined per-child to avoid silently mis-classifying a
+    // misplaced suite in a categorized bucket.
+    const isStubs = bucketName === "stubs";
+    for (const child of fs.readdirSync(bucketDir, { withFileTypes: true })) {
+      if (!child.isDirectory()) continue;
+      const childPath = path.join(bucketDir, child.name);
+      const childIsSuite =
+        fs.existsSync(path.join(childPath, "src")) ||
+        fs.existsSync(path.join(childPath, "test"));
+      if (isStubs || childIsSuite) {
+        const alFiles = [
+          ...walkDir(path.join(childPath, "src"), ".al"),
+          ...walkDir(path.join(childPath, "test"), ".al"),
+        ];
+        const content = alFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
+        const relativePath = `tests/${bucketName}/${child.name}`;
+        suites[relativePath] = { content, name: child.name };
+        continue;
+      }
+      // bucket-*: thematic category folder; suites live one level deeper.
+      // Reject any nested "src"/"test" directly inside a category as an error
+      // rather than absorbing it.
+      for (const suite of fs.readdirSync(childPath, { withFileTypes: true })) {
+        if (!suite.isDirectory()) continue;
+        const suiteDir = path.join(childPath, suite.name);
+        const alFiles = [
+          ...walkDir(path.join(suiteDir, "src"), ".al"),
+          ...walkDir(path.join(suiteDir, "test"), ".al"),
+        ];
+        const content = alFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
+        const relativePath = `tests/${bucketName}/${child.name}/${suite.name}`;
+        suites[relativePath] = { content, name: suite.name };
+      }
     }
   }
   return suites;
