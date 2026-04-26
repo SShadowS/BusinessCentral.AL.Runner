@@ -12,6 +12,16 @@ table 60110 "LF Row"
     begin
         SetLoadFields("Id", "Name");
     end;
+
+    internal procedure AddLoadFieldsOnSelf()
+    begin
+        AddLoadFields("Name");
+    end;
+
+    internal procedure AreFieldsLoadedOnSelf(): Boolean
+    begin
+        exit(AreFieldsLoaded("Id"));
+    end;
 }
 
 /// Helper codeunit exercising AddLoadFields (standalone no-op because all
@@ -113,5 +123,19 @@ codeunit 60110 "LF Src"
         r: Record "LF Row";
     begin
         r.SetLoadFieldsOnSelf();
+    end;
+
+    procedure DriveAddLoadFieldsOnSelf()
+    var
+        r: Record "LF Row";
+    begin
+        r.AddLoadFieldsOnSelf();
+    end;
+
+    procedure DriveAreFieldsLoadedOnSelf(): Boolean
+    var
+        r: Record "LF Row";
+    begin
+        exit(r.AreFieldsLoadedOnSelf());
     end;
 }

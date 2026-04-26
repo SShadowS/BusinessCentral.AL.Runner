@@ -62,4 +62,17 @@ codeunit 60111 "LF Test"
     begin
         Src.DriveSetLoadFieldsOnSelf();
     end;
+
+    [Test]
+    procedure AddLoadFieldsOnSelf_NoThrow()
+    begin
+        Src.DriveAddLoadFieldsOnSelf();
+    end;
+
+    [Test]
+    procedure AreFieldsLoadedOnSelf_ReturnsTrue()
+    begin
+        Assert.IsTrue(Src.DriveAreFieldsLoadedOnSelf(),
+            'AreFieldsLoaded on Self must return true (all fields always loaded standalone)');
+    end;
 }
