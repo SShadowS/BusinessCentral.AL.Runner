@@ -209,11 +209,27 @@ public class MockQueryHandle
     public static bool ALSaveAsXml(DataError errorLevel, int queryId, MockOutStream stream)
         => throw new NotSupportedException($"Query.SaveAsXml (Query {queryId}) is not supported in al-runner standalone mode.");
 
+    /// <summary>
+    /// BC emits <c>q.ALSaveAsCsv(errorLevel, filePath)</c> for
+    /// <c>QueryInstance.SaveAsCsv(FilePath)</c> — 1-arg AL overload.
+    /// Requires BC service tier for actual CSV generation; throws in standalone mode.
+    /// </summary>
     public bool ALSaveAsCsv(DataError errorLevel, string filePath)
         => throw new NotSupportedException($"Query.SaveAsCsv (Query {QueryId}) is not supported in al-runner standalone mode.");
 
-    public bool ALSaveAsXml(DataError errorLevel, string filePath)
-        => throw new NotSupportedException($"Query.SaveAsXml (Query {QueryId}) is not supported in al-runner standalone mode.");
+    /// <summary>
+    /// BC emits <c>q.ALSaveAsCsv(errorLevel, filePath, maxLines, fieldSeparator)</c> for
+    /// <c>QueryInstance.SaveAsCsv(FilePath, MaxLines, FieldSeparator)</c> — 3-arg AL overload.
+    /// No-op in standalone mode — no real file I/O is performed; returns true to indicate success.
+    /// </summary>
+    public bool ALSaveAsCsv(DataError errorLevel, string filePath, int maxLines, string fieldSeparator) => true;
+
+    /// <summary>
+    /// BC emits <c>q.ALSaveAsXml(errorLevel, filePath)</c> for
+    /// <c>QueryInstance.SaveAsXml(FilePath)</c>.
+    /// No-op in standalone mode — no real file I/O is performed; returns true to indicate success.
+    /// </summary>
+    public bool ALSaveAsXml(DataError errorLevel, string filePath) => true;
 
     public bool ALSaveAsXml(DataError errorLevel, MockOutStream stream)
         => throw new NotSupportedException($"Query.SaveAsXml (Query {QueryId}) is not supported in al-runner standalone mode.");
