@@ -2314,6 +2314,53 @@ public void Unbind() { AlRunner.Runtime.EventSubscriberRegistry.Unbind(this); }
                 })));
         }
 
+        // Special-case: `NavOption.Create(meta, V)` where meta is either:
+        //   a) A direct `NCLOptionMetadata.Create("literal")` call (field initializer)
+        //      → AlCompat.CreateInlineTaggedOption (tags with the literal option string)
+        //   b) A static field reference to an NCLOptionMetadata (scope constructor)
+        //      → AlCompat.CreateScopeTaggedOption (tags if the metadata was RegisterInlineMeta'd)
+        //
+        // In both cases, the tagging allows FormatNavOption to return the correct member name.
+        // Excluded: `.NavOptionMetadata` reassignment (handled above) and NCLEnumMetadata.Create (handled below).
+        if (node.ArgumentList.Arguments.Count == 2 &&
+            node.Expression is MemberAccessExpressionSyntax inlineMa &&
+            inlineMa.Expression is IdentifierNameSyntax inlineIdent &&
+            inlineIdent.Identifier.Text == "NavOption" &&
+            inlineMa.Name.Identifier.Text == "Create" &&
+            !(node.ArgumentList.Arguments[0].Expression is MemberAccessExpressionSyntax maArgCheck &&
+              maArgCheck.Name.Identifier.Text == "NavOptionMetadata") &&
+            // Exclude NCLEnumMetadata.Create — handled by CreateTaggedOption
+            !(node.ArgumentList.Arguments[0].Expression is InvocationExpressionSyntax excInv &&
+              excInv.Expression is MemberAccessExpressionSyntax excMa &&
+              excMa.Expression is IdentifierNameSyntax excIdent &&
+              excIdent.Identifier.Text == "NCLEnumMetadata"))
+        {
+            // Determine which helper to use based on the first-arg pattern.
+            // Direct NCLOptionMetadata.Create("literal") → CreateInlineTaggedOption.
+            // Any other pattern (static field, variable) → CreateScopeTaggedOption.
+            bool isDirect = node.ArgumentList.Arguments[0].Expression is InvocationExpressionSyntax dirInv &&
+                dirInv.Expression is MemberAccessExpressionSyntax dirMa &&
+                dirMa.Expression is IdentifierNameSyntax dirIdent &&
+                dirIdent.Identifier.Text == "NCLOptionMetadata" &&
+                dirMa.Name.Identifier.Text == "Create" &&
+                dirInv.ArgumentList.Arguments.Count == 1 &&
+                dirInv.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax;
+
+            var helperName = isDirect ? "CreateInlineTaggedOption" : "CreateScopeTaggedOption";
+            var metaArg = (ExpressionSyntax)Visit(node.ArgumentList.Arguments[0].Expression)!;
+            var ordinalArg = (ExpressionSyntax)Visit(node.ArgumentList.Arguments[1].Expression)!;
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName(helperName)),
+                SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+                {
+                    SyntaxFactory.Argument(metaArg),
+                    SyntaxFactory.Argument(ordinalArg)
+                })));
+        }
+
         // Special-case: `NavOption.Create(NCLEnumMetadata.Create(N), V)`
         // must be rewritten to `AlCompat.CreateTaggedOption(N, V)` so the
         // NavOption instance remembers its source enum — later calls to
@@ -3197,6 +3244,33 @@ public void Unbind() { AlRunner.Runtime.EventSubscriberRegistry.Unbind(this); }
                     SyntaxKind.SimpleMemberAccessExpression,
                     SyntaxFactory.IdentifierName("NCLOptionMetadata"),
                     SyntaxFactory.IdentifierName("Default"));
+            }
+
+            // NCLOptionMetadata.Create("A,B,C") — inline AL Option member string.
+            // Wrap with AlCompat.RegisterInlineMeta so that subsequent NavOption.Create
+            // calls with this metadata can tag the resulting NavOption for safe
+            // Format(NavOption) name resolution (issue #1488).
+            // Only intercept when the single argument is a string literal — this is
+            // the pattern for explicit AL-source-declared option strings. Dynamic
+            // metadata (from field-registry lookups) uses different patterns.
+            if (exprText == "NCLOptionMetadata" && methodName == "Create" &&
+                visited.ArgumentList.Arguments.Count == 1 &&
+                visited.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax nclOptLiteral)
+            {
+                var optStr = nclOptLiteral.Token.ValueText;
+                return SyntaxFactory.InvocationExpression(
+                    SyntaxFactory.MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        SyntaxFactory.IdentifierName("AlCompat"),
+                        SyntaxFactory.IdentifierName("RegisterInlineMeta")),
+                    SyntaxFactory.ArgumentList(
+                        SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] {
+                            SyntaxFactory.Argument(visited),
+                            SyntaxFactory.Argument(
+                                SyntaxFactory.LiteralExpression(
+                                    SyntaxKind.StringLiteralExpression,
+                                    SyntaxFactory.Literal(optStr)))
+                        })));
             }
 
             // ALSession.ALStartSession(...) -> MockSession.ALStartSession(...)
@@ -4473,6 +4547,29 @@ public void Unbind() { AlRunner.Runtime.EventSubscriberRegistry.Unbind(this); }
             }
         }
 
+        // NavOption.CreateInstance(ordinal) — BC emits this for <OptionVar>::<Member>
+        // (e.g. `Style::Attention` where Style is a NavOption field/variable).
+        // CreateInstance calls NavEnvironment-dependent code in standalone mode (NRE).
+        // Route through AlCompat.NavOptionCreateInstance which extracts NCLOptionMetadata
+        // from the source NavOption and creates the new instance session-independently.
+        if (visited.ArgumentList.Arguments.Count == 1 &&
+            visited.Expression is MemberAccessExpressionSyntax createInstMa &&
+            createInstMa.Name.Identifier.Text == "CreateInstance")
+        {
+            var receiver = createInstMa.Expression;
+            var ordinalArg = visited.ArgumentList.Arguments[0].Expression;
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName("NavOptionCreateInstance")),
+                SyntaxFactory.ArgumentList(
+                    SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] {
+                        SyntaxFactory.Argument(receiver),
+                        SyntaxFactory.Argument(ordinalArg)
+                    })));
+        }
+
         return visited;
     }
 
@@ -4503,6 +4600,32 @@ public void Unbind() { AlRunner.Runtime.EventSubscriberRegistry.Unbind(this); }
 
         bool isEq = visited.IsKind(SyntaxKind.EqualsExpression);
         bool isNe = visited.IsKind(SyntaxKind.NotEqualsExpression);
+        bool isGt = visited.IsKind(SyntaxKind.GreaterThanExpression);
+        bool isLt = visited.IsKind(SyntaxKind.LessThanExpression);
+        bool isGte = visited.IsKind(SyntaxKind.GreaterThanOrEqualExpression);
+        bool isLte = visited.IsKind(SyntaxKind.LessThanOrEqualExpression);
+
+        // NavText / NavCode relational operators (>, <, >=, <=) call NavStringValue.CompareTo
+        // which requires NavEnvironment (null in standalone → NullReferenceException).
+        // Route ALL relational binary expressions through AlCompat helpers that do safe
+        // string comparison for NavText/NavCode and fall back to IComparable for numeric types.
+        // Issue #1488.
+        if (isGt || isLt || isGte || isLte)
+        {
+            var helperName = isGt ? "NavGt" : isLt ? "NavLt" : isGte ? "NavGte" : "NavLte";
+            return SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    SyntaxFactory.IdentifierName("AlCompat"),
+                    SyntaxFactory.IdentifierName(helperName)),
+                SyntaxFactory.ArgumentList(
+                    SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] {
+                        SyntaxFactory.Argument(visited.Left),
+                        SyntaxFactory.Argument(visited.Right)
+                    })))
+                .WithTriviaFrom(visited);
+        }
+
         if (!isEq && !isNe)
             return visited;
 
