@@ -6,6 +6,23 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+## [1.0.28] - 2026-04-27
+
+### Added
+- sweep 160 not-tested overloads to covered (issue #1400)
+
+### Fixed
+- Format() <Filler Character,N> directive emits nothing instead of literal token text
+- MaxStrLen(Record.Field) returns declared length after InitValue/Get
+
+### Documentation
+- remove stale MockImage guide bullet and add SA boundary note
+- audit 29 stub entries — add tests and justification notes
+- audit not-possible/out-of-scope entries in coverage.yaml — add cross-references and re-classify StartSession overloads
+
+### Changed
+- test: add regression suite for Format(Rec.EnumField) enum-type resolution — closes #1507
+
 ## [1.0.27] - 2026-04-27
 
 ### Fixed
