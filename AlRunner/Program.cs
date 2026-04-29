@@ -35,6 +35,10 @@ if (args.Length == 0 || args.Any(a => a is "-h" or "--help"))
     Console.Error.WriteLine("  --dep-dlls <dir>      Load pre-compiled dependency DLLs for runtime execution");
     Console.Error.WriteLine("  --compile-dep <app> <out-dir> [--packages <dir>]");
     Console.Error.WriteLine("                        Compile a .app dependency to a rewritten DLL on disk");
+    Console.Error.WriteLine("  --extract-deps <src-dir> <out-dir> <app1> [<app2> ...]");
+    Console.Error.WriteLine("                        Extract the minimal reachable dependency slice from .app");
+    Console.Error.WriteLine("                        artifacts for the extension source in <src-dir> and write");
+    Console.Error.WriteLine("                        extracted AL files to <out-dir>");
     Console.Error.WriteLine("  --stubs <dir>         Override dependency objects with stub AL files");
     Console.Error.WriteLine("  --init-events         Fire BC lifecycle integration events once at runner startup");
     Console.Error.WriteLine("                        (OnCompanyInitialize from CU 2/27, OnInstallAppPerCompany from CU 2)");
@@ -297,6 +301,42 @@ while (argIdx < args.Length)
             options.DepDllPaths.Add(Path.GetFullPath(args[argIdx]));
             argIdx++;
             break;
+        case "--extract-deps":
+        {
+            argIdx++;
+            if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --extract-deps requires <src-dir> <out-dir> <app1> [<app2> ...]"); return 1; }
+            var edSrcDir = Path.GetFullPath(args[argIdx]);
+            argIdx++;
+            if (argIdx >= args.Length) { Console.Error.WriteLine("Error: --extract-deps requires <src-dir> <out-dir> <app1> [<app2> ...]"); return 1; }
+            var edOutDir = Path.GetFullPath(args[argIdx]);
+            argIdx++;
+            var edApps = new List<string>();
+            var edPkgPaths = new List<string>();
+            while (argIdx < args.Length)
+            {
+                if (args[argIdx] == "--packages" && argIdx + 1 < args.Length)
+                {
+                    argIdx++;
+                    edPkgPaths.Add(Path.GetFullPath(args[argIdx]));
+                    argIdx++;
+                }
+                else if (!args[argIdx].StartsWith("-"))
+                {
+                    edApps.Add(Path.GetFullPath(args[argIdx]));
+                    argIdx++;
+                }
+                else
+                {
+                    argIdx++;
+                }
+            }
+            if (edApps.Count == 0)
+            {
+                Console.Error.WriteLine("Error: --extract-deps requires at least one <app> path");
+                return 1;
+            }
+            return AlRunner.DepExtractor.ExtractDeps(edSrcDir, edApps, edOutDir, edPkgPaths.Count > 0 ? edPkgPaths : null);
+        }
         case "--compile-dep":
         {
             argIdx++;
@@ -1073,16 +1113,240 @@ public static class AlTranspiler
     /// <param name="alSources">AL source code strings to transpile.</param>
     /// <param name="packagePaths">Directories containing .app files for symbol references (optional).</param>
     /// <param name="inputPaths">Input directories/file paths for auto-discovery of .alpackages (optional).</param>
+    /// <summary>
+    /// Preprocessor symbols defined when parsing AL sources. Issue #1525 will replace
+    /// this with proper CLI/app.json wiring; for now we hardcode CLEANSCHEMA1..CLEANSCHEMA25
+    /// so obsolete-and-moved tables (e.g. \"Source Code Setup\" → Business Foundation) drop
+    /// out of compilation instead of producing AL0797 errors on every reference.
+    ///
+    /// The range stops at 25 because CLEANSCHEMA26 in current BC 27.x strips Power BI
+    /// configuration tables that have unguarded consumers — defining it would auto-stub
+    /// those tables with empty shells, then trigger AL0132 missing-field errors at the
+    /// consumers (e.g. PowerBIEmbeddedReportPart.Page.al). CLEANSCHEMA27 is the current
+    /// in-development symbol for BC 27.x and similarly should not be defined.
+    /// </summary>
+    public static List<string> PreprocessorSymbols { get; set; } =
+        Enumerable.Range(1, 25).Select(n => $"CLEANSCHEMA{n}").ToList();
+
+    /// <summary>
+    /// Compute a per-slice safe set of <c>CLEANSCHEMA&lt;N&gt;</c> preprocessor symbols.
+    /// For each <c>N</c> mentioned in the slice, scan all <c>#if not CLEANSCHEMA&lt;N&gt;</c>
+    /// blocks for the field/object names they declare. If any other file references one of
+    /// those names (textual occurrence of <c>"name"</c>), defining <c>N</c> would strip a
+    /// declaration that a consumer relies on — so <c>N</c> is excluded. Otherwise <c>N</c>
+    /// is defined.
+    ///
+    /// Designed for the issue #1521 final stretch: BC 27.x slices wrap obsoleted fields
+    /// (e.g. <c>"IC Partner G/L Acc. No."</c>) in <c>#if not CLEANSCHEMA25</c> while leaving
+    /// upgrade codeunits referencing them unguarded — neither defining nor not-defining
+    /// CLEANSCHEMA25 globally is right; per-slice analysis is.
+    /// </summary>
+    public static List<string> ComputeCleanSchemaSymbols(IEnumerable<string> alSources, int defaultMax = 25, int scanMax = 50)
+    {
+        var sources = alSources?.ToList() ?? new List<string>();
+        // Collect every CLEANSCHEMA<N> token mentioned anywhere in the slice.
+        var mentioned = new HashSet<int>();
+        var rxToken = new System.Text.RegularExpressions.Regex(@"\bCLEANSCHEMA(\d+)\b");
+        foreach (var s in sources)
+        {
+            foreach (System.Text.RegularExpressions.Match m in rxToken.Matches(s))
+            {
+                if (int.TryParse(m.Groups[1].Value, out var n) && n > 0 && n <= scanMax)
+                    mentioned.Add(n);
+            }
+        }
+
+        // For each mentioned N, locate every #if not CLEANSCHEMA<N> ... #endif block,
+        // collect declared field names inside it (paired with the source index that
+        // contains the declaration), then count textual references in any *other*
+        // source file. Do the same for positive #if CLEANSCHEMA<N> ... #endif blocks
+        // (which can hide whole object declarations, e.g. enum/table/codeunit).
+        // When both sides have consumers, prefer the side with the larger count;
+        // on a tie, prefer the negative side (historical default).
+        var risky = new HashSet<int>();
+        foreach (var n in mentioned)
+        {
+            // (declared-name, declaring-source-index) pairs for each polarity.
+            var negDecls = new List<(string Name, int SrcIdx)>();
+            var posDecls = new List<(string Name, int SrcIdx)>();
+            for (int i = 0; i < sources.Count; i++)
+            {
+                ExtractCleanSchemaGuardedNames(sources[i], n, negative: true, names =>
+                {
+                    foreach (var name in names) negDecls.Add((name, i));
+                });
+                ExtractCleanSchemaGuardedNames(sources[i], n, negative: false, names =>
+                {
+                    foreach (var name in names) posDecls.Add((name, i));
+                });
+            }
+            if (negDecls.Count == 0 && posDecls.Count == 0) continue;
+
+            int negCount = CountUnguardedConsumers(sources, negDecls);
+            int posCount = CountUnguardedConsumers(sources, posDecls);
+
+            // Negative side wins on tie or strict majority — keeps the historical
+            // "drop N when stripping a field would break a consumer" behaviour and
+            // only flips to positive when its consumer count is strictly larger.
+            if (negCount > 0 && negCount >= posCount)
+                risky.Add(n);
+        }
+
+        // Build the final symbol set: 1..max(defaultMax, mentioned-max), minus risky.
+        var maxN = defaultMax;
+        if (mentioned.Count > 0) maxN = Math.Max(maxN, mentioned.Max());
+        var result = new List<string>();
+        for (int n = 1; n <= maxN; n++)
+        {
+            if (risky.Contains(n)) continue;
+            // For Ns above defaultMax that are mentioned but NOT proven risky, still
+            // include them so newer-than-default cleans flow through.
+            if (n > defaultMax && !mentioned.Contains(n)) continue;
+            result.Add($"CLEANSCHEMA{n}");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Find every <c>#if [not] CLEANSCHEMA&lt;n&gt;</c> ... <c>#endif</c> block in
+    /// <paramref name="src"/> matching the requested polarity (<paramref name="negative"/>)
+    /// and report declared names inside (field names <c>field(N; "..." ...)</c> plus,
+    /// for positive blocks, top-level object names like <c>enum 50100 "..."</c>).
+    /// Nested preprocessor directives are tracked so the right <c>#endif</c> is matched.
+    /// </summary>
+    private static void ExtractCleanSchemaGuardedNames(string src, int n, bool negative, Action<IEnumerable<string>> emit)
+    {
+        var openTok = negative ? $"#if not CLEANSCHEMA{n}" : $"#if CLEANSCHEMA{n}";
+        int idx = 0;
+        while ((idx = src.IndexOf(openTok, idx, StringComparison.Ordinal)) >= 0)
+        {
+            int after = idx + openTok.Length;
+            // Reject CLEANSCHEMA<n><digit> false matches (e.g. CLEANSCHEMA2 vs CLEANSCHEMA25).
+            if (after < src.Length && char.IsDigit(src[after])) { idx = after; continue; }
+            // Ensure the line actually starts with the directive (allow leading whitespace).
+            int lineStart = src.LastIndexOf('\n', Math.Max(0, idx - 1)) + 1;
+            var prefix = src.Substring(lineStart, idx - lineStart);
+            if (prefix.Trim().Length != 0) { idx = after; continue; }
+
+            // For the positive form, distinguish "#if CLEANSCHEMA<n>" from
+            // "#if not CLEANSCHEMA<n>" — the positive token is a prefix-substring
+            // of the negative one when scanning for "#if CLEANSCHEMA<n>".
+            if (!negative)
+            {
+                // Re-check: the matched "#if CLEANSCHEMA<n>" shouldn't have been
+                // produced by skipping past "#if not " — guarantee by requiring
+                // the character before "CLEANSCHEMA" to be exactly one space.
+                int csIdx = idx + "#if ".Length;
+                if (csIdx >= src.Length || src.IndexOf("CLEANSCHEMA", csIdx, StringComparison.Ordinal) != csIdx)
+                {
+                    idx = after; continue;
+                }
+            }
+
+            int endIdx = FindMatchingEndif(src, after);
+            if (endIdx < 0) { idx = after; continue; }
+            var block = src.Substring(after, endIdx - after);
+
+            var names = new List<string>();
+            // Field declarations: field(<id>; "<Name>"; <Type>...)
+            var rxField = new System.Text.RegularExpressions.Regex(
+                @"\bfield\s*\(\s*\d+\s*;\s*""([^""]+)""");
+            foreach (System.Text.RegularExpressions.Match m in rxField.Matches(block))
+                names.Add(m.Groups[1].Value);
+            // Top-level object declarations inside positive guards: enum/table/codeunit/page/...
+            // The object header has the shape "<keyword> <id> "<Name>"".
+            if (!negative)
+            {
+                var rxObj = new System.Text.RegularExpressions.Regex(
+                    @"\b(?:enum|enumextension|table|tableextension|codeunit|page|pageextension|report|reportextension|xmlport|query|interface|permissionset|permissionsetextension|profile|controladdin|dotnet|entitlement)\s+\d+\s+""([^""]+)""",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                foreach (System.Text.RegularExpressions.Match m in rxObj.Matches(block))
+                    names.Add(m.Groups[1].Value);
+            }
+            if (names.Count > 0) emit(names);
+
+            idx = endIdx;
+        }
+    }
+
+    /// <summary>
+    /// For each (declared-name, declaring-source-index) pair, count source files
+    /// other than the declaring one that textually mention the quoted name.
+    /// Returns the total count across all declarations (a single consumer file
+    /// referencing two different declared names counts twice — that's a feature:
+    /// it weights the conflict by the breadth of impact).
+    /// </summary>
+    private static int CountUnguardedConsumers(List<string> sources, List<(string Name, int SrcIdx)> decls)
+    {
+        int total = 0;
+        foreach (var (name, declIdx) in decls)
+        {
+            var quoted = "\"" + name + "\"";
+            for (int i = 0; i < sources.Count; i++)
+            {
+                if (i == declIdx) continue;
+                if (sources[i].Contains(quoted, StringComparison.Ordinal))
+                    total++;
+            }
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// Starting at <paramref name="afterOpen"/> (just after a <c>#if</c> directive's body),
+    /// scan forward and return the index of the matching <c>#endif</c>. Tracks nested
+    /// <c>#if</c> / <c>#endif</c>. Returns <c>-1</c> if no match found.
+    /// </summary>
+    private static int FindMatchingEndif(string src, int afterOpen)
+    {
+        int depth = 1;
+        int i = afterOpen;
+        while (i < src.Length)
+        {
+            int ifIdx = src.IndexOf("#if", i, StringComparison.Ordinal);
+            int endIdx = src.IndexOf("#endif", i, StringComparison.Ordinal);
+            if (endIdx < 0) return -1;
+            if (ifIdx >= 0 && ifIdx < endIdx)
+            {
+                // Confirm it's a directive at line start.
+                int ls = src.LastIndexOf('\n', Math.Max(0, ifIdx - 1)) + 1;
+                if (src.Substring(ls, ifIdx - ls).Trim().Length == 0)
+                    depth++;
+                i = ifIdx + 3;
+                continue;
+            }
+            depth--;
+            if (depth == 0) return endIdx + "#endif".Length;
+            i = endIdx + "#endif".Length;
+        }
+        return -1;
+    }
+
     public static List<(string Name, string Code)>? TranspileMulti(
         List<string> alSources,
         List<string>? packagePaths = null,
         List<string>? inputPaths = null,
         SyntaxTreeCache? treeCache = null,
-        List<string?>? sourceFilePaths = null)
+        List<string?>? sourceFilePaths = null,
+        IEnumerable<SymbolReferenceSpecification>? extraRefs = null)
     {
         // Parse all sources into syntax trees
         var syntaxTrees = new List<SyntaxTree>();
         bool hasErrors = false;
+
+        // Per-slice CLEANSCHEMA<N> auto-detection (issue #1521 final stretch).
+        // If defining a CLEANSCHEMA<N> guard would strip a declaration that another
+        // file in the slice references unguarded, drop N from the preprocessor set.
+        // For slices that don't mention CLEANSCHEMA at all, this returns the default.
+        var effectiveSymbols = ComputeCleanSchemaSymbols(alSources, defaultMax: 25);
+        if (!effectiveSymbols.SequenceEqual(PreprocessorSymbols))
+        {
+            var dropped = PreprocessorSymbols.Except(effectiveSymbols).ToList();
+            var added = effectiveSymbols.Except(PreprocessorSymbols).ToList();
+            if (dropped.Count > 0 || added.Count > 0)
+                Console.Error.WriteLine($"  CLEANSCHEMA per-slice: -[{string.Join(",", dropped)}] +[{string.Join(",", added)}]");
+        }
+        var parseOptions = new ParseOptions(runtimeVersion: null!, effectiveSymbols, DocumentationMode.None);
 
         var parsedResults = new (SyntaxTree tree, List<Diagnostic> diags)[alSources.Count];
         Parallel.For(0, alSources.Count, i =>
@@ -1091,7 +1355,7 @@ public static class AlTranspiler
             if (treeCache != null && sourceFilePaths != null && i < sourceFilePaths.Count && sourceFilePaths[i] != null)
                 tree = treeCache.GetOrParse(sourceFilePaths[i]!, alSources[i]);
             else
-                tree = SyntaxTree.ParseObjectText(alSources[i]);
+                tree = SyntaxTree.ParseObjectText(alSources[i], path: "", encoding: null!, parseOptions, default);
             var diags = tree.GetDiagnostics().ToList();
             parsedResults[i] = (tree, diags);
         });
@@ -1125,7 +1389,18 @@ public static class AlTranspiler
         }
 
         if (hasErrors)
+        {
+            var parseErrs = parsedResults.SelectMany(r => r.diags)
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToList();
+            var firstIds = parseErrs.Take(5)
+                .Select(d => $"{d.Id}: {d.GetMessage().Split('\n', 2)[0]}");
+            Console.Error.WriteLine(
+                $"  [TranspileMulti-NoOutput-A] parse errors blocked compile: " +
+                $"sources={alSources.Count} parseErrors={parseErrs.Count} " +
+                $"firstIds=[{string.Join(" | ", firstIds)}]");
             return null;
+        }
 
         // Extract app identity from input manifest (for correct InternalsVisibleTo resolution)
         var appIdentity = ExtractAppIdentity(inputPaths);
@@ -1134,22 +1409,45 @@ public static class AlTranspiler
         var appFeatures = ExtractFeatures(inputPaths);
         var compilerFeatures = MapCompilerFeatures(appFeatures);
 
+        // Only set manifest options when compiling BC source apps (compile-dep flow).
+        // For normal user-AL runs, BC's default manifest behavior matches what tests
+        // expect; injecting our manifest changes implicit-with feature evaluation and
+        // breaks bucket-feature-niw etc.
+        var inCompileDepFlow = extraRefs != null;
+        var compilationOptions = new CompilationOptions(
+            continueBuildOnError: true,
+            target: CompilationTarget.OnPrem,
+            // Exclude ReportLayout — the runner has no RDLC file system and
+            // GenerateRdlcLayout crashes with NullReferenceException.
+            generateOptions: CompilationGenerationOptions.Code | CompilationGenerationOptions.Navigation,
+            compilerFeatures: compilerFeatures
+        );
+        if (inCompileDepFlow)
+            compilationOptions = compilationOptions.WithManifestOptions(BuildManifestOptions(inputPaths));
+
+        // Propagate `internalsVisibleTo` from the consumer's app.json into the compilation.
+        // Setting it on NavAppManifest is NOT enough — Compilation only consults its dedicated
+        // `internalsVisibleTo` parameter when populating IModuleSymbol.InternalsVisibleToModules.
+        // Without this, downstream apps in the multi-app pipeline hit AL0161 when they touch a
+        // member declared `Access = Internal` in this app even when the manifest grants them
+        // (e.g. BFTL → BF "Temp Current Sequence No." — issue #1521).
+        var ivtRefs = inCompileDepFlow ? BuildInternalsVisibleToRefs(inputPaths) : null;
+
         // Create compilation with all syntax trees
         var compilation = Compilation.Create(
             moduleName: appIdentity.Name,
             publisher: appIdentity.Publisher,
             version: appIdentity.Version,
             appId: appIdentity.AppId,
+            internalsVisibleTo: ivtRefs,
             syntaxTrees: syntaxTrees.ToArray(),
-            options: new CompilationOptions(
-                continueBuildOnError: true,
-                target: CompilationTarget.OnPrem,
-                // Exclude ReportLayout — the runner has no RDLC file system and
-                // GenerateRdlcLayout crashes with NullReferenceException.
-                generateOptions: CompilationGenerationOptions.Code | CompilationGenerationOptions.Navigation,
-                compilerFeatures: compilerFeatures
-            )
+            options: compilationOptions
         );
+
+        // Per-app multi-app compile: chain in-memory ModuleInfos from previously-compiled
+        // apps (issue #1521 architecture). Avoids round-tripping through .app files.
+        if (extraRefs != null)
+            compilation = compilation.AddReferences(extraRefs.ToArray());
 
         // --- Symbol reference support ---
         // Always call ResolvePackagePaths so that .alpackages directories adjacent to
@@ -1192,15 +1490,29 @@ public static class AlTranspiler
 
             refLoader = ReferenceLoaderFactory.CreateReferenceLoader(allPackagePaths);
 
+            // Compose with a JSON-symbols loader so committed `<App>.symbols.json` files
+            // (produced by per-app compile-dep) are usable as symbol references at
+            // downstream compile time without needing .app artifacts.
+            var jsonLoaders = allPackagePaths
+                .Select(p => new JsonSymbolReferenceLoader(p))
+                .Where(l => l.HasAny)
+                .ToList();
+            if (jsonLoaders.Count > 0)
+            {
+                Log.Info($"  +{jsonLoaders.Count} JSON-symbols loader(s) for *.symbols.json");
+                refLoader = new CompositeSymbolReferenceLoader(jsonLoaders.Cast<ISymbolReferenceLoader>().Append(refLoader).ToList());
+            }
+
             if (depSpecs.Count > 0)
             {
                 Log.Info($"Adding {depSpecs.Count} symbol reference specifications:");
                 foreach (var spec in depSpecs)
                     Log.Info($"  {FormatSpec(spec)}");
 
+                var allRefs = extraRefs == null ? depSpecs.ToArray() : depSpecs.Concat(extraRefs).ToArray();
                 compilation = compilation
                     .WithReferenceLoader(refLoader)
-                    .AddReferences(depSpecs.ToArray());
+                    .AddReferences(allRefs);
             }
             else
             {
@@ -1219,6 +1531,18 @@ public static class AlTranspiler
 
                 loadedPackageSpecs.AddRange(scannedSpecs);
 
+                // Also contribute specs for *.symbols.json files that JsonSymbolReferenceLoader
+                // indexed — PackageScanner only scans .app files so these would otherwise be
+                // invisible to the compiler's reference resolver.
+                foreach (var jl in jsonLoaders)
+                    foreach (var (publisher, name, version, appId) in jl.EnumerateSpecs())
+                    {
+                        if (appId == appIdentity.AppId) continue;
+                        if (string.Equals(name, appIdentity.Name, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (loadedPackageSpecs.Any(s => s.AppId == appId)) continue;
+                        loadedPackageSpecs.Add(new PackageSpec(publisher, name, version, appId));
+                    }
+
                 if (loadedPackageSpecs.Count > 0)
                 {
                     var allAppSpecs = loadedPackageSpecs
@@ -1227,9 +1551,10 @@ public static class AlTranspiler
                             false, s.AppId, false, ImmutableArray<Guid>.Empty))
                         .ToArray();
                     Log.Info($"  Loaded {allAppSpecs.Length} symbol packages (deduplicated by identity)");
+                    var combined = extraRefs == null ? allAppSpecs : allAppSpecs.Concat(extraRefs).ToArray();
                     compilation = compilation
                         .WithReferenceLoader(refLoader)
-                        .AddReferences(allAppSpecs);
+                        .AddReferences(combined);
                 }
                 else
                 {
@@ -1300,6 +1625,8 @@ public static class AlTranspiler
                     ))
                     .WithReferenceLoader(refLoader!)
                     .AddReferences(dedupedSpecs);
+                if (extraRefs != null)
+                    compilation = compilation.AddReferences(extraRefs.ToArray());
 
                 // Re-check declaration diagnostics
                 declDiags = compilation.GetDeclarationDiagnostics().ToList();
@@ -1357,6 +1684,8 @@ public static class AlTranspiler
                         ))
                         .WithReferenceLoader(refLoader!)
                         .AddReferences(filteredSpecs);
+                    if (extraRefs != null)
+                        compilation = compilation.AddReferences(extraRefs.ToArray());
 
                     // Re-check declaration diagnostics
                     declDiags = compilation.GetDeclarationDiagnostics().ToList();
@@ -1515,6 +1844,10 @@ public static class AlTranspiler
                     Console.Error.WriteLine($"  {FormatAlDiagnostic(d, treeToPath)}");
                 if (genuineDuplicates.Count > 10)
                     Console.Error.WriteLine($"  ... and {genuineDuplicates.Count - 10} more");
+                Console.Error.WriteLine(
+                    $"  [TranspileMulti-NoOutput-B] genuine AL0197 duplicates blocked emit: " +
+                    $"genuineDuplicates={genuineDuplicates.Count} totalDeclErrors={declErrors.Count} " +
+                    $"syntaxTrees={syntaxTrees.Count}");
                 return null;
             }
         }
@@ -1524,6 +1857,7 @@ public static class AlTranspiler
 
         var outputter = new CSharpCaptureOutputter();
         EmitResult? emitResult = null;
+        var emitExceptions = new List<Exception>();
         try
         {
             emitResult = compilation.Emit(new EmitOptions(), outputter);
@@ -1541,6 +1875,7 @@ public static class AlTranspiler
                     foreach (var innerInner in innerAgg.Flatten().InnerExceptions)
                     {
                         failedMethods.Add(innerInner.Message);
+                        emitExceptions.Add(innerInner);
                         if (Log.Verbose)
                             Log.Info($"  emit exception: {innerInner}");
                     }
@@ -1548,6 +1883,7 @@ public static class AlTranspiler
                 else
                 {
                     failedMethods.Add(inner.Message);
+                    emitExceptions.Add(inner);
                     if (Log.Verbose)
                         Log.Info($"  emit exception: {inner}");
                 }
@@ -1562,11 +1898,51 @@ public static class AlTranspiler
         if (outputter.CapturedObjects.Count == 0)
         {
             Console.Error.WriteLine("AL transpilation: no C# code was generated.");
+            // [TranspileMulti-NoOutput-C] — root-cause counters for the silent-failure path.
+            // Surface decl/emit data unconditionally so callers don't need Verbose to debug.
+            var allDeclErrors = (compilation != null ? compilation.GetDeclarationDiagnostics() : Enumerable.Empty<Diagnostic>())
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToList();
+            int emitErrCount = 0, emitWarnCount = 0, emitInfoCount = 0;
+            List<Diagnostic> emitErrors = new();
             if (emitResult != null)
             {
-                Console.Error.WriteLine("Emit diagnostics:");
-                foreach (var d in emitResult.Diagnostics.Take(30))
+                foreach (var d in emitResult.Diagnostics)
+                {
+                    switch (d.Severity)
+                    {
+                        case DiagnosticSeverity.Error: emitErrCount++; emitErrors.Add(d); break;
+                        case DiagnosticSeverity.Warning: emitWarnCount++; break;
+                        case DiagnosticSeverity.Info: emitInfoCount++; break;
+                    }
+                }
+            }
+            Console.Error.WriteLine(
+                $"  [TranspileMulti-NoOutput-C] zero objects emitted: " +
+                $"compilation={(compilation != null ? "set" : "null")} " +
+                $"syntaxTrees={syntaxTrees.Count} " +
+                $"declErrors={allDeclErrors.Count} " +
+                $"emitExceptions={emitExceptions.Count} " +
+                $"emitDiag(err/warn/info)={emitErrCount}/{emitWarnCount}/{emitInfoCount}");
+            foreach (var d in allDeclErrors.Take(5))
+                Console.Error.WriteLine($"    decl[{d.Id}]: {d.GetMessage().Split('\n', 2)[0]}");
+            foreach (var ex in emitExceptions.Take(3))
+            {
+                var firstFrame = (ex.StackTrace ?? "").Split('\n', 2)[0].Trim();
+                Console.Error.WriteLine($"    emitEx[{ex.GetType().Name}]: {ex.Message} | {firstFrame}");
+            }
+            // Prioritize ERROR-severity emit diagnostics — warnings here drown them out.
+            if (emitErrors.Count > 0)
+            {
+                Console.Error.WriteLine($"Emit error diagnostics ({emitErrors.Count}):");
+                foreach (var d in emitErrors.Take(30))
                     Console.Error.WriteLine($"  {FormatAlDiagnostic(d, treeToPath)}");
+            }
+            else if (emitResult != null)
+            {
+                Console.Error.WriteLine("Emit diagnostics (no errors among them — first 10 by severity):");
+                foreach (var d in emitResult.Diagnostics.OrderByDescending(d => (int)d.Severity).Take(10))
+                    Console.Error.WriteLine($"  [{d.Severity}] {FormatAlDiagnostic(d, treeToPath)}");
             }
             return null;
         }
@@ -1605,7 +1981,131 @@ public static class AlTranspiler
     /// App identity extracted from manifest, used for Compilation.Create parameters.
     /// This matters for InternalsVisibleTo resolution (publisher must match).
     /// </summary>
-    private record AppIdentity(string Name, string Publisher, Version Version, Guid AppId);
+    internal record AppIdentity(string Name, string Publisher, Version Version, Guid AppId);
+
+    /// <summary>
+    /// Build a NavAppManifest with target derived from the consumer's app.json (default
+    /// <see cref="CompilationTarget.Extension"/>). Microsoft's BC source apps declare
+    /// <c>"target": "OnPrem"</c>; user/test apps usually omit the field. Forcing OnPrem
+    /// for everyone breaks user apps (e.g. NoImplicitWith semantics differ by target).
+    /// Help URLs are unconditional — they're only consulted when a page declares
+    /// <c>ContextSensitiveHelpPage</c>, and an empty value crashes that lookup.
+    /// </summary>
+    private static Microsoft.Dynamics.Nav.CodeAnalysis.Packaging.NavAppManifest BuildManifestOptions(List<string>? inputPaths)
+    {
+        var target = CompilationTarget.Extension;
+        if (inputPaths != null)
+        {
+            foreach (var inputPath in inputPaths)
+            {
+                var dir = Directory.Exists(inputPath) ? Path.GetFullPath(inputPath) : Path.GetDirectoryName(Path.GetFullPath(inputPath));
+                while (dir != null)
+                {
+                    var appJsonPath = Path.Combine(dir, "app.json");
+                    if (File.Exists(appJsonPath))
+                    {
+                        try
+                        {
+                            using var json = JsonDocument.Parse(File.ReadAllText(appJsonPath));
+                            if (json.RootElement.TryGetProperty("target", out var tgt) &&
+                                tgt.ValueKind == JsonValueKind.String &&
+                                Enum.TryParse<CompilationTarget>(tgt.GetString(), ignoreCase: true, out var parsed))
+                                target = parsed;
+                        }
+                        catch { /* malformed app.json — keep Extension default */ }
+                        goto found;
+                    }
+                    dir = Path.GetDirectoryName(dir);
+                }
+            }
+            found: { }
+        }
+        return new Microsoft.Dynamics.Nav.CodeAnalysis.Packaging.NavAppManifest
+        {
+            ContextSensitiveHelpUrl = "https://learn.microsoft.com/en-us/dynamics365/business-central/",
+            AppHelpBaseUrl = "https://learn.microsoft.com/en-us/dynamics365/business-central/",
+            Target = target,
+        };
+    }
+
+    /// <summary>
+    /// Read <c>internalsVisibleTo</c> from the consumer's app.json and return one
+    /// <see cref="SymbolReferenceSpecification"/> per entry. These are passed as the dedicated
+    /// <c>internalsVisibleTo</c> parameter of <see cref="Compilation.Create"/> so the resulting
+    /// <c>IModuleSymbol.InternalsVisibleToModules</c> exposes the grant to subsequent compiles
+    /// in the multi-app pipeline (e.g. BF → BFTL — issue #1521 / AL0161). Setting
+    /// <c>NavAppManifest.InternalsVisibleTo</c> alone is not sufficient: BC consults the
+    /// <c>Compilation.Create</c> parameter, not the manifest, when wiring up IVT.
+    /// app.json schema: <c>[{ id|appId: guid, name: string, publisher: string }]</c>.
+    /// </summary>
+    private static IEnumerable<SymbolReferenceSpecification>? BuildInternalsVisibleToRefs(List<string>? inputPaths)
+    {
+        if (inputPaths == null) return null;
+        foreach (var inputPath in inputPaths)
+        {
+            var dir = Directory.Exists(inputPath) ? Path.GetFullPath(inputPath) : Path.GetDirectoryName(Path.GetFullPath(inputPath));
+            while (dir != null)
+            {
+                var appJsonPath = Path.Combine(dir, "app.json");
+                if (File.Exists(appJsonPath))
+                {
+                    try
+                    {
+                        using var json = JsonDocument.Parse(File.ReadAllText(appJsonPath));
+                        if (!TryFindProperty(json.RootElement, "internalsVisibleTo", out var ivtProp) ||
+                            ivtProp.ValueKind != JsonValueKind.Array)
+                            return null;
+                        var refs = new List<SymbolReferenceSpecification>();
+                        foreach (var entry in ivtProp.EnumerateArray())
+                        {
+                            if (entry.ValueKind != JsonValueKind.Object) continue;
+                            var name = TryFindProperty(entry, "name", out var nProp) && nProp.ValueKind == JsonValueKind.String
+                                ? nProp.GetString() : null;
+                            if (string.IsNullOrEmpty(name)) continue;
+                            var publisher = TryFindProperty(entry, "publisher", out var pProp) && pProp.ValueKind == JsonValueKind.String
+                                ? pProp.GetString() ?? "" : "";
+                            Guid? appId = null;
+                            if ((TryFindProperty(entry, "id", out var idProp) || TryFindProperty(entry, "appId", out idProp)) &&
+                                idProp.ValueKind == JsonValueKind.String &&
+                                Guid.TryParse(idProp.GetString(), out var parsedId))
+                                appId = parsedId;
+                            // Version is not part of the IVT app.json schema; identity is by
+                            // publisher/name/appId. Use 0.0.0.0 as a placeholder — BC's IVT
+                            // matching does not gate on version.
+                            refs.Add(new SymbolReferenceSpecification(
+                                publisher: publisher,
+                                name: name!,
+                                version: new Version(0, 0, 0, 0),
+                                exact: false,
+                                appId: appId));
+                        }
+                        return refs.Count > 0 ? refs : null;
+                    }
+                    catch { return null; }
+                }
+                dir = Path.GetDirectoryName(dir);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Case-insensitive JSON property lookup.</summary>
+    private static bool TryFindProperty(JsonElement obj, string name, out JsonElement value)
+    {
+        if (obj.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in obj.EnumerateObject())
+            {
+                if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = p.Value;
+                    return true;
+                }
+            }
+        }
+        value = default;
+        return false;
+    }
 
     /// <summary>
     /// Extract feature flags from the first app.json found by walking up from input paths.
@@ -1699,7 +2199,7 @@ public static class AlTranspiler
     /// Extract app identity from the first input that has a manifest (app.json or NavxManifest.xml).
     /// Falls back to generic defaults for self-contained spikes.
     /// </summary>
-    private static AppIdentity ExtractAppIdentity(List<string>? inputPaths)
+    internal static AppIdentity ExtractAppIdentity(List<string>? inputPaths)
     {
         var defaults = new AppIdentity("AlRunnerApp", "AlRunner", new Version("1.0.0.0"), Guid.NewGuid());
         if (inputPaths == null || inputPaths.Count == 0) return defaults;
@@ -1719,7 +2219,15 @@ public static class AlTranspiler
                         var root = json.RootElement;
                         var name = root.TryGetProperty("name", out var n) ? n.GetString()! : defaults.Name;
                         var publisher = root.TryGetProperty("publisher", out var p) ? p.GetString()! : defaults.Publisher;
-                        var version = root.TryGetProperty("version", out var v) ? Version.Parse(v.GetString()!) : defaults.Version;
+                        // BC source repos use placeholders like "$(app_currentVersion)" that are
+                        // substituted at build time and are not parseable as System.Version. Fall
+                        // back to the default version rather than discarding the entire identity —
+                        // otherwise the runner mis-attributes Microsoft.* namespace declarations to
+                        // its own AlRunnerApp publisher and trips AL0275 (issue #1521).
+                        var version = root.TryGetProperty("version", out var v)
+                            && Version.TryParse(v.GetString(), out var parsedV)
+                            ? parsedV
+                            : defaults.Version;
                         var appId = root.TryGetProperty("id", out var id) ? Guid.Parse(id.GetString()!) : defaults.AppId;
                         return new AppIdentity(name, publisher, version, appId);
                     }
@@ -1831,22 +2339,60 @@ public static class AlTranspiler
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Add explicit --packages paths (scan recursively for subdirectories containing .app files)
+        // Add explicit --packages paths. Accepts both directories and individual .app files.
+        // For individual .app files, isolate them in a temp dir — adding the parent directory
+        // would pull in every other .app sitting alongside, which leaks unrelated symbols and
+        // produces AL0275 ambiguous-reference errors when the slice already contains source
+        // for those apps.
         if (explicitPaths != null)
         {
+            // Group individual .app files by their parent directory and isolate any group
+            // that does NOT include all .app files in that directory (otherwise the parent
+            // is fine to use directly).
+            var individualApps = explicitPaths
+                .Where(p => File.Exists(p) && p.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                .Select(Path.GetFullPath)
+                .ToList();
+            string? isolatedDir = null;
+            foreach (var grp in individualApps.GroupBy(p => Path.GetDirectoryName(p)!))
+            {
+                var allInDir = Directory.GetFiles(grp.Key, "*.app").Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var picked = grp.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (picked.SetEquals(allInDir))
+                {
+                    result.Add(grp.Key);
+                }
+                else
+                {
+                    isolatedDir ??= Path.Combine(Path.GetTempPath(), $"alrunner-pkgs-{Guid.NewGuid():N}");
+                    Directory.CreateDirectory(isolatedDir);
+                    foreach (var app in picked)
+                        File.Copy(app, Path.Combine(isolatedDir, Path.GetFileName(app)), overwrite: true);
+                    result.Add(isolatedDir);
+                }
+            }
             foreach (var p in explicitPaths)
             {
+                if (File.Exists(p) && p.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 if (!Directory.Exists(p)) continue;
                 var fullPath = Path.GetFullPath(p);
 
-                // Add the directory itself if it contains .app files
-                if (Directory.GetFiles(fullPath, "*.app").Length > 0)
+                // Add the directory itself if it contains .app or .symbols.json files
+                // (the latter come from compile-dep's per-app output and are consumed by
+                // JsonSymbolReferenceLoader downstream).
+                static bool HasSymbolArtifacts(string d) =>
+                    Directory.GetFiles(d, "*.app").Length > 0
+                    || Directory.GetFiles(d, "*.symbols.json").Length > 0;
+
+                if (HasSymbolArtifacts(fullPath))
                     result.Add(fullPath);
 
-                // Recursively scan for subdirectories containing .app files
+                // Recursively scan for subdirectories
                 foreach (var subDir in Directory.GetDirectories(fullPath, "*", SearchOption.AllDirectories))
                 {
-                    if (Directory.GetFiles(subDir, "*.app").Length > 0)
+                    if (HasSymbolArtifacts(subDir))
                         result.Add(subDir);
                 }
             }

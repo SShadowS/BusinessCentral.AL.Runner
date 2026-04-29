@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using BcSrs = Microsoft.Dynamics.Nav.CodeAnalysis.SymbolReferenceSpecification;
 
 namespace AlRunner;
 
@@ -16,6 +17,70 @@ public static class DepCompiler
 {
     private static readonly Version DefaultAppVersion = new(1, 0, 0, 0);
     private static bool _loggedVersionFallback;
+
+    /// <summary>
+    /// Re-emit an app.json string, replacing unparseable version-shaped values with
+    /// concrete defaults so downstream consumers (the BC compiler's NavAppManifest reader,
+    /// our own <see cref="AlTranspiler.ExtractAppIdentity"/>-style readers) do not fail.
+    /// Microsoft's BC source repos ship app.json files with build-time placeholders such
+    /// as <c>$(app_currentVersion)</c>, <c>$(app_platformVersion)</c>, and
+    /// <c>$(app_minimumVersion)</c> in the per-dependency <c>version</c> fields. When any
+    /// of these reach the compiler unsubstituted, BC's manifest reader throws and the
+    /// compilation falls back to a phantom "(Unknown)" extension that owns every
+    /// namespace declared by the slice — producing AL0275 ambiguous-reference errors.
+    ///
+    /// Top-level <c>version</c> placeholder is substituted with <c>1.0.0.0</c> (the
+    /// identity passed to <see cref="Microsoft.Dynamics.Nav.CodeAnalysis.Compilation.Create"/>
+    /// is supplied separately, so the slice's own version is informational only).
+    /// Top-level <c>platform</c>, <c>application</c>, and <c>dependencies</c> fields are
+    /// DROPPED entirely if any placeholder is present — this lets the runner's "no
+    /// explicit dependencies found, loading all .app packages as symbols" fallback
+    /// discover concrete versions from the package directory rather than feeding the BC
+    /// reference resolver synthetic versions that may not match any real binary.
+    /// </summary>
+    internal static string SanitizeManifestVersions(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) return json;
+
+        bool IsUnparseable(JsonElement el)
+            => el.ValueKind == JsonValueKind.String
+               && !Version.TryParse(el.GetString() ?? string.Empty, out _);
+
+        bool dropPlatform = root.TryGetProperty("platform", out var pl) && IsUnparseable(pl);
+        bool dropApplication = root.TryGetProperty("application", out var ap) && IsUnparseable(ap);
+        bool dropDependencies = false;
+        if (root.TryGetProperty("dependencies", out var deps) && deps.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var dep in deps.EnumerateArray())
+            {
+                if (dep.ValueKind != JsonValueKind.Object) continue;
+                if (dep.TryGetProperty("version", out var dv) && IsUnparseable(dv))
+                { dropDependencies = true; break; }
+            }
+        }
+
+        var sb = new System.Text.StringBuilder("{");
+        bool first = true;
+        foreach (var p in root.EnumerateObject())
+        {
+            if (dropPlatform && p.Name.Equals("platform", StringComparison.OrdinalIgnoreCase)) continue;
+            if (dropApplication && p.Name.Equals("application", StringComparison.OrdinalIgnoreCase)) continue;
+            if (dropDependencies && p.Name.Equals("dependencies", StringComparison.OrdinalIgnoreCase)) continue;
+
+            if (!first) sb.Append(',');
+            first = false;
+            sb.Append(JsonSerializer.Serialize(p.Name)).Append(':');
+
+            if (p.Name.Equals("version", StringComparison.OrdinalIgnoreCase) && IsUnparseable(p.Value))
+                sb.Append(JsonSerializer.Serialize("1.0.0.0"));
+            else
+                sb.Append(p.Value.GetRawText());
+        }
+        sb.Append('}');
+        return sb.ToString();
+    }
 
     private record AppJsonIdentity(string Publisher, string Name, string VersionRaw, Version Version, Guid AppId);
 
@@ -240,7 +305,7 @@ public static class DepCompiler
             // AL syntax: `var x: DotNet StreamReader;` or `DotNet "System.IO.StreamReader"`
             var dotnetPattern = new System.Text.RegularExpressions.Regex(
                 @":\s*DotNet\b|\bDotNet\s+[""A-Z]",
-                System.Text.RegularExpressions.RegexOptions.Compiled);
+                System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             var dotnetCount = compilableSources.Count(s => dotnetPattern.IsMatch(s));
             if (dotnetCount > 0)
             {
@@ -289,6 +354,11 @@ public static class DepCompiler
 
         if (csharpList == null || csharpList.Count == 0)
         {
+            Console.Error.WriteLine(
+                $"  [CompileDepMultiApp-NoOutput] (single-app) " +
+                $"compilable={compilableSources.Count}/{alSources.Count} " +
+                $"effectivePackages={(effectivePackages?.Count ?? 0)} " +
+                $"name={name}");
             Console.Error.WriteLine($"  AL transpilation produced no output for {name}");
             return 1;
         }
@@ -362,30 +432,17 @@ public static class DepCompiler
             return 1;
         }
 
-        var appJsonPaths = Directory.GetFiles(rootDir, "app.json", SearchOption.AllDirectories);
-        if (appJsonPaths.Length == 0)
-            return CompileDepFromDir(rootDir, outputDir, packagePaths);
-
-        var appDirs = appJsonPaths
-            .Select(Path.GetDirectoryName)
-            .Where(d => !string.IsNullOrEmpty(d))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        // Multi-app: top-level slice has subdirectories with app.json files. Delegate to
+        // the private overload which adds topological sorting + in-memory ModuleInfo
+        // chaining so apps see prior siblings' compiled symbols (issue #1521).
+        var directChildAppDirs = Directory.GetDirectories(rootDir)
+            .Where(d => File.Exists(Path.Combine(d, "app.json")))
             .ToList();
+        if (directChildAppDirs.Count > 0)
+            return CompileDepMultiApp(rootDir, directChildAppDirs, outputDir, packagePaths);
 
-        int failures = 0;
-        foreach (var appDir in appDirs)
-        {
-            AppJsonIdentity? identity = null;
-            var appJsonPath = Path.Combine(appDir!, "app.json");
-            if (File.Exists(appJsonPath) && TryReadAppJsonIdentity(appJsonPath, out var parsed))
-                identity = parsed;
-
-            var result = CompileDepFromDir(appDir!, outputDir, packagePaths, identity);
-            if (result != 0)
-                failures++;
-        }
-
-        return failures == 0 ? 0 : 1;
+        // Fallback: single app at root, or no app.jsons anywhere.
+        return CompileDepFromDir(rootDir, outputDir, packagePaths);
     }
 
     /// <summary>
@@ -410,6 +467,22 @@ public static class DepCompiler
                 .ToList();
             foreach (var d in errors)
                 errorSink?.Add(d.ToString());
+            // DEBUG: dump rewritten trees on failure
+            if (System.Environment.GetEnvironmentVariable("ALRUNNER_DUMP_REWRITTEN") == "1")
+            {
+                var dumpDir = Path.Combine(System.IO.Path.GetTempPath(), "alrunner_debug_" + Path.GetFileNameWithoutExtension(outputPath));
+                Directory.CreateDirectory(dumpDir);
+                int idx = 0;
+                foreach (var tree in syntaxTrees)
+                {
+                    var fp = tree.FilePath;
+                    var fn = (!string.IsNullOrEmpty(fp) ? Path.GetFileName(fp) : null) ?? $"tree_{idx}";
+                    if (string.IsNullOrEmpty(fn)) fn = $"tree_{idx}";
+                    File.WriteAllText(Path.Combine(dumpDir, fn + ".cs"), tree.GetRoot().ToFullString());
+                    idx++;
+                }
+                Console.Error.WriteLine($"  DEBUG: rewritten trees dumped to {dumpDir}");
+            }
             // Clean up partial output
             try { File.Delete(outputPath); } catch { }
             return false;
@@ -421,9 +494,220 @@ public static class DepCompiler
     /// <summary>
     /// Compile a directory of AL source files to a dependency .dll.
     /// </summary>
-    private static int CompileDepFromDir(string srcDir, string outputDir, List<string> packagePaths, AppJsonIdentity? appIdentity = null)
+    private record AppInfo(string Dir, Guid Id, string Name, string Publisher, string Version,
+        List<Guid> DepIds, List<DepsSidecarWriter.DepEntry> DepSpecs);
+
+    /// <summary>
+    /// Per-app compiled module-info cache for in-memory symbol chaining. Avoids needing
+    /// to emit a synthetic .app file alongside each .dll — the BC compiler can resolve
+    /// downstream apps' references against the upstream app's compiled module symbol
+    /// directly.
+    /// </summary>
+    private static readonly Dictionary<Guid, BcSrs> CompiledAppRefs = new();
+
+    /// <summary>
+    /// Wrap a compiled BC <c>Compilation</c>'s module symbol in a SymbolReferenceSpecification
+    /// using the <c>(IModuleSymbol)</c> ctor — the BC compiler resolves downstream references
+    /// against the live module without needing to call out to ISymbolReferenceLoader.
+    /// <c>CompiledModule</c> is internal so we access it via reflection.
+    /// </summary>
+    private static BcSrs? TryGetModuleRef(Microsoft.Dynamics.Nav.CodeAnalysis.Compilation comp)
+    {
+        var prop = comp.GetType().GetProperty("CompiledModule",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var moduleObj = prop?.GetValue(comp);
+        if (moduleObj == null) return null;
+        var imsType = comp.GetType().Assembly.GetType("Microsoft.Dynamics.Nav.CodeAnalysis.IModuleSymbol");
+        if (imsType == null || !imsType.IsAssignableFrom(moduleObj.GetType())) return null;
+        var ctor = typeof(BcSrs).GetConstructor(new[] { imsType });
+        if (ctor == null) return null;
+        return (BcSrs)ctor.Invoke(new[] { moduleObj });
+    }
+
+    /// <summary>
+    /// Compile a multi-app slice: each subdirectory of <paramref name="srcDir"/> is a
+    /// separate app with its own app.json. Build a dependency graph from the manifests,
+    /// topologically sort, and compile each app to its own DLL — accumulating prior
+    /// outputs as <c>--packages</c> for later compiles. Mirrors BC's actual packaging.
+    /// </summary>
+    private static int CompileDepMultiApp(string srcDir, List<string> appDirs, string outputDir, List<string> packagePaths)
+    {
+        var apps = new List<AppInfo>();
+        foreach (var dir in appDirs)
+        {
+            var manPath = Path.Combine(dir, "app.json");
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(manPath));
+                var root = doc.RootElement;
+                var id = Guid.Parse(root.GetProperty("id").GetString()!);
+                var name = root.GetProperty("name").GetString() ?? Path.GetFileName(dir);
+                var publisher = root.GetProperty("publisher").GetString() ?? "Unknown";
+                var version = root.GetProperty("version").GetString() ?? "1.0.0.0";
+                var deps = new List<Guid>();
+                var depSpecs = new List<DepsSidecarWriter.DepEntry>();
+
+                // Platform reference: `platform: "27.0.0.0"` in app.json corresponds to the
+                // Microsoft "System" platform package. Its AppId is well-known and stable
+                // across BC versions (8874ed3a-…). Including it here lets the JSON loader
+                // advertise the system→app dependency edge that ReferenceManager needs to
+                // resolve cross-app type references (issue #1546).
+                if (root.TryGetProperty("platform", out var platformProp))
+                {
+                    if (Version.TryParse(platformProp.GetString() ?? "", out var pv))
+                        depSpecs.Add(new DepsSidecarWriter.DepEntry(
+                            "Microsoft", "System", pv,
+                            Guid.Parse("8874ed3a-0643-4247-9ced-7a7002f7135d")));
+                }
+
+                if (root.TryGetProperty("dependencies", out var depArr) && depArr.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    foreach (var d in depArr.EnumerateArray())
+                    {
+                        Guid did = Guid.Empty;
+                        if ((d.TryGetProperty("id", out var didProp) || d.TryGetProperty("appId", out didProp)) &&
+                            Guid.TryParse(didProp.GetString(), out var parsedDid))
+                        {
+                            did = parsedDid;
+                            deps.Add(parsedDid);
+                        }
+                        var dPub = d.TryGetProperty("publisher", out var dp) ? dp.GetString() ?? "" : "";
+                        var dName = d.TryGetProperty("name", out var dn) ? dn.GetString() ?? "" : "";
+                        var dVerText = d.TryGetProperty("version", out var dv) ? dv.GetString() ?? "0.0.0.0" : "0.0.0.0";
+                        if (!Version.TryParse(dVerText, out var dVer)) dVer = new Version(0, 0, 0, 0);
+                        if (!string.IsNullOrEmpty(dName))
+                            depSpecs.Add(new DepsSidecarWriter.DepEntry(dPub, dName, dVer, did));
+                    }
+                Version verParsed = Version.TryParse(version, out var vp) ? vp : new Version(1, 0, 0, 0);
+                apps.Add(new AppInfo(dir, id, name, publisher, version, deps, depSpecs));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Warning: failed to read {manPath}: {ex.Message}");
+            }
+        }
+
+        Console.Error.WriteLine($"Multi-app compile: {apps.Count} apps detected");
+
+        // Topological sort: an app comes after all dependencies it has *that are also
+        // present in our slice*. Dependencies on apps not in the slice are satisfied
+        // by the user-provided --packages binaries.
+        var slicedIds = apps.Select(a => a.Id).ToHashSet();
+        var ordered = new List<AppInfo>();
+        var done = new HashSet<Guid>();
+        var maxIters = apps.Count * apps.Count + 1;
+        while (ordered.Count < apps.Count && maxIters-- > 0)
+        {
+            foreach (var app in apps)
+            {
+                if (done.Contains(app.Id)) continue;
+                if (app.DepIds.Where(slicedIds.Contains).All(done.Contains))
+                {
+                    ordered.Add(app);
+                    done.Add(app.Id);
+                }
+            }
+        }
+        if (ordered.Count < apps.Count)
+        {
+            Console.Error.WriteLine($"Error: dependency cycle in {apps.Count - ordered.Count} apps");
+            return 1;
+        }
+
+        Directory.CreateDirectory(outputDir);
+        var accumPackages = new List<string>(packagePaths);
+        var outputDirAbs = Path.GetFullPath(outputDir);
+        if (!accumPackages.Contains(outputDirAbs)) accumPackages.Add(outputDirAbs);
+
+        // Reset the compiled-app symbol-ref cache for this build. Each app accumulates
+        // ModuleInfo from its declared deps that are also in our slice — no .app
+        // serialization needed.
+        CompiledAppRefs.Clear();
+
+        var failed = new List<string>();
+        foreach (var app in ordered)
+        {
+            Console.Error.WriteLine($"=== Compiling app: {app.Name} by {app.Publisher} v{app.Version} ===");
+            // Build the in-memory refs list for this app: ModuleInfo of every previously
+            // compiled app in the slice — declared dep or not. Microsoft's real BC source
+            // frequently references objects across apps that the consumer's app.json
+            // does not declare (e.g. Tests-TestLibraries references Base Application
+            // pages without a declared Base App dep). Real BC resolves these via
+            // platform-wide symbol leakage; mirror that by exposing every prior compile's
+            // module to the current one. Issue #1551.
+            var refs = CompiledAppRefs.Values.ToList();
+            if (refs.Count > 0)
+                Console.Error.WriteLine($"  Chaining {refs.Count} prior ModuleInfo(s) into compile.");
+            var rc = CompileDepFromDir(app.Dir, outputDir, accumPackages, appIdentity: null, extraRefs: refs);
+            if (rc != 0)
+            {
+                failed.Add(app.Name);
+                Console.Error.WriteLine($"WARN: compile failed for {app.Name}; continuing with other apps");
+            }
+            else
+            {
+                // Capture the compiled app's module symbol for downstream chaining via the
+                // in-memory ISymbolReferenceLoader path.
+                var compFor = AlTranspiler.LastCompilation;
+                var moduleRef = compFor != null ? TryGetModuleRef(compFor) : null;
+                if (moduleRef != null)
+                    CompiledAppRefs[app.Id] = moduleRef;
+
+                // Emit a <App>.symbols.json next to the .dll. This is a JSON-only symbol
+                // artifact (NOT a .app — no AL bytecode, cannot be deployed to a BC instance).
+                // Subsequent compiles in the multi-app loop, and any future test-run that
+                // recompiles user AL against this slice, resolve cross-app references via
+                // the JsonSymbolReferenceLoader in TranspileMulti.
+                if (compFor != null)
+                {
+                    try
+                    {
+                        var jsonName = SanitizeName($"{app.Publisher}_{app.Name}_{app.Version}.symbols.json");
+                        var jsonPath = Path.Combine(outputDir, jsonName);
+                        using (var fs = File.Create(jsonPath))
+                        {
+                            SymbolJsonWriter.WriteSymbolJson(compFor, fs);
+                            Console.Error.WriteLine($"  Wrote symbols: {jsonName} ({fs.Length} bytes)");
+                        }
+
+                        // Sidecar deps file — see DepsSidecarWriter / issue #1546.
+                        var depsName = SanitizeName($"{app.Publisher}_{app.Name}_{app.Version}.symbols.deps.json");
+                        var depsPath = Path.Combine(outputDir, depsName);
+                        var appVer = Version.TryParse(app.Version, out var av) ? av : new Version(1, 0, 0, 0);
+                        DepsSidecarWriter.Write(depsPath, app.Publisher, app.Name, appVer, app.Id, app.DepSpecs);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"  WARN: symbols.json emission failed for {app.Name}: {ex.Message}");
+                    }
+                }
+            }
+        }
+        var built = ordered.Count - failed.Count;
+        Console.Error.WriteLine($"Multi-app compile: {built}/{ordered.Count} app(s) compiled to {outputDir}");
+        if (failed.Count > 0)
+        {
+            Console.Error.WriteLine($"  Failed apps ({failed.Count}): {string.Join(", ", failed)}");
+            return 1;
+        }
+        return 0;
+    }
+
+    private static int CompileDepFromDir(string srcDir, string outputDir, List<string> packagePaths, AppJsonIdentity? appIdentity = null, List<BcSrs>? extraRefs = null)
     {
         Directory.CreateDirectory(outputDir);
+
+        // Multi-app detection: if subdirectories have app.json files, treat each as a
+        // separate app and produce one DLL per app. This mirrors BC's actual packaging:
+        // each app carries its real identity (id/name/publisher) so InternalsVisibleTo
+        // grants resolve correctly per-DLL, and cross-app object name conflicts that
+        // exist legitimately in BC source (different apps shipping the same FQN) are
+        // dissolved at the compile-unit boundary.
+        var appDirs = Directory.GetDirectories(srcDir)
+            .Where(d => File.Exists(Path.Combine(d, "app.json")))
+            .ToList();
+        if (appDirs.Count > 0)
+            return CompileDepMultiApp(srcDir, appDirs, outputDir, packagePaths);
+
         var dirName = Path.GetFileName(srcDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         if (appIdentity == null)
         {
@@ -463,14 +747,125 @@ public static class DepCompiler
             Runtime.QueryFieldRegistry.ParseAndRegister(src);
         }
 
-        var allPackagePaths = new List<string>(packagePaths);
+        // Route through ResolvePackagePaths so individual .app files are isolated to a temp
+        // directory rather than exposing every other .app in the same .alpackages folder
+        // (which would pull in System Application as a binary symbol while we already have
+        // its source in the slice — produces AL0275 ambiguous-reference errors).
+        var allPackagePaths = AlTranspiler.ResolvePackagePaths(packagePaths, null);
         var alPkg = Path.Combine(srcDir, ".alpackages");
         if (Directory.Exists(alPkg) && !allPackagePaths.Contains(alPkg))
             allPackagePaths.Add(alPkg);
 
-        var csharpList = AlTranspiler.TranspileMulti(alSources, allPackagePaths.Count > 0 ? allPackagePaths : null, null);
+        // Pass file paths so parse-error messages include the source filename.
+        var filePaths = alFiles.Select(f => (string?)f).ToList();
+        var effectivePackages = allPackagePaths.Count > 0 ? allPackagePaths : null;
+        var compilableSources = alSources;
+        var compilableFilePaths = filePaths;
+
+        // Use the app's real app.json if present (per-app DLL mode); otherwise synthesize
+        // a stub one. Either way we inject contextSensitiveHelpUrl/helpBaseUrl so Microsoft
+        // pages with `ContextSensitiveHelpPage` don't fail AL0543. Real identity preserves
+        // InternalsVisibleTo grants, which a synthetic identity cannot inherit.
+        var sliceManifestDir = Path.Combine(Path.GetTempPath(), $"alrunner-slice-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(sliceManifestDir);
+        var realManifest = Path.Combine(srcDir, "app.json");
+        string manifestJson;
+        if (File.Exists(realManifest))
+        {
+            // Inject the help URLs into the real manifest. We parse and re-emit minimally;
+            // the BC compiler tolerates extra properties.
+            var raw = File.ReadAllText(realManifest);
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                var sb = new System.Text.StringBuilder("{");
+                bool first = true;
+                foreach (var p in doc.RootElement.EnumerateObject())
+                {
+                    if (p.Name.Equals("contextSensitiveHelpUrl", StringComparison.OrdinalIgnoreCase)
+                        || p.Name.Equals("helpBaseUrl", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!first) sb.Append(',');
+                    sb.Append(System.Text.Json.JsonSerializer.Serialize(p.Name)).Append(':').Append(p.Value.GetRawText());
+                    first = false;
+                }
+                if (!first) sb.Append(',');
+                sb.Append("\"contextSensitiveHelpUrl\":\"https://learn.microsoft.com/en-us/dynamics365/business-central/\",")
+                  .Append("\"helpBaseUrl\":\"https://learn.microsoft.com/en-us/dynamics365/business-central/\"}");
+                manifestJson = sb.ToString();
+            }
+            catch
+            {
+                manifestJson = raw; // fallback: use as-is
+            }
+        }
+        else
+        {
+            manifestJson = $"{{\"id\":\"{Guid.NewGuid()}\",\"name\":\"{dirName}\",\"publisher\":\"AlRunner\",\"version\":\"1.0.0.0\"," +
+                "\"contextSensitiveHelpUrl\":\"https://learn.microsoft.com/en-us/dynamics365/business-central/\"," +
+                "\"helpBaseUrl\":\"https://learn.microsoft.com/en-us/dynamics365/business-central/\"}";
+        }
+        // Sanitize version-shaped fields so BC's NavAppManifest reader does not throw on
+        // unsubstituted build placeholders ($(app_currentVersion), $(app_platformVersion),
+        // $(app_minimumVersion)) shipped in Microsoft's BC source repos. Without this the
+        // compiler falls back to a phantom "(Unknown)" extension that owns every namespace
+        // declared by the slice — producing AL0275 ambiguous-reference errors.
+        try { manifestJson = SanitizeManifestVersions(manifestJson); }
+        catch { /* leave manifestJson unchanged on any malformed JSON */ }
+        File.WriteAllText(Path.Combine(sliceManifestDir, "app.json"), manifestJson);
+        var inputPaths = new List<string> { sliceManifestDir };
+
+        var csharpList = AlTranspiler.TranspileMulti(compilableSources, effectivePackages, inputPaths, sourceFilePaths: compilableFilePaths, extraRefs: extraRefs);
+
+        if ((csharpList == null || csharpList.Count == 0) && compilableSources.Count > 0)
+        {
+            // Remove files with residual DotNet type references not caught by extract-time stripping.
+            // Uses AST-based detection (not regex) to avoid false positives from DotNet appearing
+            // in string literals, Obsolete attributes, or codeunit names.
+            static bool HasDotNetTypeRef(string src) {
+                try {
+                    return Microsoft.Dynamics.Nav.CodeAnalysis.Syntax.SyntaxTree
+                        .ParseObjectText(src).GetRoot().DescendantNodes()
+                        .OfType<Microsoft.Dynamics.Nav.CodeAnalysis.Syntax.SubtypedDataTypeSyntax>()
+                        .Any(s => s.TypeName.ToFullString().Trim()
+                            .Equals("DotNet", StringComparison.OrdinalIgnoreCase));
+                } catch { return false; }
+            }
+            var pairs = compilableSources.Zip(compilableFilePaths, (s, p) => (s, p)).ToList();
+            var cleaned = pairs.Where(x => !HasDotNetTypeRef(x.s)).ToList();
+            var dotnetCount = pairs.Count - cleaned.Count;
+            if (dotnetCount > 0)
+            {
+                compilableSources = cleaned.Select(x => x.s).ToList();
+                compilableFilePaths = cleaned.Select(x => x.p).ToList();
+                Console.Error.WriteLine($"  Excluded {dotnetCount} file(s) with residual DotNet interop (unsupported in runner)");
+                csharpList = AlTranspiler.TranspileMulti(compilableSources, effectivePackages, inputPaths, sourceFilePaths: compilableFilePaths, extraRefs: extraRefs);
+            }
+        }
+
         if (csharpList == null || csharpList.Count == 0)
         {
+            // Re-run capturing stderr so we can surface specific compilation diagnostics
+            // (otherErrors, parse errors) that TranspileMulti suppresses by default.
+            var savedErr = Console.Error;
+            var diagCapture = new System.IO.StringWriter();
+            Console.SetError(diagCapture);
+            var prevVerbose = Log.Verbose;
+            Log.Verbose = true;
+            try { AlTranspiler.TranspileMulti(compilableSources, effectivePackages, inputPaths, sourceFilePaths: compilableFilePaths, extraRefs: extraRefs); }
+            finally { Console.SetError(savedErr); Log.Verbose = prevVerbose; }
+            var diagText = diagCapture.ToString();
+            if (!string.IsNullOrWhiteSpace(diagText))
+            {
+                Console.Error.WriteLine("  Compilation diagnostics:");
+                foreach (var line in diagText.Split('\n').Take(40))
+                    Console.Error.WriteLine($"    {line.TrimEnd()}");
+            }
+            Console.Error.WriteLine(
+                $"  [CompileDepMultiApp-NoOutput] (multi-app) " +
+                $"compilable={compilableSources.Count}/{alSources.Count} " +
+                $"effectivePackages={(effectivePackages?.Count ?? 0)} " +
+                $"extraRefs={(extraRefs?.Count ?? 0)} " +
+                $"dir={dirName}");
             Console.Error.WriteLine($"  AL transpilation produced no output");
             return 1;
         }
