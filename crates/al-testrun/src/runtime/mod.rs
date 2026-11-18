@@ -106,8 +106,8 @@ fn lexical(path: &std::path::Path) -> Vec<String> {
 }
 
 /// The files the `.al` files of `dir` name with `LayoutFile = '...'`, read where they exist: the path is relative to `dir`
-/// (the written path from the app's folder), content bytes.
-fn load_layout_files(dir: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+/// (the written path from the app's folder), content bytes. A named file outside `dir` is added to `outside`, read or not.
+fn load_layout_files(dir: &std::path::Path, outside: &mut Vec<std::path::PathBuf>) -> Vec<(String, Vec<u8>)> {
     let mut out: Vec<(String, Vec<u8>)> = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
@@ -140,8 +140,11 @@ fn load_layout_files(dir: &std::path::Path) -> Vec<(String, Vec<u8>)> {
                 let Some(end) = rest.find('\'') else { continue };
                 let written = &rest[..end];
                 let target = dir.join(written);
-                let Ok(bytes) = std::fs::read(&target) else { continue };
                 let (root, full) = (lexical(dir), lexical(&target));
+                if !full.starts_with(&root) && !outside.contains(&target) {
+                    outside.push(target.clone());
+                }
+                let Ok(bytes) = std::fs::read(&target) else { continue };
                 let rel = full[root.len().min(full.len())..].join("/");
                 if !out.iter().any(|(r, _)| *r == rel) {
                     out.push((rel, bytes));
@@ -162,6 +165,14 @@ impl Manifest {
 
 /// The manifest fields `NavApp.GetCurrentModuleInfo` reports, from `dir/app.json`.
 pub fn load_manifest(dir: &std::path::Path) -> Result<Manifest, String> {
+    load_manifest_reading(dir).map(|(m, _)| m)
+}
+
+/// [`load_manifest`], with the files and folders outside `dir` it read or looked for: resource folders, the logo and the
+/// layout files the code names (a warm server keeps the app while they are unchanged, alrunner-cli `kept_apps.rs`).
+pub fn load_manifest_reading(dir: &std::path::Path) -> Result<(Manifest, Vec<std::path::PathBuf>), String> {
+    let mut outside = Vec::new();
+    let is_outside = |p: &std::path::Path| !lexical(p).starts_with(&lexical(dir));
     let manifest: serde_json::Value = serde_json::from_str(&al_deps::load::read_text(&dir.join("app.json"))?)
         .map_err(|e| format!("{}/app.json: {e}", dir.display()))?;
     let s = |k: &str| manifest[k].as_str().unwrap_or_default().to_string();
@@ -173,6 +184,9 @@ pub fn load_manifest(dir: &std::path::Path) -> Result<Manifest, String> {
         .filter_map(|f| f.as_str())
     {
         let root = dir.join(folder);
+        if is_outside(&root) {
+            outside.push(root.clone());
+        }
         let mut stack = vec![root.clone()];
         while let Some(d) = stack.pop() {
             let Ok(entries) = std::fs::read_dir(&d) else { continue };
@@ -188,14 +202,18 @@ pub fn load_manifest(dir: &std::path::Path) -> Result<Manifest, String> {
         }
     }
     resources.sort();
-    Ok(Manifest {
+    if let Some(logo) = manifest["logo"].as_str().map(|l| dir.join(l)).filter(|l| is_outside(l)) {
+        outside.push(logo);
+    }
+    let layout_files = load_layout_files(dir, &mut outside);
+    let manifest = Manifest {
         publisher: s("publisher"),
         version: s("version"),
         resources,
         include_source: manifest["resourceExposurePolicy"]["includeSourceInSymbolFile"]
             .as_bool()
             .unwrap_or(false),
-        layout_files: load_layout_files(dir),
+        layout_files,
         translations: al_deps::load::ships_translations(dir),
         package_data: al_deps::load::ships_package_data(dir),
         package_data_files: al_deps::load::package_data_files(dir)?,
@@ -226,7 +244,8 @@ pub fn load_manifest(dir: &std::path::Path) -> Result<Manifest, String> {
             .unwrap_or_default(),
         // An app folder is never the platform package here: its `internalsVisibleTo` is not read.
         platform_internals_visible_to: Vec::new(),
-    })
+    };
+    Ok((manifest, outside))
 }
 
 /// Every corpus test's outcome on this runtime, keyed by (codeunit id, procedure).
