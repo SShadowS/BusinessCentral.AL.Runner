@@ -34,6 +34,7 @@ pub mod isolation;
 pub mod junit;
 pub mod license;
 mod login;
+mod login_replay;
 pub mod observe;
 mod partner_login;
 pub mod profiling;
