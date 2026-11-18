@@ -9,7 +9,7 @@ cap_add: [PERFMON] # samply and perf stat need perf_event_open (Docker seccomp a
 agents:
   - name: orchestrator
     runtime: interactive
-    branch: main
+    branch: kraken # the fork main is left alone (264 old commits); .kraken lives only here
     model: opus
     session_name: alrunner-orchestrator
     start:
