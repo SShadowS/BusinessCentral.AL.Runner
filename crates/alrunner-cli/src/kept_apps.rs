@@ -295,7 +295,10 @@ mod tests {
         assert_eq!(k.reads, 2, "the resource outside the folder");
         write(&d.path().join("shared/L.rdlc"), "<Report />");
         assert_eq!(once(&mut k, &app), fresh(&app));
-        assert_eq!(k.reads, 2, "a layout outside the folder is never read (al-testrun `layout_file_at`): the app is kept");
+        assert_eq!(
+            k.reads, 2,
+            "a layout outside the folder is never read (al-testrun `layout_file_at`): the app is kept"
+        );
         write(&d.path().join("app.json"), r#"{"build":"28.5.54151.58194"}"#);
         assert_eq!(once(&mut k, &app), fresh(&app));
         assert_eq!(k.reads, 3, "the record next to the folder");
