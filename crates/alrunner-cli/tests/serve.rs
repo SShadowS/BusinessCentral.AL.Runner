@@ -2423,3 +2423,100 @@ codeunit 50821 "Probe Login Tests"
         "login replay check: 6 sessions over 4 keys (a key seen before: 2 sessions, 33%), 2 compared, 0 differ; across test codeunits: 0 compared, 0 differ"
     );
 }
+
+/// Each refuser writes state first (a row, a SingleInstance text, isolated storage, WorkDate, the language), then makes a
+/// call the runner refuses while it runs; the reader fails with what it sees, so its answer line holds that state.
+const CLEAN_CHECK: &str = r#"
+table 50840 "DC Row" { fields { field(1; K; Integer) { } } keys { key(PK; K) { Clustered = true; } } }
+codeunit 50841 "DC Single" { SingleInstance = true; var X: Text; procedure Set(V: Text) begin X := V; end; procedure Get(): Text begin exit(X); end; }
+codeunit 50842 "DC State"
+{
+    procedure Write() var R: Record "DC Row"; S: Codeunit "DC Single";
+    begin R.K := 7; R.Insert(); S.Set('leak'); IsolatedStorage.Set('k', 'leak'); WorkDate(20200102D); GlobalLanguage(1031); end;
+    procedure Read(): Text var R: Record "DC Row"; S: Codeunit "DC Single"; V: Text;
+    begin
+        if not IsolatedStorage.Get('k', V) then V := '(none)';
+        exit(StrSubstNo('rows=%1 single=%2 storage=%3 workdate=%4 lang=%5', R.Count(), S.Get(), V, WorkDate(), GlobalLanguage()));
+    end;
+}
+codeunit 50843 "DC Reader" { Subtype = Test; [Test] procedure Read() var C: Codeunit "DC State"; begin Error(C.Read()); end; }
+codeunit 50853 "DC Refused" { Subtype = Test; [Test] procedure Refused() var C: Codeunit "DC State"; D: Decimal; I: Integer; begin C.Write(); D := -2147483647; D := D - 1; I := Random(D); end; }
+codeunit 50859 "DC Taint"
+{
+    Subtype = Test;
+    [Test] procedure A_Refused() var T: Text; begin T := ApplicationPath(); end;
+    [Test] procedure B_After() var C: Codeunit "DC State"; begin C.Write(); Error('after'); end;
+}
+"#;
+
+/// Runs the reader, `refuser` and the reader again on one daemon with `ALRUNNER_DAEMON_CLEAN_CHECK=mode`; the check's
+/// lines on stderr, and the answer lines of the daemon.
+fn clean_check(mode: &str, refuser: &str) -> (Vec<String>, Vec<Vec<Value>>) {
+    let d = tempfile::tempdir().unwrap();
+    let a = app(d.path(), "cleancheck", CLEAN_CHECK);
+    let log = d.path().join("stderr.txt");
+    let mut s = Server::start_with_stderr(
+        &["--no-download", "--no-test-data"],
+        &[("ALRUNNER_DAEMON_CLEAN_CHECK", mode)],
+        Stdio::from(std::fs::File::create(&log).unwrap()),
+    );
+    assert_eq!(s.line(), json!({"ready": true}), "the daemon writes no state line");
+    let mut answers = Vec::new();
+    for test in ["Codeunit50843.", refuser, "Codeunit50843."] {
+        s.send(json!({"command": "runTests", "sourcePaths": [a], "test": test}));
+        answers.push(s.until_summary());
+    }
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line()["status"], "shutting down");
+    s.child.wait().unwrap();
+    let text = std::fs::read_to_string(&log).unwrap();
+    let lines = text
+        .lines()
+        .filter(|l| l.starts_with("daemon clean check"))
+        .map(String::from)
+        .collect();
+    (lines, answers)
+}
+
+/// Al-runner issue 8180: after a request whose test the runner refused while it ran (it wrote a row, a SingleInstance
+/// text, isolated storage, WorkDate and the language first), a fresh daemon fed the same requests but the refused one
+/// keeps the same state and answers the next request alike. The daemon's own answers carry nothing of the check.
+#[test]
+fn the_daemon_clean_check_finds_a_daemon_clean_after_a_refused_test() {
+    let (lines, answers) = clean_check("1", "Codeunit50853.");
+    assert_eq!(
+        lines,
+        vec![
+            "daemon clean check (replay): after the refused request: 1 compared, 0 differ; next request: 1 compared, 0 differ"
+        ]
+    );
+    assert_eq!(answers[1].last().unwrap()["notRun"], 1, "{answers:?}");
+    let reader = |a: &[Value]| a[0]["message"].as_str().unwrap().to_string();
+    assert_eq!(reader(&answers[0]), reader(&answers[2]));
+    assert!(
+        answers.iter().flatten().all(|l| l["type"] != "daemonState"),
+        "{answers:?}"
+    );
+    let (lines, _) = clean_check("next", "Codeunit50853.");
+    assert_eq!(
+        lines,
+        vec![
+            "daemon clean check (next): after the refused request: 0 compared, 0 differ; next request: 1 compared, 0 differ"
+        ]
+    );
+}
+
+/// What the check reports across two processes: a failed test after a refused one in the same codeunit (its outcome is
+/// not run) leaves its session language on the request thread, where the next request's first session sets it again.
+#[test]
+fn the_daemon_clean_check_reports_the_language_a_request_left_on_its_thread() {
+    let (lines, _) = clean_check("1", "Codeunit50859.");
+    assert_eq!(
+        lines,
+        vec![
+            "daemon clean check (replay): after the refused request: 1 compared, 1 differ (not comparable 0, answers 0, \
+             store 0, engines 0, session 0, language 1, clock 0, process 0, compile 0, front end 0; first: language 1: \
+             filter language 1031 turkic code false | filter language 1033 turkic code false); next request: 1 compared, 0 differ"
+        ]
+    );
+}

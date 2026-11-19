@@ -717,6 +717,37 @@ pub struct WarmCtx {
     pub license: Option<(String, al_testrun::license::LicenseUse)>,
 }
 
+impl WarmCtx {
+    /// What this front end keeps for the next request, one line each: the dependency apps (their key and the files they
+    /// were read from), the license by build, and the backup kept open with the tables read from it (the daemon clean
+    /// check, `daemon_clean.rs`).
+    pub fn kept_lines(&self) -> Vec<String> {
+        use al_vm::state_content as content;
+        let mut out = match &self.dependencies {
+            None => vec!["dependencies none".to_string()],
+            Some(d) => {
+                let mut l = vec![format!("dependencies key {}", d.key)];
+                l.extend(
+                    d.stamps
+                        .iter()
+                        .map(|(p, s)| format!("dependencies file {} {}", p.display(), content(s))),
+                );
+                l
+            }
+        };
+        out.push(format!(
+            "license {}",
+            content(&(self.license.as_ref()).map(|(build, u)| (build, u.license.as_ref().map(|l| &l.sha256))))
+        ));
+        let backup = KEPT_BACKUP.lock().unwrap_or_else(|e| e.into_inner());
+        out.push(format!(
+            "kept backup {}",
+            content(&backup.as_ref().map(|(k, d)| (k, d.provider.identity())))
+        ));
+        out
+    }
+}
+
 /// The dependency apps a warm server read for a request ([`WarmCtx::dependencies`]).
 pub struct KeptDependencies {
     /// The request's apps and options that chose them.

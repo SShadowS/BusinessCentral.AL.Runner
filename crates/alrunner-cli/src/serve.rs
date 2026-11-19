@@ -68,7 +68,8 @@ const EXECUTE_FIELDS: &[&str] = &[
 /// Fields v2 reads for another command only: accepted, with a warning.
 const OTHER_COMMAND: &[&str] = &["code"];
 
-fn out(v: &Value) {
+pub(crate) fn out(v: &Value) {
+    crate::daemon_clean::record(v);
     let mut o = std::io::stdout().lock();
     let _ = writeln!(o, "{v}");
     let _ = o.flush();
@@ -170,7 +171,11 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
         ..WarmCtx::default()
     };
     crate::run::keep_backups();
+    // Issue 8180, internal: the daemon clean check (`daemon_clean.rs`).
+    let mut clean =
+        crate::daemon_clean::DaemonClean::of(std::env::var("ALRUNNER_DAEMON_CLEAN_CHECK").ok().as_deref(), daemon)?;
     out(&json!({ "ready": true }));
+    clean.iter().for_each(|c| c.ready(&ctx));
     let mut n = 0u64;
     while let Ok(Input::Line(line)) = rx.recv() {
         let request: Value = match serde_json::from_str(&line) {
@@ -193,6 +198,7 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
             "shutdown" => {
                 out(&json!({ "status": "shutting down" }));
                 eprintln!("[server] request {} done", n + 1);
+                clean.iter_mut().for_each(crate::daemon_clean::DaemonClean::end);
                 return Ok(());
             }
             "runtests" => run_tests(&base, fields, &mut ctx, &flags),
@@ -202,7 +208,9 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
         }
         n += 1;
         eprintln!("[server] request {n} done");
+        clean.iter_mut().for_each(|c| c.after_request(&request, &ctx));
     }
+    clean.iter_mut().for_each(crate::daemon_clean::DaemonClean::end);
     Ok(())
 }
 
