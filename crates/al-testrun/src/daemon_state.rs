@@ -26,6 +26,11 @@
 //! each request (alrunner-cli `run.rs` `test_inner`) and shut down at its end; a kept engine holds that host until the
 //! next request takes it and sets its own (`corpus.rs` `take_kept_engines`). Whether a helper process outlives a request
 //! is measured, not assumed: the `process` line `helper processes alive`.
+//!
+//! Not rendered either, because they live in the codeunit's session, which a request drops (issue 8334): the locks of the
+//! open transaction (al-vm `state.rs:91,113`, `OpenTx` in the session's `TxState`) and the in-memory `File` system (each
+//! codeunit's session gets a new host, `runtime/run.rs:437-439`, whose files start as an empty `MemFileSystem`, al-host
+//! `lib.rs:896`; with `--files-dir` the files are the folder's, `host.rs:299`, compared by [`outside`]).
 
 use crate::runtime::Warm;
 use al_vm::state_content as content;
@@ -208,7 +213,11 @@ fn process() -> Vec<String> {
 }
 
 /// The process lines of the helper processes (`dotnet::helpers_alive`: session sidecars, standbys, the render process)
-/// this process holds, `alive` of them.
+/// this process holds, `alive` of them. A warm server starts no standby ahead (alrunner-cli `run.rs:1788-1789`:
+/// `looks_pure` holds with a kept compile, so neither `prewarm` of `run.rs:1797-1806` runs), and a session that starts
+/// its own process starts standbys only when `prewarm_on_first_use` asked for them (`dotnet.rs:1175-1188`); the pool
+/// is closed at the request's end (alrunner-cli `run.rs:2066`, `dotnet.rs:548-549`). So the count read between two
+/// requests is not a standby still starting.
 pub(crate) fn helper_lines(alive: usize) -> Vec<String> {
     vec![format!("helper processes alive {alive}")]
 }
