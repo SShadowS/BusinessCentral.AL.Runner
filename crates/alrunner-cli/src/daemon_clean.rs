@@ -1,21 +1,22 @@
 //! The daemon clean check of `al-runner serve` (al-runner issue 8180), internal: `ALRUNNER_DAEMON_CLEAN_CHECK=1` (or
 //! `replay`, or `next`). It measures; no answer and no kept state changes.
 //!
-//! After a `runTests` request with a refused test (`notRun` above 0 in its summary), the daemon waits for the next request.
-//! It answers that one as always, then starts a fresh daemon (this program, `serve`, the same options) and feeds it:
-//! - with `1` or `replay`: every earlier request that had no refused test, each with the seed this daemon gave it; the fresh
-//!   daemon's state after them is compared with this daemon's state right after the refused request (when there was one:
-//!   a daemon that ran nothing has kept nothing yet);
-//! - with `next`: nothing (as a client that restarts the daemon after a refusal);
+//! After a `runTests` request with a refused test (`notRun` above 0 in its summary) or a test the time limit cut (a `test`
+//! line with a `clock`, issue 8334; [`cause`]), the daemon waits for the next request. It answers that one as always,
+//! then starts a fresh daemon (this program, `serve`, the same options) and feeds it:
+//! - with `1` or `replay`: every earlier request that had no refused or cut test, each with the seed this daemon gave it;
+//!   the fresh daemon's state after them is compared with this daemon's state right after the refused or cut request
+//!   (when there was one: a daemon that ran nothing has kept nothing yet);
+//! - with `next`: nothing (as a client that restarts the daemon after a refusal or a cut);
 //!
 //! then the next request with this daemon's seed. Both daemons' answer lines to it (without times and what says whether
 //! the compile was kept) and their state after it are compared. The state is al-testrun `daemon_state::render` plus the
 //! front end's (`WarmCtx::kept_lines`); the fresh daemon runs with `ALRUNNER_DAEMON_CLEAN_CHECK=twin` and writes its state
 //! as a `daemonState` line after the `ready` line and after each request. The report line goes to stderr after each
-//! comparison (`daemon_state::Check::line`).
+//! comparison (`daemon_state::Check::line`), for the cause of the request compared.
 
 use crate::run::WarmCtx;
-use al_testrun::daemon_state::{self, DaemonState};
+use al_testrun::daemon_state::{self, Cause, DaemonState};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -51,10 +52,11 @@ pub struct DaemonClean {
     mode: Mode,
     /// The daemon's own options, for the fresh daemon.
     daemon: Vec<String>,
-    /// The earlier requests without a refused test, each with the seed this daemon gave it.
+    /// The earlier requests without a refused or cut test, each with the seed this daemon gave it.
     log: Vec<Value>,
-    /// This daemon's state right after the last refused request, while no later request was compared.
-    pending: Option<DaemonState>,
+    /// The cause of the last refused or cut request and this daemon's state right after it, while no later request was
+    /// compared.
+    pending: Option<(Cause, DaemonState)>,
     check: daemon_state::Check,
 }
 
@@ -99,23 +101,21 @@ impl DaemonClean {
             (v["type"] == "summary").then_some(v)
         });
         let seeded = with_seed(request, summary.as_ref());
-        if let Some(after) = self.pending.take() {
-            self.compare(&after, &seeded, &answer, &now);
+        if let Some((cause, after)) = self.pending.take() {
+            self.compare(cause, &after, &seeded, &answer, &now);
         }
-        let refused = summary.as_ref().and_then(|s| s["notRun"].as_u64()).unwrap_or(0) > 0;
-        if refused {
-            self.pending = Some(now);
-        } else {
-            self.log.push(seeded);
+        match cause(&answer, summary.as_ref()) {
+            Some(c) => self.pending = Some((c, now)),
+            None => self.log.push(seeded),
         }
     }
 
-    /// The end of input or `shutdown`: a refused request no later request followed is named as not compared.
+    /// The end of input or `shutdown`: a refused or cut request no later request followed is named as not compared.
     pub fn end(&mut self) {
-        if self.pending.take().is_some() {
+        if let Some((cause, _)) = self.pending.take() {
             self.check
-                .note_not_compared("no request followed the refused one".into());
-            eprintln!("{}", self.check.line(self.mode_text()));
+                .note_not_compared(cause, format!("no request followed the {} one", cause.word()));
+            eprintln!("{}", self.check.line(self.mode_text(), cause));
         }
     }
 
@@ -128,22 +128,38 @@ impl DaemonClean {
     }
 
     /// Runs the fresh daemon over the replayed requests and `next`, and notes what differs.
-    fn compare(&mut self, after: &DaemonState, next: &Value, answer: &[String], now: &DaemonState) {
+    fn compare(&mut self, cause: Cause, after: &DaemonState, next: &Value, answer: &[String], now: &DaemonState) {
         let replay: &[Value] = if self.mode == Mode::Replay { &self.log } else { &[] };
         match Fresh::run(&self.daemon, replay, next) {
-            Err(why) => self.check.note_not_compared(why),
+            Err(why) => self.check.note_not_compared(cause, why),
             Ok(fresh) => {
                 // A fresh daemon that ran nothing kept nothing yet: only a replay gives a state to compare with.
                 if !replay.is_empty() {
                     self.check
-                        .note_after(&daemon_state::differences(None, after, &fresh.before_next));
+                        .note_after(cause, &daemon_state::differences(None, after, &fresh.before_next));
                 }
                 let answers = Some((answer, fresh.answer.as_slice()));
                 self.check
-                    .note_next(&daemon_state::differences(answers, now, &fresh.after_next));
+                    .note_next(cause, &daemon_state::differences(answers, now, &fresh.after_next));
             }
         }
-        eprintln!("{}", self.check.line(self.mode_text()));
+        eprintln!("{}", self.check.line(self.mode_text(), cause));
+    }
+}
+
+/// Why the request with answer lines `answer` and summary `summary` is compared with a fresh daemon (issue 8334): `Cut`
+/// when one of its `test` lines is a test the time limit stopped (`notRun` and a `clock`, output.rs `json_row`), else
+/// `Refused` when its summary counts a test not run (`notRun` above 0, issue 8180); `None` otherwise.
+fn cause(answer: &[String], summary: Option<&Value>) -> Option<Cause> {
+    let cut = answer.iter().any(|l| {
+        serde_json::from_str::<Value>(l)
+            .is_ok_and(|v| v["type"] == "test" && v["notRun"] == true && v["clock"].is_string())
+    });
+    let refused = summary.and_then(|s| s["notRun"].as_u64()).unwrap_or(0) > 0;
+    match (cut, refused) {
+        (true, _) => Some(Cause::Cut),
+        (false, true) => Some(Cause::Refused),
+        (false, false) => None,
     }
 }
 
@@ -338,6 +354,39 @@ mod tests {
             json!({"command": "runTests", "seed": 42})
         );
         assert_eq!(with_seed(&r, None), r);
+    }
+
+    fn answer(lines: &[Value]) -> Vec<String> {
+        lines.iter().map(comparable).collect()
+    }
+
+    #[test]
+    fn a_request_with_a_clock_row_is_a_cut() {
+        let cut = json!({"type": "test", "name": "A", "notRun": true, "clock": "cpu", "status": "error"});
+        let refused = json!({"type": "test", "name": "B", "notRun": true, "status": "error"});
+        let summary = json!({"type": "summary", "notRun": 2});
+        assert_eq!(
+            cause(&answer(&[refused, cut, summary.clone()]), Some(&summary)),
+            Some(Cause::Cut)
+        );
+    }
+
+    #[test]
+    fn a_request_with_only_refused_rows_is_refused() {
+        let refused = json!({"type": "test", "name": "B", "notRun": true, "status": "error"});
+        let summary = json!({"type": "summary", "notRun": 1});
+        assert_eq!(
+            cause(&answer(&[refused, summary.clone()]), Some(&summary)),
+            Some(Cause::Refused)
+        );
+    }
+
+    #[test]
+    fn a_request_without_a_test_not_run_has_no_cause() {
+        let passed = json!({"type": "test", "name": "A", "status": "pass"});
+        let summary = json!({"type": "summary", "notRun": 0, "passed": 1});
+        assert_eq!(cause(&answer(&[passed, summary.clone()]), Some(&summary)), None);
+        assert_eq!(cause(&[], None), None);
     }
 
     #[test]

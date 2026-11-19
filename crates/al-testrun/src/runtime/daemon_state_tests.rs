@@ -6,7 +6,7 @@
 //! fresh daemon is a thread that did not run it. Without the plant both render the same.
 
 use super::*;
-use crate::daemon_state::{Check, DaemonState, differences, render};
+use crate::daemon_state::{Cause, Check, DaemonState, differences, render};
 
 const SRC: &str = r#"
 table 50801 "DC Row" { fields { field(1; K; Integer) { } } keys { key(PK; K) { Clustered = true; } } }
@@ -106,8 +106,8 @@ fn keep_store(baseline: al_vm::Baseline) {
 /// The report line of one comparison of the state after a refused request with a fresh daemon's.
 fn line(kept: &DaemonState, fresh: &DaemonState) -> String {
     let mut check = Check::default();
-    check.note_after(&differences(None, kept, fresh));
-    check.line("unit")
+    check.note_after(Cause::Refused, &differences(None, kept, fresh));
+    check.line("unit", Cause::Refused)
 }
 
 const CLEAN: &str =
@@ -230,5 +230,50 @@ fn equal_daemons_compare_equal() {
             1,
             "answer line 1: {\"type\":\"summary\"} | {\"type\":\"summary\",\"passed\":1}".to_string()
         )]
+    );
+}
+
+// The report line names the cause of the request it compared (issue 8334): a cut request's tallies are its own, and the
+// files folder it left is named once noted.
+#[test]
+fn the_report_line_names_a_cut_request_as_cut() {
+    let mut check = Check::default();
+    check.note_after(Cause::Cut, &[]);
+    check.note_next(Cause::Cut, &[]);
+    assert_eq!(
+        check.line("replay", Cause::Cut),
+        "daemon clean check (replay): after the cut request: 1 compared, 0 differ; next request: 1 compared, 0 differ"
+    );
+    check.note_left(Cause::Cut, &[(0, "files 1: file cut.txt 0 1f | (none)".into())]);
+    check.note_not_compared(Cause::Cut, "no request followed the cut one".into());
+    assert_eq!(
+        check.line("next", Cause::Cut),
+        "daemon clean check (next): after the cut request: 1 compared, 0 differ; next request: 1 compared, 0 differ; \
+         left outside the daemon: 1 compared, 1 differ (files 1; first: files 1: file cut.txt 0 1f | (none)); \
+         not compared 1 (first: no request followed the cut one)"
+    );
+    // The refused requests have their own tallies.
+    assert_eq!(
+        check.line("next", Cause::Refused),
+        "daemon clean check (next): after the refused request: 0 compared, 0 differ; next request: 0 compared, 0 differ"
+    );
+}
+
+// Without a files folder, a refused request's line is the line of issue 8180, byte for byte.
+#[test]
+fn a_refused_request_keeps_its_report_line() {
+    let mut check = Check::default();
+    check.note_after(Cause::Refused, &[]);
+    check.note_next(Cause::Refused, &[]);
+    check.note_after(Cause::Cut, &[(2, "store 1: a | b".into())]);
+    assert_eq!(
+        check.line("replay", Cause::Refused),
+        "daemon clean check (replay): after the refused request: 1 compared, 0 differ; next request: 1 compared, 0 differ"
+    );
+    check.note_not_compared(Cause::Refused, "no request followed the refused one".into());
+    assert_eq!(
+        check.line("replay", Cause::Refused),
+        "daemon clean check (replay): after the refused request: 1 compared, 0 differ; next request: 1 compared, 0 \
+         differ; not compared 1 (first: no request followed the refused one)"
     );
 }

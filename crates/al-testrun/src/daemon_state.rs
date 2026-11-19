@@ -1,7 +1,8 @@
-//! The daemon clean check (al-runner issue 8180): is a kept `serve` daemon, after a request with a refused test, in the
-//! state a fresh daemon would be in for the next request? This module renders what a daemon keeps for later requests
-//! ([`render`], [`DaemonState`]) and compares two daemons ([`differences`], [`Check`]); it changes nothing. The front end
-//! (alrunner-cli `daemon_clean.rs`, `ALRUNNER_DAEMON_CLEAN_CHECK=1`) runs the fresh daemon and feeds both.
+//! The daemon clean check (al-runner issues 8180 and 8334): is a kept `serve` daemon, after a request with a refused test
+//! or a test the time limit cut ([`Cause`]), in the state a fresh daemon would be in for the next request? This module
+//! renders what a daemon keeps for later requests ([`render`], [`DaemonState`]) and compares two daemons ([`differences`],
+//! [`Check`]); it changes nothing. The front end (alrunner-cli `daemon_clean.rs`, `ALRUNNER_DAEMON_CLEAN_CHECK=1`) runs
+//! the fresh daemon and feeds both.
 //!
 //! What is rendered, by kind ([`KINDS`]), is what a later request of the same process can read:
 //! - `store`: the install baseline kept on this thread (`baseline_cache::read_kept`) and the one carried over an edit;
@@ -257,43 +258,90 @@ pub fn differences(answers: Option<(&[String], &[String])>, a: &DaemonState, b: 
     out.into_iter().enumerate().filter_map(|(k, d)| Some((k, d?))).collect()
 }
 
-/// The check over the requests of one daemon: per refused request, the state right after it compared with a fresh
-/// daemon's after the requests before it but the refused ones (`after`), and the next request's answers and the state
-/// after it compared on both (`next`).
+/// Why a request is compared with a fresh daemon: a test of it was refused (`notRun`), or the time limit cut one (its
+/// `test` line has a `clock`; a request with both is `Cut`). The front end (alrunner-cli `daemon_clean.rs` `cause`) names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cause {
+    Refused,
+    Cut,
+}
+
+impl Cause {
+    /// The word the report line names the cause with.
+    pub fn word(self) -> &'static str {
+        match self {
+            Cause::Refused => "refused",
+            Cause::Cut => "cut",
+        }
+    }
+}
+
+/// What a request can leave outside the daemon: the `--files-dir` folder. A fresh daemon gets the same folder, so this is
+/// compared on one daemon, before the request against after it.
+pub const OUTSIDE_KINDS: [&str; 1] = ["files"];
+
+/// The tallies of the requests of one [`Cause`].
 #[derive(Default)]
-pub struct Check {
+struct Tallies {
     after: crate::state_diff::Tally,
     next: crate::state_diff::Tally,
-    /// Refused requests not compared, with why (no later request, the fresh daemon did not answer).
+    /// The `--files-dir` folder right after the request against before it; noted only when the daemon has one.
+    left: crate::state_diff::Tally,
+    /// Requests not compared, with why (no later request, the fresh daemon did not answer).
     not_compared: Vec<String>,
 }
 
+/// The check over the requests of one daemon, per [`Cause`]: per refused or cut request, the state right after it compared
+/// with a fresh daemon's after the requests before it but the refused and cut ones (`after`), the next request's answers
+/// and the state after it compared on both (`next`), and what it left in the files folder (`left`).
+#[derive(Default)]
+pub struct Check {
+    /// Indexed by `Cause as usize`.
+    by_cause: [Tallies; 2],
+}
+
 impl Check {
-    /// Notes the differences of the state right after a refused request.
-    pub fn note_after(&mut self, differs: &[(usize, String)]) {
-        self.after.note(differs);
+    fn of(&mut self, cause: Cause) -> &mut Tallies {
+        &mut self.by_cause[cause as usize]
+    }
+
+    /// Notes the differences of the state right after a refused or cut request.
+    pub fn note_after(&mut self, cause: Cause, differs: &[(usize, String)]) {
+        self.of(cause).after.note(differs);
     }
 
     /// Notes the differences of the next request's answers and the state after it.
-    pub fn note_next(&mut self, differs: &[(usize, String)]) {
-        self.next.note(differs);
+    pub fn note_next(&mut self, cause: Cause, differs: &[(usize, String)]) {
+        self.of(cause).next.note(differs);
     }
 
-    /// Notes a refused request that could not be compared, with why.
-    pub fn note_not_compared(&mut self, why: String) {
-        self.not_compared.push(why);
+    /// Notes the differences of the files folder right after a refused or cut request against before it.
+    pub fn note_left(&mut self, cause: Cause, differs: &[(usize, String)]) {
+        self.of(cause).left.note(differs);
     }
 
-    /// The report line: `mode` says which requests the fresh daemon ran.
-    pub fn line(&self, mode: &str) -> String {
-        let not = match self.not_compared.first() {
+    /// Notes a refused or cut request that could not be compared, with why.
+    pub fn note_not_compared(&mut self, cause: Cause, why: String) {
+        self.of(cause).not_compared.push(why);
+    }
+
+    /// The report line of the requests of `cause`: `mode` says which requests the fresh daemon ran. The part on the files
+    /// folder is there once a request of `cause` noted it (`note_left`: the daemon has a files folder).
+    pub fn line(&self, mode: &str, cause: Cause) -> String {
+        let t = &self.by_cause[cause as usize];
+        let left = match t.left.compared {
+            0 => String::new(),
+            _ => format!("; left outside the daemon: {}", t.left.counts(&OUTSIDE_KINDS)),
+        };
+        let not = match t.not_compared.first() {
             None => String::new(),
-            Some(first) => format!("; not compared {} (first: {first})", self.not_compared.len()),
+            Some(first) => format!("; not compared {} (first: {first})", t.not_compared.len()),
         };
         format!(
-            "daemon clean check ({mode}): after the refused request: {}; next request: {}{not}",
-            self.after.counts(&DIFFERENCE_KINDS),
-            self.next.counts(&DIFFERENCE_KINDS)
+            "daemon clean check ({mode}): after the {} request: {}; next request: {}{left}{not}",
+            cause.word(),
+            t.after.counts(&DIFFERENCE_KINDS),
+            t.next.counts(&DIFFERENCE_KINDS)
         )
     }
 }
