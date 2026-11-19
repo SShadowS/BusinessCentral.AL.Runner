@@ -13,7 +13,7 @@ mod support;
 
 use serde_json::{Value, json};
 use std::process::Stdio;
-use support::server::{Server, app, write};
+use support::server::{Server, app};
 
 /// The state a cutter writes first and the reader prints; shared by every place.
 const STATE: &str = r#"
@@ -215,7 +215,7 @@ impl Cut {
 fn cut_check(
     mode: &str,
     sources: &[(&str, &str)],
-    layouts: &[(&str, &str)],
+    layouts: &[(&str, &[u8])],
     reader: &str,
     cutter: &str,
     extra: &[&str],
@@ -225,8 +225,10 @@ fn cut_check(
     for (name, al) in sources {
         paths.push(app(d.path(), name, &format!("{STATE}{al}")));
     }
-    for (rel, text) in layouts {
-        write(&paths[0], rel, text);
+    for (rel, bytes) in layouts {
+        let file = paths[0].join(rel);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, bytes).unwrap();
     }
     let log = d.path().join("stderr.txt");
     let mut args = vec!["--no-download", "--no-test-data"];
@@ -370,11 +372,84 @@ fn a_daemon_after_a_cut_during_a_pdf_render_is_compared() {
     let cut = cut_check(
         "1",
         &[("cutpdf", CUTRDLC)],
-        &[("layouts/Cut.rdlc", RDLC)],
+        &[("layouts/Cut.rdlc", RDLC.as_bytes())],
         "Codeunit50883.",
         "Codeunit50897.",
         &["--bc-version", "28"],
     );
     cut.assert_cut_and_readers_agree();
     assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
+}
+
+/// Place 7c: a Word layout saved as Html, the shape of corpus `reports/html-email-body/RxHtmlHashTests.al:192`
+/// (`RX Word Alpha`, two rows). The Html is the runner's placeholder text, which numbers one rendered text per save
+/// (al-builtins `rendered_text.rs`, PERF-09 finding 2): the number is per process and never reused. The layout is the
+/// corpus's `RxWordAlpha.docx`, read at run time, so this test needs the corpus checkout.
+const CUTHTML: &str = r#"
+table 50898 "RX Row" { fields { field(1; Id; Integer) { } field(2; Txt; Text[50]) { } } keys { key(PK; Id) { Clustered = true; } } }
+table 50899 "Cut Html Blob" { fields { field(1; K; Integer) { } field(2; B; Blob) { } } keys { key(PK; K) { Clustered = true; } } }
+report 50879 "RX Word Alpha"
+{
+    UsageCategory = None;
+    UseRequestPage = false;
+    DefaultRenderingLayout = RxWordAlpha;
+    dataset { dataitem(Row; "RX Row") { column(RowId; Id) { } column(RowTxt; Txt) { } } }
+    rendering { layout(RxWordAlpha) { Type = Word; LayoutFile = './layouts/RxWordAlpha.docx'; } }
+}
+codeunit 50878 "Cut Html Save"
+{
+    Subtype = Test;
+    [Test] procedure Cut() var C: Codeunit "Cut State"; T: Record "Cut Html Blob"; Row: Record "RX Row"; O: OutStream; Ok: Boolean;
+    begin
+        C.Write(); GlobalLanguage(1033);
+        Row.Id := 1; Row.Txt := 'RXROW1'; Row.Insert(); Row.Id := 2; Row.Txt := 'RXROW2'; Row.Insert();
+        repeat T.B.CreateOutStream(O, TextEncoding::UTF8); Ok := Report.SaveAs(50879, '', ReportFormat::Html, O); until false;
+    end;
+}
+"#;
+
+/// Place 7c, MEASURED (BC 28, `--no-download`, no render pieces): the cut daemon rendered N > 0 texts, the fresh daemon
+/// 0, so `process` differs on `rendered texts` after the cut request and again on the next request (replay does not
+/// re-run the cutter). N is the number of saves before the cut and depends on the machine, so it is parsed. No helper
+/// process line differs. Any request that saves such a report leaves this count; the cut adds nothing to it.
+#[test]
+#[ignore = "needs the corpus checkout (RxWordAlpha.docx) and a BC 28 target"]
+fn a_daemon_after_a_cut_during_a_word_layout_html_save_is_compared() {
+    let docx = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../corpus/tests/al-language/reports/html-email-body/RxWordAlpha.docx"
+    ))
+    .unwrap();
+    let cut = cut_check(
+        "1",
+        &[("cuthtml", CUTHTML)],
+        &[("layouts/RxWordAlpha.docx", &docx)],
+        "Codeunit50883.",
+        "Codeunit50878.",
+        &["--bc-version", "28"],
+    );
+    cut.assert_cut_and_readers_agree();
+    assert_eq!(cut.lines.len(), 1, "{:?}", cut.lines);
+    let differ = |request: &str| {
+        format!(
+            "{request}: 1 compared, 1 differ (not comparable 0, answers 0, store 0, engines 0, session 0, language 0, clock 0, \
+             process 1, compile 0, front end 0; first: process "
+        )
+    };
+    let line = &cut.lines[0];
+    let rest = line
+        .strip_prefix(&format!(
+            "daemon clean check (replay): after the cut request: {}",
+            &differ("")[2..]
+        ))
+        .unwrap_or_else(|| panic!("{line}"));
+    let (count, rest) = rest.split_once(": rendered texts ").unwrap();
+    assert!(count.parse::<usize>().is_ok(), "{line}");
+    let (n, rest) = rest.split_once(' ').unwrap();
+    assert!(n.parse::<usize>().unwrap() > 0, "{line}");
+    assert!(
+        rest.starts_with("active false placeholder sizes made false | rendered texts 0 active false placeholder sizes made false); next request: 1 compared, 1 differ ("),
+        "{line}"
+    );
+    assert!(rest.contains("process 1,"), "{line}");
 }
