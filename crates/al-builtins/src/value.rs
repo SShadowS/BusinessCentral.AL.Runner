@@ -1012,7 +1012,6 @@ impl TableGlobals {
         }
     }
 
-    /// A handle onto `xRec`'s set (created on first use).
     /// The address of the shared set (`None` while unset) and how many strong owners it has: the identity a session image
     /// (al-vm `login_image`) keys it by, and the count it checks every owner against.
     pub fn set_address(&self) -> Option<(usize, usize)> {
@@ -1026,6 +1025,7 @@ impl TableGlobals {
         (!d.xrec.is_unset()).then(|| d.xrec.share())
     }
 
+    /// A handle onto `xRec`'s set (created on first use).
     pub fn xrec(&self) -> TableGlobals {
         let data = self.data();
         let d = data.borrow();
