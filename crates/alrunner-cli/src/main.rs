@@ -8,6 +8,7 @@ mod bcapps_apps;
 mod capture;
 mod contoso;
 mod coverage;
+mod daemon_clean;
 mod debug;
 mod demotool;
 mod dev_endpoint_ui;

@@ -54,7 +54,7 @@ pub use profile::{
     DbStat, PosStat, ProfFrame, ProfNode, ProfileMode, ProfileTree, reaches_database,
     routine_label as profile_routine_label,
 };
-pub use state_stamp::{LeftChange, LeftStamp, StateStamp};
+pub use state_stamp::{LeftChange, LeftStamp, StateLines, StateStamp};
 pub use test_runner_host::TestCodeunitHost;
 mod auto_format_writer;
 mod callstack;
@@ -101,6 +101,7 @@ pub mod impact;
 mod install_left;
 mod interfaces;
 mod isdirty;
+mod kept_state;
 mod license_ceiling;
 mod load_fields_request;
 mod media_orphans;
@@ -154,6 +155,9 @@ mod sqltime;
 mod stale_buffer_origin;
 mod stale_own_modify;
 mod stale_rename;
+pub use kept_state::process_flag_lines;
+mod state_render;
+pub use state_render::content as state_content;
 mod state_stamp;
 mod table_facts;
 mod tasks;

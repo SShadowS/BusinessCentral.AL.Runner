@@ -327,6 +327,40 @@ impl Baseline {
     pub fn nonempty_tables(&self) -> std::collections::BTreeSet<u32> {
         self.store.nonempty_tables()
     }
+
+    /// The rows of the baseline, read only (the daemon clean check, al-testrun `daemon_state.rs`, writes them out).
+    pub fn store(&self) -> &al_data::memory::MemStore {
+        &self.store
+    }
+
+    /// Everything the baseline holds besides its rows and its origin (a number per process), one line each, in a fixed
+    /// order: what the daemon clean check compares (al-testrun `daemon_state.rs`, al-runner issue 8180).
+    pub fn state_lines(&self) -> Vec<String> {
+        use crate::state_render::content;
+        fn sorted<K: Ord + std::fmt::Debug, V: std::fmt::Debug>(m: &std::collections::HashMap<K, V>) -> String {
+            content(&m.iter().collect::<std::collections::BTreeMap<_, _>>())
+        }
+        vec![
+            format!(
+                "counters guid {} row version {} committed {} last stamp {}",
+                self.next_guid, self.next_row_version, self.committed_row_version, self.last_stamp
+            ),
+            format!("autoincrement {}", sorted(&self.autoinc)),
+            format!("isolated storage {}", sorted(&self.isolated_storage)),
+            format!("sequences {}", sorted(&self.sequences)),
+            format!("workspace installs {}", content(&self.workspace_installs)),
+            format!(
+                "company built {} install rows {}",
+                self.company_built,
+                content(&self.install_rows)
+            ),
+            format!(
+                "company unknown {} full copies {}",
+                content(&self.company_unknown),
+                content(&self.full_copies)
+            ),
+        ]
+    }
 }
 
 impl Session {

@@ -64,6 +64,16 @@ impl Counts {
 /// The exit code of a run whose APPs do not compile: no test ran (al-runner issue 5602; AL Runner v2 used 3 too).
 pub const COMPILE_ERRORS: u8 = 3;
 
+/// Prints the first 100 compile errors (file, then [`compile_error_line`]) to stderr, and how many more there are.
+pub fn print_compile_errors(errors: &[(String, String)]) {
+    for (file, line) in errors.iter().take(100) {
+        eprintln!("compile: {file}{line}");
+    }
+    if errors.len() > 100 {
+        eprintln!("compile: ... {} more", errors.len() - 100);
+    }
+}
+
 /// One compile error after its file, in the AL compiler's form: `(line,column): error AL0118: text`; a parse error has
 /// no code.
 pub fn compile_error_line(e: &al_testrun::runtime::CompileError) -> String {

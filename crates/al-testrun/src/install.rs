@@ -1154,6 +1154,8 @@ pub(crate) struct CompanyOpenWrites {
     pub own_login: BTreeSet<u32>,
     /// What the partner dependency apps' login subscribers left where the session ran them (`partner_login.rs`).
     pub partner_login: crate::partner_login::PartnerLogin,
+    /// The login was raised to every subscriber (`login::Login::Raise`): what it left is what `login_replay.rs` checks.
+    pub raised: bool,
 }
 
 impl CompanyOpenWrites {
@@ -1326,6 +1328,7 @@ fn open_test_session_company(
         of_event.sort_by_key(|&(id, _)| id);
         subs.extend(of_event.into_iter().map(|(_, s)| s));
     }
+    wrote.raised = raise;
     let mut own_wrote = BTreeSet::new();
     for step in subs {
         let Some((o, r)) = step else {
@@ -1745,6 +1748,19 @@ pub(crate) struct LoginMemo {
     recording: Mutex<()>,
     /// How often a recorded run was replayed (for tests).
     pub(crate) replays: AtomicU64,
+}
+
+/// What `engine`'s login memo decided that outlives a request on a kept engine (the daemon clean check,
+/// `daemon_state.rs`): `none` before a session used it, else whether it gave up replaying. The recorded runs are not
+/// written: they are keyed by baseline origins, numbers of their process.
+pub(crate) fn memo_line(engine: &Engine) -> String {
+    match engine.derived_if_made::<LoginMemo>() {
+        None => "none".into(),
+        Some(m) => format!(
+            "gave up {}",
+            m.state.lock().unwrap_or_else(PoisonError::into_inner).gave_up
+        ),
+    }
 }
 
 /// The recorded runs over one test data.
