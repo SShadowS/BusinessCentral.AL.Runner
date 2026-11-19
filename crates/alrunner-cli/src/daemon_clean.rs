@@ -4,7 +4,8 @@
 //! After a `runTests` request with a refused test (`notRun` above 0 in its summary), the daemon waits for the next request.
 //! It answers that one as always, then starts a fresh daemon (this program, `serve`, the same options) and feeds it:
 //! - with `1` or `replay`: every earlier request that had no refused test, each with the seed this daemon gave it; the fresh
-//!   daemon's state after them is compared with this daemon's state right after the refused request;
+//!   daemon's state after them is compared with this daemon's state right after the refused request (when there was one:
+//!   a daemon that ran nothing has kept nothing yet);
 //! - with `next`: nothing (as a client that restarts the daemon after a refusal);
 //!
 //! then the next request with this daemon's seed. Both daemons' answer lines to it (without times and what says whether
@@ -132,7 +133,8 @@ impl DaemonClean {
         match Fresh::run(&self.daemon, replay, next) {
             Err(why) => self.check.note_not_compared(why),
             Ok(fresh) => {
-                if self.mode == Mode::Replay {
+                // A fresh daemon that ran nothing kept nothing yet: only a replay gives a state to compare with.
+                if !replay.is_empty() {
                     self.check
                         .note_after(&daemon_state::differences(None, after, &fresh.before_next));
                 }

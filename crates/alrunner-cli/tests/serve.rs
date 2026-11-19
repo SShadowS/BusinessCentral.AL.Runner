@@ -2452,6 +2452,11 @@ codeunit 50859 "DC Taint"
 /// Runs the reader, `refuser` and the reader again on one daemon with `ALRUNNER_DAEMON_CLEAN_CHECK=mode`; the check's
 /// lines on stderr, and the answer lines of the daemon.
 fn clean_check(mode: &str, refuser: &str) -> (Vec<String>, Vec<Vec<Value>>) {
+    clean_check_of(mode, &["Codeunit50843.", refuser, "Codeunit50843."])
+}
+
+/// [`clean_check`] over the requests `tests`, one test filter each.
+fn clean_check_of(mode: &str, tests: &[&str]) -> (Vec<String>, Vec<Vec<Value>>) {
     let d = tempfile::tempdir().unwrap();
     let a = app(d.path(), "cleancheck", CLEAN_CHECK);
     let log = d.path().join("stderr.txt");
@@ -2462,7 +2467,7 @@ fn clean_check(mode: &str, refuser: &str) -> (Vec<String>, Vec<Vec<Value>>) {
     );
     assert_eq!(s.line(), json!({"ready": true}), "the daemon writes no state line");
     let mut answers = Vec::new();
-    for test in ["Codeunit50843.", refuser, "Codeunit50843."] {
+    for test in tests {
         s.send(json!({"command": "runTests", "sourcePaths": [a], "test": test}));
         answers.push(s.until_summary());
     }
@@ -2517,6 +2522,23 @@ fn the_daemon_clean_check_reports_the_language_a_request_left_on_its_thread() {
             "daemon clean check (replay): after the refused request: 1 compared, 1 differ (not comparable 0, answers 0, \
              store 0, engines 0, session 0, language 1, clock 0, process 0, compile 0, front end 0; first: language 1: \
              filter language 1031 turkic code false | filter language 1033 turkic code false); next request: 1 compared, 0 differ"
+        ]
+    );
+}
+
+/// The shape of a client that sends the same refused test with every request: each request is compared as the next one
+/// of the refusal before it, on a fresh daemon that ran nothing else (it has no earlier request without a refusal), and
+/// the last refusal, which no request follows, is named as not compared.
+#[test]
+fn the_daemon_clean_check_compares_each_request_after_a_refused_one_when_every_request_is_refused() {
+    let (lines, _) = clean_check_of("1", &["Codeunit50853.", "Codeunit50853.", "Codeunit50853."]);
+    assert_eq!(
+        lines,
+        vec![
+            "daemon clean check (replay): after the refused request: 0 compared, 0 differ; next request: 1 compared, 0 differ",
+            "daemon clean check (replay): after the refused request: 0 compared, 0 differ; next request: 2 compared, 0 differ",
+            "daemon clean check (replay): after the refused request: 0 compared, 0 differ; next request: 2 compared, 0 differ; \
+             not compared 1 (first: no request followed the refused one)",
         ]
     );
 }
