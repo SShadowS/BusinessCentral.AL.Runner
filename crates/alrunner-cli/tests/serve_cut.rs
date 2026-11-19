@@ -53,21 +53,23 @@ codeunit 50887 "Cut OnRun" { Subtype = Test; trigger OnRun() var C: Codeunit "Cu
 codeunit 50888 "Cut File" { Subtype = Test; [Test] procedure Cut() var C: Codeunit "Cut State"; R: Record "Cut Row"; F: File; begin C.Write(); F.Create('cut.txt'); F.TextMode(true); F.Write('x'); R.K := 1000; repeat R.K += 1; R.Insert(); until false; end; }
 "#;
 
-/// Place 5 (BC 28 target, the .NET 8 sidecar): a DotNet StringBuilder held in a SingleInstance codeunit.
+/// Place 5 (BC 28 target, the .NET 8 sidecar): a `ManualResetEvent` held in a SingleInstance codeunit. A StringBuilder
+/// is served without the sidecar (al-vm `DotNetKind::Host`), so it would not reach it; this type does (place 8 shows the
+/// sidecar starts for it). The loop calls `E.Set()`, a live sidecar handle and one sidecar call per step.
 const CUTDOTNET: &str = r#"
-dotnet { assembly(mscorlib) { type(System.Text.StringBuilder; SB) { } } }
+dotnet { assembly(mscorlib) { type(System.Threading.ManualResetEvent; MRE) { } } }
 codeunit 50889 "Cut Sidecar Single"
 {
     SingleInstance = true;
-    var B: DotNet SB;
-    procedure Append(T: Text) begin if IsNull(B) then B := B.StringBuilder(); B.Append(T); end;
-    procedure Get(): Text begin if IsNull(B) then exit('(null)'); exit(B.ToString()); end;
+    var E: DotNet MRE;
+    procedure Touch() begin if IsNull(E) then E := E.ManualResetEvent(false); E.Set(); end;
+    procedure Get(): Text begin if IsNull(E) then exit('(null)'); exit('handle'); end;
 }
-codeunit 50890 "Cut Dotnet" { Subtype = Test; [Test] procedure Cut() var C: Codeunit "Cut State"; S: Codeunit "Cut Sidecar Single"; begin C.Write(); repeat S.Append('x'); until false; end; }
+codeunit 50890 "Cut Dotnet" { Subtype = Test; [Test] procedure Cut() var C: Codeunit "Cut State"; S: Codeunit "Cut Sidecar Single"; begin C.Write(); repeat S.Touch(); until false; end; }
 codeunit 50891 "Cut Dotnet Reader" { Subtype = Test; [Test] procedure Read() var C: Codeunit "Cut State"; S: Codeunit "Cut Sidecar Single"; begin Error('%1 sb=%2', C.Read(), S.Get()); end; }
 "#;
 
-/// Place 7b (BC 28 target): the same report with an RDLC layout, saved as Pdf, which the render process draws.
+/// Place 7b (BC 28 target): the same report with an RDLC layout, saved as Pdf. Measured by part (a): the Pdf draws without the render process, so this place starts no helper.
 const CUTRDLC: &str = r#"
 table 50895 "Cut Pdf Blob" { fields { field(1; K; Integer) { } field(2; B; Blob) { } } keys { key(PK; K) { Clustered = true; } } }
 report 50896 "Cut Pdf Report"
@@ -299,16 +301,30 @@ fn a_daemon_is_clean_after_a_cut_in_a_single_instance_codeunit() {
     assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
 }
 
-/// Place 4: the loop in the OnRun trigger of the test codeunit (a time limit of its own), every test gets the row.
+/// Place 4, a FINDING (same class as PERF-09's "taint"): the cut in the OnRun trigger returns through `on_run_refused`
+/// (al-testrun `runtime/run.rs`, the `TIME_LIMIT_REASON` arm of the OnRun match) and skips
+/// `stopped_state::roll_back_refused_test`, which the test-method path runs (`run.rs:1078-1083`). The session's filter
+/// language (1031) therefore stays on the request thread right after the cut; the next request is clean because every
+/// new session sets its language (al-vm `lib.rs:1334-1335`). Measured lines asserted, not the design's "clean / clean".
 #[test]
-fn a_daemon_is_clean_after_a_cut_in_an_onrun_trigger() {
+fn a_cut_in_an_onrun_trigger_leaves_the_language_on_the_request_thread_and_the_next_request_is_clean() {
     let cut = on_cutcheck("1", "Codeunit50887.", &[]);
     cut.assert_cut_and_readers_agree();
-    assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
+    assert_eq!(
+        cut.lines,
+        vec![
+            "daemon clean check (replay): after the cut request: 1 compared, 1 differ (not comparable 0, answers 0, \
+             store 0, engines 0, session 0, language 1, clock 0, process 0, compile 0, front end 0; first: language 1: \
+             filter language 1031 turkic code false | filter language 1033 turkic code false); next request: 1 compared, 0 differ"
+        ],
+        "{:?}",
+        cut.answers
+    );
 }
 
-/// Place 5: a DotNet handle live in the session's sidecar. Needs the .NET 8 sidecar (at `/opt/dotnet` here) and a
-/// BC 28 target (BC 29 needs .NET 10). Run with `--ignored`. Neither daemon has a helper process alive afterwards.
+/// Place 5: a ManualResetEvent handle live in the session's sidecar. Needs the .NET 8 sidecar (at `/opt/dotnet` here) and a
+/// BC 28 target (BC 29 needs .NET 10). Run with `--ignored`. The sidecar is started (hand-checked with `ps` during the
+/// request); no helper process line differs afterwards.
 #[test]
 #[ignore = "needs the .NET 8 sidecar and a BC 28 target"]
 fn a_daemon_is_clean_after_a_cut_around_a_dotnet_call() {
