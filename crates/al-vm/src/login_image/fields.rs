@@ -99,6 +99,8 @@ macro_rules! session_fields {
                 tx,
                 ui_state,
                 events,
+                // The live records, as nodes (`freeze.rs`); install code is held to `as_new` (`install_left`).
+                temp_blob_impl_fields,
             }
             fresh {
                 spare_vecs,
@@ -150,8 +152,6 @@ macro_rules! session_fields {
                 temp_files => |s: &Session| s.temp_files == 0,
                 render_pending_files => |s: &Session| s.render_pending_files.is_empty(),
                 placeholder_files => |s: &Session| s.placeholder_files.as_new(),
-                // Install code is held to `as_new` (`install_left`); a list of gone records answers as an empty one.
-                temp_blob_impl_fields [image_only] => |s: &Session| s.temp_blob_impl_fields.holds_no_live_record(),
                 pages => |s: &Session| crate::install_left::clients::pages_as_new(&s.pages),
                 coverage => |s: &Session| crate::install_left::clients::coverage_as_new(&s.coverage),
                 report => |s: &Session| crate::install_left::clients::report_as_new(&s.report),
