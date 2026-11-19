@@ -13,7 +13,7 @@ mod support;
 
 use serde_json::{Value, json};
 use std::process::Stdio;
-use support::server::{Server, app};
+use support::server::{Server, app, write};
 
 /// The state a cutter writes first and the reader prints; shared by every place.
 const STATE: &str = r#"
@@ -67,6 +67,101 @@ codeunit 50890 "Cut Dotnet" { Subtype = Test; [Test] procedure Cut() var C: Code
 codeunit 50891 "Cut Dotnet Reader" { Subtype = Test; [Test] procedure Read() var C: Codeunit "Cut State"; S: Codeunit "Cut Sidecar Single"; begin Error('%1 sb=%2', C.Read(), S.Get()); end; }
 "#;
 
+/// Place 7b (BC 28 target): the same report with an RDLC layout, saved as Pdf, which the render process draws.
+const CUTRDLC: &str = r#"
+table 50895 "Cut Pdf Blob" { fields { field(1; K; Integer) { } field(2; B; Blob) { } } keys { key(PK; K) { Clustered = true; } } }
+report 50896 "Cut Pdf Report"
+{
+    DefaultRenderingLayout = CutLayout;
+    dataset { dataitem(AmRow; "Cut Row") { column(AmNum; K) { } column(AmReq; ReqText) { } column(AmMark; 'AMMARK') { } } }
+    rendering { layout(CutLayout) { Type = RDLC; LayoutFile = './layouts/Cut.rdlc'; } }
+    var ReqText: Text[30];
+}
+codeunit 50897 "Cut Pdf Save"
+{
+    Subtype = Test;
+    [Test] procedure Cut() var C: Codeunit "Cut State"; T: Record "Cut Pdf Blob"; O: OutStream;
+    begin C.Write(); GlobalLanguage(1033); repeat T.B.CreateOutStream(O); Report.SaveAs(Report::"Cut Pdf Report", '', ReportFormat::Pdf, O); until false; end;
+}
+"#;
+
+/// The RDLC layout of `CUTRDLC`: one text box over the dataset (a copy of corpus `reports/layouts-saveas/LtAmRdlcText.rdlc`).
+const RDLC: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="DataSource">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString />
+      </ConnectionProperties>
+      <rd:SecurityType>None</rd:SecurityType>
+    </DataSource>
+  </DataSources>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Textbox Name="AmBox1">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=&quot;AMTXT[REQ:&quot; &amp; First(Fields!AmReq.Value, &quot;DataSet_Result&quot;) &amp; &quot;|MARK:&quot; &amp; First(Fields!AmMark.Value, &quot;DataSet_Result&quot;) &amp; &quot;|ROWS:&quot; &amp; CStr(CountRows(&quot;DataSet_Result&quot;)) &amp; &quot;|SUM:&quot; &amp; CStr(Sum(Fields!AmNum.Value, &quot;DataSet_Result&quot;)) &amp; &quot;|LAST:&quot; &amp; CStr(Last(Fields!AmNum.Value, &quot;DataSet_Result&quot;)) &amp; &quot;]&quot;</Value>
+                    <Style />
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.0in</Top>
+            <Left>0in</Left>
+            <Height>0.25in</Height>
+            <Width>6in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+        </ReportItems>
+        <Height>2in</Height>
+        <Style />
+      </Body>
+      <Width>6.5in</Width>
+      <Page>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <Language>=User!Language</Language>
+  <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>94d09022-4050-5d98-bbb5-572fcbd78587</rd:ReportID>
+  <DataSets>
+    <DataSet Name="DataSet_Result">
+      <Fields>
+        <Field Name="AmNum">
+          <DataField>AmNum</DataField>
+        </Field>
+        <Field Name="AmReq">
+          <DataField>AmReq</DataField>
+        </Field>
+        <Field Name="AmMark">
+          <DataField>AmMark</DataField>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource</DataSourceName>
+        <CommandText />
+      </Query>
+    </DataSet>
+  </DataSets>
+</Report>
+"#;
+
 /// Place 7: a report over the state's table (the runner refuses a dataitem over Integer outside the workspace), saved as Xml into a Blob, in the loop.
 const CUTREPORT: &str = r#"
 table 50892 "Cut Blob" { fields { field(1; K; Integer) { } field(2; B; Blob) { } } keys { key(PK; K) { Clustered = true; } } }
@@ -117,11 +212,21 @@ impl Cut {
 
 /// Runs the reader (`Codeunit50883.`), the cutter (`cutter`, with `testTimeoutSecs: 1`) and the reader again on one
 /// daemon with `ALRUNNER_DAEMON_CLEAN_CHECK=mode`. `extra` are the daemon's options after `--no-download`.
-fn cut_check(mode: &str, sources: &[(&str, &str)], reader: &str, cutter: &str, extra: &[&str]) -> Cut {
+fn cut_check(
+    mode: &str,
+    sources: &[(&str, &str)],
+    layouts: &[(&str, &str)],
+    reader: &str,
+    cutter: &str,
+    extra: &[&str],
+) -> Cut {
     let d = tempfile::tempdir().unwrap();
     let mut paths = Vec::new();
     for (name, al) in sources {
         paths.push(app(d.path(), name, &format!("{STATE}{al}")));
+    }
+    for (rel, text) in layouts {
+        write(&paths[0], rel, text);
     }
     let log = d.path().join("stderr.txt");
     let mut args = vec!["--no-download", "--no-test-data"];
@@ -155,7 +260,7 @@ fn cut_check(mode: &str, sources: &[(&str, &str)], reader: &str, cutter: &str, e
 
 /// The check on `cutter` of `CUTCHECK`, in the default target.
 fn on_cutcheck(mode: &str, cutter: &str, extra: &[&str]) -> Cut {
-    cut_check(mode, &[("cutcheck", CUTCHECK)], "Codeunit50883.", cutter, extra)
+    cut_check(mode, &[("cutcheck", CUTCHECK)], &[], "Codeunit50883.", cutter, extra)
 }
 
 fn clean(mode: &str, after: usize, next: usize) -> String {
@@ -208,6 +313,7 @@ fn a_daemon_is_clean_after_a_cut_around_a_dotnet_call() {
     let cut = cut_check(
         "1",
         &[("cutdotnet", CUTDOTNET)],
+        &[],
         "Codeunit50891.",
         "Codeunit50890.",
         &["--bc-version", "28"],
@@ -247,9 +353,27 @@ fn a_daemon_after_a_cut_during_a_report_save_is_compared() {
     let cut = cut_check(
         "1",
         &[("cutreport", CUTREPORT)],
+        &[],
         "Codeunit50883.",
         "Codeunit50894.",
         &[],
+    );
+    cut.assert_cut_and_readers_agree();
+    assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
+}
+
+/// Place 7b: the same, with an RDLC layout saved as Pdf (BC 28; the render process draws it, which needs the .NET 8
+/// sidecar and the render pieces in the cache).
+#[test]
+#[ignore = "needs the .NET 8 sidecar, the report render pieces and a BC 28 target"]
+fn a_daemon_after_a_cut_during_a_pdf_render_is_compared() {
+    let cut = cut_check(
+        "1",
+        &[("cutpdf", CUTRDLC)],
+        &[("layouts/Cut.rdlc", RDLC)],
+        "Codeunit50883.",
+        "Codeunit50897.",
+        &["--bc-version", "28"],
     );
     cut.assert_cut_and_readers_agree();
     assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
