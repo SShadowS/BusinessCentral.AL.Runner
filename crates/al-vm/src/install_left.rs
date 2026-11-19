@@ -390,6 +390,7 @@ impl Session {
             && self.tx_left_as_after_commit()
             && self.blob_sources.as_new()
             && self.variant_refs.as_new()
+            && self.temp_blob_impl_fields.as_new()
             && clients::ui_as_new(&self.ui_state)
             && clients::events_as_new(&self.events)
     }
