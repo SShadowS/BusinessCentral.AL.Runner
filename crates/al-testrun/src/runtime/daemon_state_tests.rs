@@ -277,3 +277,23 @@ fn a_refused_request_keeps_its_report_line() {
          differ; not compared 1 (first: no request followed the refused one)"
     );
 }
+
+// A helper process (a .NET sidecar or the render process) a request left alive is reported in `process`. The process
+// holds one count, so the two daemons here are its lines, as for the clock.
+#[test]
+fn a_helper_process_left_alive_is_reported() {
+    let at = |alive: usize| {
+        let mut s = daemon(|| {});
+        s.kinds[crate::daemon_state::KINDS.iter().position(|k| *k == "process").unwrap()] =
+            crate::daemon_state::helper_lines(alive);
+        s
+    };
+    assert_eq!(line(&at(0), &at(0)), CLEAN);
+    let report = line(&at(1), &at(0));
+    eprintln!("{report}");
+    assert!(report.contains("process 1,"), "{report}");
+    assert!(
+        report.contains("first: process 1: helper processes alive 1 | helper processes alive 0"),
+        "{report}"
+    );
+}

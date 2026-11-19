@@ -1001,6 +1001,7 @@ pub(crate) fn spawn_helper(cfg: &SidecarConfig, r: &Resolved, folder: &str, args
         let _ = tx.send(None);
     });
     Ok(Proc {
+        alive: Alive::new(),
         child,
         stdin,
         replies: rx,
@@ -1020,7 +1021,34 @@ impl Drop for Proc {
     }
 }
 
+/// How many helper processes ([`Proc`]: session sidecars, standbys and the render process) this process holds now.
+static HELPERS_ALIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// The helper processes this process holds now (the daemon clean check's `process` kind, `daemon_state.rs`, issue 8334).
+pub fn helpers_alive() -> usize {
+    HELPERS_ALIVE.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Counts one helper process in [`helpers_alive`] while its [`Proc`] is held: made with the process, dropped after
+/// `Proc::drop` killed it and waited for it.
+pub(crate) struct Alive(());
+
+impl Alive {
+    pub(crate) fn new() -> Alive {
+        HELPERS_ALIVE.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Alive(())
+    }
+}
+
+impl Drop for Alive {
+    fn drop(&mut self) {
+        HELPERS_ALIVE.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 pub(crate) struct Proc {
+    /// Counts the process in [`helpers_alive`] until the process is killed (fields drop after `Proc::drop`).
+    alive: Alive,
     pub(crate) child: Child,
     pub(crate) stdin: ChildStdin,
     pub(crate) replies: Receiver<Option<Vec<u8>>>,
@@ -1625,6 +1653,17 @@ pub fn unbase64(text: &str) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The count is process-wide (another test may hold a helper meanwhile), so the change is asserted, not the count.
+    #[test]
+    fn a_helper_process_counts_as_alive_until_it_is_dropped() {
+        let before = helpers_alive();
+        let alive = Alive::new();
+        assert!(helpers_alive() > before, "{} after {before}", helpers_alive());
+        let held = helpers_alive();
+        drop(alive);
+        assert!(helpers_alive() < held, "{} after {held}", helpers_alive());
+    }
 
     fn fake_artifact(root: &Path, build: &str, nav: &str) -> PathBuf {
         let svc = root

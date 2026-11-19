@@ -15,7 +15,7 @@
 //! - `language`: the session language a session left on this thread (`filter::filter_language`, `ops::turkic_code`);
 //! - `clock`: the instant the run clock started (`host::SystemClock`), set once per process, and whether the wall clock runs;
 //! - `process`: the process-wide settings and flags a request sets (`host.rs`, `rendered_text`, `placeholder_output`,
-//!   al-vm `process_flag_lines`);
+//!   al-vm `process_flag_lines`), and the helper processes alive (`dotnet::helpers_alive`, issue 8334);
 //! - `compile`: the kept compile (`Warm`): its key, files and what it decided about the baseline;
 //! - `front end`: what the front end keeps (alrunner-cli fills it: the dependency apps, the kept backup, the license).
 //!
@@ -23,8 +23,9 @@
 //! per process: the caches of the engine worked out from the program (`Engine::reset_run_state` names them), the
 //! other `Engine::derived` values, the login records kept per baseline origin (`install.rs` `LOGIN_RECORDS`), the shared
 //! virtual-table listings (al-vm `platform` `SHARED`), engine uids and baseline origins. The .NET sidecar host is made for
-//! each request (alrunner-cli `run.rs` `test_inner`) and shut down at its end, so no sidecar process outlives a request; a
-//! kept engine holds that stopped host until the next request takes it and sets its own (`corpus.rs` `take_kept_engines`).
+//! each request (alrunner-cli `run.rs` `test_inner`) and shut down at its end; a kept engine holds that host until the
+//! next request takes it and sets its own (`corpus.rs` `take_kept_engines`). Whether a helper process outlives a request
+//! is measured, not assumed: the `process` line `helper processes alive`.
 
 use crate::runtime::Warm;
 use al_vm::state_content as content;
@@ -202,7 +203,14 @@ fn process() -> Vec<String> {
         ),
     ];
     out.extend(al_vm::process_flag_lines());
+    out.extend(helper_lines(crate::dotnet::helpers_alive()));
     out
+}
+
+/// The process lines of the helper processes (`dotnet::helpers_alive`: session sidecars, standbys, the render process)
+/// this process holds, `alive` of them.
+pub(crate) fn helper_lines(alive: usize) -> Vec<String> {
+    vec![format!("helper processes alive {alive}")]
 }
 
 fn compile(warm: &Warm) -> Vec<String> {
