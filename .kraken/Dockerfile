@@ -3,9 +3,11 @@ USER root
 ARG DEBIAN_FRONTEND=noninteractive
 # build-essential and pkg-config: crates with C parts; jq: kraken and agent scripts; libicu: .NET aborts
 # without it; tzdata-legacy: the old IANA zone links the .NET sidecar maps Windows zone ids to (CI installs
-# it when missing, .github/actions/setup/action.yml); time: GNU `/usr/bin/time -v` for peak memory.
+# it when missing, .github/actions/setup/action.yml); time: GNU `/usr/bin/time -v` for peak memory; python3,
+# zip, unzip: al-runner tests and tools call python3 and zip (al-test-cli's corpus_bump_*, record_windows_oracle and
+# step_time_guard failed without them).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential pkg-config jq libicu-dev tzdata-legacy time ca-certificates curl \
+      build-essential pkg-config jq libicu-dev tzdata-legacy time ca-certificates curl python3 zip unzip \
     && rm -rf /var/lib/apt/lists/*
 # Rust as CI pins it (dtolnay/rust-toolchain@1.98.1 in .github/actions/setup/action.yml), outside the cache
 # volume (the base points CARGO_HOME at ~/.cache for the registry).
