@@ -371,9 +371,8 @@ fn open_backup(a: &TestArgs, path: PathBuf) -> Result<(TestData, PathBuf), Strin
 fn open_backup_fresh(a: &TestArgs, path: PathBuf) -> Result<(TestData, PathBuf), String> {
     // The page map of the backup is kept next to the compile cache, so a cold or a warm open of a
     // 900 MB backup reads the map instead of verifying every extent.
-    let index_dir = (!a.no_compile_cache
-        && !std::env::var("ALRUNNER_NO_COMPILE_CACHE").is_ok_and(|v| !v.is_empty() && v != "0"))
-    .then(|| al_deps::cache::cache_root_from_env(a.cache_dir.as_deref()).join("backup-index"));
+    let index_dir = (!a.no_compile_cache && !al_testrun::switches::on("ALRUNNER_NO_COMPILE_CACHE"))
+        .then(|| al_deps::cache::cache_root_from_env(a.cache_dir.as_deref()).join("backup-index"));
     let provider = BackupProvider::open_with_index_dir(&path, a.test_data_company.as_deref(), index_dir.as_deref())
         .map_err(|e| format!("--test-data {}: {e}", path.display()))?;
     Ok((TestData::new(Arc::new(provider)), path))
@@ -1591,8 +1590,7 @@ fn test_inner(
             && std::env::var_os("AL_FORCE_BASELINE").is_none()
             && al_testrun::observe::text_looks_pure(&all_apps, &kinds, &symbols, opts_only.as_deref())
     };
-    let compile_cache_on =
-        !a.no_compile_cache && !std::env::var("ALRUNNER_NO_COMPILE_CACHE").is_ok_and(|v| !v.is_empty() && v != "0");
+    let compile_cache_on = !a.no_compile_cache && !al_testrun::switches::on("ALRUNNER_NO_COMPILE_CACHE");
     if !dependencies.apps.is_empty() && !looks_pure {
         // The Microsoft apps call .NET (Media, images). Without the compile cache the compile takes
         // seconds: start the helper processes now so the starts overlap it. With the cache the
