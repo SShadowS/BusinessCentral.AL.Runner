@@ -758,6 +758,37 @@ pub struct WarmCtx {
     pub license: Option<(String, al_testrun::license::LicenseUse)>,
 }
 
+impl WarmCtx {
+    /// What this front end keeps for the next request, one line each: the dependency apps (their key and the files they
+    /// were read from), the license by build, and the backup kept open with the tables read from it (the daemon clean
+    /// check, `daemon_clean.rs`).
+    pub fn kept_lines(&self) -> Vec<String> {
+        use al_vm::state_content as content;
+        let mut out = match &self.dependencies {
+            None => vec!["dependencies none".to_string()],
+            Some(d) => {
+                let mut l = vec![format!("dependencies key {}", d.key)];
+                l.extend(
+                    d.stamps
+                        .iter()
+                        .map(|(p, s)| format!("dependencies file {} {}", p.display(), content(s))),
+                );
+                l
+            }
+        };
+        out.push(format!(
+            "license {}",
+            content(&(self.license.as_ref()).map(|(build, u)| (build, u.license.as_ref().map(|l| &l.sha256))))
+        ));
+        let backup = KEPT_BACKUP.lock().unwrap_or_else(|e| e.into_inner());
+        out.push(format!(
+            "kept backup {}",
+            content(&backup.as_ref().map(|(k, d)| (k, d.provider.identity())))
+        ));
+        out
+    }
+}
+
 /// The dependency apps a warm server read for a request ([`WarmCtx::dependencies`]).
 pub struct KeptDependencies {
     /// The request's apps and options that chose them.
@@ -1834,6 +1865,7 @@ fn test_inner(
         test_suites,                   // `--test-suites FILE` (ADR-066 amendment 6)
         memory: crate::memory_budget::budget(a.max_memory, warm.is_none() && debug.is_none()), // `--max-memory`
         private_baseline: std::env::var_os("AL_PRIVATE_BASELINE").is_some(), // ADR-069 decision 11
+        login_replay_check: std::env::var_os("ALRUNNER_LOGIN_REPLAY_CHECK").is_some(), // issue 8211, internal
         // ADR-070 step 2 (internal); ADR-074: the discovery pass under strict order needs each BC session in one walk.
         strict_sequential: std::env::var_os("AL_STRICT_SEQUENTIAL").is_some() || driver.one_session(),
         test_driver: driver,
@@ -1959,6 +1991,7 @@ fn test_inner(
         }
     };
     let p = &rt.phases;
+    p.login_replay.iter().for_each(|l| eprintln!("{l}")); // ALRUNNER_LOGIN_REPLAY_CHECK (issue 8211)
     let d = sidecar_host.stats();
     sidecar_host.shutdown();
 
@@ -1977,12 +2010,7 @@ fn test_inner(
     };
     if !rt.compile_errors().is_empty() {
         let errors: Vec<(String, String)> = rt.compile_errors().iter().map(located).collect();
-        for (file, line) in errors.iter().take(100) {
-            eprintln!("compile: {file}{line}");
-        }
-        if errors.len() > 100 {
-            eprintln!("compile: ... {} more", errors.len() - 100);
-        }
+        output::print_compile_errors(&errors);
         let code = output::COMPILE_ERRORS;
         let why = format!(
             "the APPs do not compile: {} error(s); no test ran (exit {code})",

@@ -81,6 +81,13 @@ pub fn noted() -> usize {
     MADE.with(|m| m.borrow().len())
 }
 
+/// How many instances this thread made are alive. An instance cannot leave the thread that made it (an `Rc`), so on the
+/// request thread of a serve daemon this is every instance a request can leave for the next (the daemon clean check,
+/// al-testrun `daemon_state.rs`).
+pub fn alive_on_this_thread() -> usize {
+    MADE.with(|m| m.borrow().iter().filter(|w| w.strong_count() > 0).count())
+}
+
 /// The shared handle of a new instance, noted for [`collect`].
 pub fn shared(instance: Instance) -> Shared {
     let r = Rc::new(RefCell::new(instance));

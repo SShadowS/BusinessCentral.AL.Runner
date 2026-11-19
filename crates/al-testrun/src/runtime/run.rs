@@ -194,31 +194,42 @@ pub fn run_codeunit_full(
 /// marks of the assumptions this step relied on: they count for every test of the session (`mark_test_start_assumptions`).
 /// `Err`: why the codeunit is not run.
 fn open_company(
-    engine: &Engine,
     lowered: &Lowered,
     session: &mut Session,
     mode: Option<bool>,
     skipped_installs: &[al_vm::SkippedInstall],
     perturb: &crate::stability::Perturb,
+    scratch: &Scratch,
 ) -> Result<(crate::install::CompanyOpenWrites, al_builtins::assumptions::HitBits), crate::install::NotOpened> {
     // A scratch run is not a test session: it opens nothing.
     let Some(disabled) = mode else {
         return Ok(Default::default());
     };
+    let engine = session.engine.clone();
     al_builtins::assumptions::clear_hits();
+    // `RunOptions::login_replay_check` (al-runner issue 8211): what the login can read, before it runs.
+    let replay_key = scratch
+        .flags
+        .login_replay_check()
+        .then(|| crate::login_replay::Key::of(session, disabled, scratch.flags));
     // Base Application's login code sets WorkDate when the session opens the company (`install::login_work_date`).
     // It runs before the workspace's own Company Triggers subscribers: the order of the two is not pinned
     // (docs/probes-needed.md, WorkDate row).
-    crate::install::login_work_date(engine, lowered, session)?;
+    crate::install::login_work_date(&engine, lowered, session)?;
     let wrote = crate::install::test_session_company_open(lowered, session, disabled, skipped_installs)?;
     session.commit_transaction();
+    let hits = al_builtins::assumptions::take_hit_bits();
+    if let Some(key) = replay_key.filter(|_| wrote.raised) {
+        let state = crate::login_replay::LoginState::of(session, hits);
+        crate::login_replay::check(&engine).note(key, state);
+    }
     // `workDate.offset` of a stability run (ADR-058): the work date the session starts with, after the login code set it;
     // a `WorkDate(d)` of the test still wins.
     if let Some(shift) = perturb.work_date {
         let day = session.work_date();
         session.set_work_date(shift.apply_day(day));
     }
-    Ok((wrote, al_builtins::assumptions::take_hit_bits()))
+    Ok((wrote, hits))
 }
 
 /// The session enters test codeunit `object` after the install code: the settings of its isolation, and the refusal of
@@ -517,7 +528,7 @@ fn run_codeunit_inner(
     // (`mark_test_start_assumptions`).
     // `None`: a scratch run (`execute`), not a test session; else whether the isolation is Disabled.
     let mode = (!execute).then_some(isolation == TestIsolation::Disabled);
-    let opened = open_company(engine, lowered, &mut session, mode, &skipped_installs, &perturb);
+    let opened = open_company(lowered, &mut session, mode, &skipped_installs, &perturb, scratch);
     let (company_open, company_open_marks) = match opened {
         Ok(opened) => opened,
         Err(not) => return observed_not_run(observe.as_deref_mut(), &session, &not, all),
@@ -1658,6 +1669,17 @@ thread_local! {
     /// What the last codeunit with RequiredTestIsolation = Disabled that ran on this thread left. A baseline holds `Rc`s
     /// and stays on its thread: the codeunits that start from it run on the same one (`corpus.rs`).
     pub(crate) static CARRIED: std::cell::RefCell<Option<Carried>> = const { std::cell::RefCell::new(None) };
+}
+
+/// What [`CARRIED`] holds on this thread, for `look` to read (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn look_carried<R>(look: impl FnOnce(Option<&Carried>) -> R) -> R {
+    CARRIED.with(|c| look(c.borrow().as_ref()))
+}
+
+/// What [`LANE_SINGLES`] holds on this thread: `None` no lane, `Some(false)` a lane that moved nothing, `Some(true)` single
+/// instances moved (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn lane_singles() -> Option<bool> {
+    LANE_SINGLES.with(|c| c.borrow().as_ref().map(Option::is_some))
 }
 
 /// What a codeunit with RequiredTestIsolation = Disabled left for the codeunits after it ([`CARRIED`]).
