@@ -295,13 +295,15 @@ mod tests {
         assert_eq!(k.reads, 2, "the resource outside the folder");
         write(&d.path().join("shared/L.rdlc"), "<Report />");
         assert_eq!(once(&mut k, &app), fresh(&app));
+        // The layout is never read as a layout (al-testrun `layout_file_at`: a path outside the folder), but it is a file
+        // of the resource folder `../shared`, so the app is read again.
         assert_eq!(
-            k.reads, 2,
-            "a layout outside the folder is never read (al-testrun `layout_file_at`): the app is kept"
+            k.reads, 3,
+            "the layout outside the folder, a file of its resource folder"
         );
         write(&d.path().join("app.json"), r#"{"build":"28.5.54151.58194"}"#);
         assert_eq!(once(&mut k, &app), fresh(&app));
-        assert_eq!(k.reads, 3, "the record next to the folder");
+        assert_eq!(k.reads, 4, "the record next to the folder");
     }
 
     #[test]
