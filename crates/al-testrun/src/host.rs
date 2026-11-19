@@ -99,6 +99,50 @@ pub fn set_files_dir(dir: PathBuf) {
     let _ = FILES_DIR.set(dir);
 }
 
+/// What the `--files-dir` folder holds now, as lines (the daemon clean check, `daemon_state::outside`, issue 8334):
+/// `files dir none` without a folder, else [`files_lines_of`] the folder.
+pub fn files_dir_lines() -> Vec<String> {
+    match FILES_DIR.get() {
+        Some(dir) => files_lines_of(dir),
+        None => vec!["files dir none".into()],
+    }
+}
+
+/// Every file under `root`, one line each, sorted by its path relative to `root` with `/` separators:
+/// `file <path> <length> <hash of the content:x>` (the hash of the kept compile's file lines), or `file <path> unreadable`.
+/// Folders are not listed; a folder that cannot be read lists nothing of it.
+pub(crate) fn files_lines_of(root: &std::path::Path) -> Vec<String> {
+    use std::hash::{Hash, Hasher};
+    let mut files = Vec::new();
+    let mut dirs = vec![root.to_path_buf()];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if let Ok(rel) = path.strip_prefix(root) {
+                let rel: Vec<String> = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect();
+                files.push((rel.join("/"), path));
+            }
+        }
+    }
+    files.sort();
+    files
+        .into_iter()
+        .map(|(rel, path)| match std::fs::read(&path) {
+            Ok(bytes) => {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                bytes.hash(&mut h);
+                format!("file {rel} {} {:x}", bytes.len(), h.finish())
+            }
+            Err(_) => format!("file {rel} unreadable"),
+        })
+        .collect()
+}
+
 /// The environment `--environment` named. Set once at start-up; the default is the probed SaaS-like sandbox.
 static ENVIRONMENT: OnceLock<al_host::Environment> = OnceLock::new();
 
@@ -361,6 +405,39 @@ mod tests {
         assert!(fs.write("/abs.txt", b"x").is_err());
         assert!(!fs.exists("../escape.txt"));
         assert!(fs.remove("a/b.txt") && !fs.remove("a/b.txt"));
+    }
+
+    // A cut test that created a file and never closed it leaves it empty in the folder (al-builtins file.rs: `Create`
+    // writes the empty file at once): the folder before and after it differ in that file.
+    #[test]
+    fn a_file_a_cut_test_left_in_the_files_folder_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let before = files_lines_of(dir.path());
+        assert_eq!(before, Vec::<String>::new());
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        std::fs::write(dir.path().join("sub/b.txt"), b"hi").unwrap();
+        std::fs::write(dir.path().join("cut.txt"), b"").unwrap();
+        let after = files_lines_of(dir.path());
+        assert_eq!(after.len(), 2, "{after:?}");
+        assert!(after[0].starts_with("file cut.txt 0 "), "{after:?}");
+        assert!(after[1].starts_with("file sub/b.txt 2 "), "{after:?}");
+        let differs = crate::daemon_state::outside_differences(&before, &after);
+        let mut check = crate::daemon_state::Check::default();
+        check.note_left(crate::daemon_state::Cause::Cut, &differs);
+        let line = check.line("unit", crate::daemon_state::Cause::Cut);
+        assert!(
+            line.ends_with(&format!(
+                "; left outside the daemon: 1 compared, 1 differ (files 1; first: files 1: {} | (none))",
+                after[0]
+            )),
+            "{line}"
+        );
+        // The same folder twice is no difference.
+        assert_eq!(crate::daemon_state::outside_differences(&after, &after), Vec::new());
+        // Without a folder there is one line, which a daemon with the same options has too.
+        if FILES_DIR.get().is_none() {
+            assert_eq!(files_dir_lines(), vec!["files dir none".to_string()]);
+        }
     }
 
     #[test]

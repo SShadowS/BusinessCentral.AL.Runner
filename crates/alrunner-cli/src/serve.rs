@@ -182,8 +182,13 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
     // Issue 8180, internal: the daemon clean check (`daemon_clean.rs`).
     let mut clean =
         crate::daemon_clean::DaemonClean::of(std::env::var("ALRUNNER_DAEMON_CLEAN_CHECK").ok().as_deref(), daemon)?;
+    // The check reads the daemon's files folder at `ready` (issue 8334). A request does not name one, so it is the
+    // daemon's `--files-dir`, which the first request sets (run.rs `test_inner`, set once); with the check on, set here.
+    if let (Some(_), Some(dir)) = (&clean, &base.files_dir) {
+        al_testrun::host::set_files_dir(dir.clone());
+    }
     out(&json!({ "ready": true }));
-    clean.iter().for_each(|c| c.ready(&ctx));
+    clean.iter_mut().for_each(|c| c.ready(&ctx));
     let mut n = 0u64;
     while let Ok(Input::Line(line)) = rx.recv() {
         let request: Value = match serde_json::from_str(&line) {

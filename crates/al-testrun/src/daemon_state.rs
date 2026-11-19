@@ -284,9 +284,24 @@ impl Cause {
     }
 }
 
-/// What a request can leave outside the daemon: the `--files-dir` folder. A fresh daemon gets the same folder, so this is
-/// compared on one daemon, before the request against after it.
+/// What a request can leave outside the daemon: the `--files-dir` folder ([`outside`]). A fresh daemon gets the same
+/// folder, so this is compared on one daemon, before the request against after it ([`outside_differences`]).
 pub const OUTSIDE_KINDS: [&str; 1] = ["files"];
+
+/// What the `--files-dir` folder holds now (`host::files_dir_lines`), compared with [`outside_differences`].
+pub fn outside() -> Vec<String> {
+    crate::host::files_dir_lines()
+}
+
+/// What differs between the files folder `before` a request and `after` it, both [`outside`]: per kind of
+/// [`OUTSIDE_KINDS`] that differs, its index and its first difference, naming the folder after the request first (as
+/// [`differences`] names this daemon first).
+pub fn outside_differences(before: &[String], after: &[String]) -> Vec<(usize, String)> {
+    crate::state_diff::line_difference(after, before, OUTSIDE_KINDS[0])
+        .map(|d| (0, d))
+        .into_iter()
+        .collect()
+}
 
 /// The tallies of the requests of one [`Cause`].
 #[derive(Default)]
@@ -323,7 +338,8 @@ impl Check {
         self.of(cause).next.note(differs);
     }
 
-    /// Notes the differences of the files folder right after a refused or cut request against before it.
+    /// Notes the differences of the files folder right after a refused or cut request against before it
+    /// ([`outside_differences`]).
     pub fn note_left(&mut self, cause: Cause, differs: &[(usize, String)]) {
         self.of(cause).left.note(differs);
     }

@@ -57,6 +57,8 @@ pub struct DaemonClean {
     /// The cause of the last refused or cut request and this daemon's state right after it, while no later request was
     /// compared.
     pending: Option<(Cause, DaemonState)>,
+    /// The `--files-dir` folder after the last request (`daemon_state::outside`), taken at `ready` and after each request.
+    outside: Vec<String>,
     check: daemon_state::Check,
 }
 
@@ -76,14 +78,17 @@ impl DaemonClean {
             daemon: daemon.to_vec(),
             log: Vec::new(),
             pending: None,
+            outside: Vec::new(),
             check: Default::default(),
         }))
     }
 
-    /// The daemon is ready: the fresh daemon writes the state it starts with.
-    pub fn ready(&self, ctx: &WarmCtx) {
+    /// The daemon is ready: the fresh daemon writes the state it starts with; this daemon takes its files folder.
+    pub fn ready(&mut self, ctx: &WarmCtx) {
         if self.mode == Mode::Twin {
             crate::serve::out(&state_json(&state(ctx)));
+        } else {
+            self.outside = daemon_state::outside();
         }
         take_answer();
     }
@@ -104,10 +109,19 @@ impl DaemonClean {
         if let Some((cause, after)) = self.pending.take() {
             self.compare(cause, &after, &seeded, &answer, &now);
         }
+        let outside = daemon_state::outside();
         match cause(&answer, summary.as_ref()) {
-            Some(c) => self.pending = Some((c, now)),
+            Some(c) => {
+                // The files folder is the same for a fresh daemon (the same options): compared here, before against after.
+                if al_testrun::host::uses_real_files() {
+                    self.check
+                        .note_left(c, &daemon_state::outside_differences(&self.outside, &outside));
+                }
+                self.pending = Some((c, now));
+            }
             None => self.log.push(seeded),
         }
+        self.outside = outside;
     }
 
     /// The end of input or `shutdown`: a refused or cut request no later request followed is named as not compared.
