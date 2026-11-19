@@ -453,3 +453,44 @@ fn a_daemon_after_a_cut_during_a_word_layout_html_save_is_compared() {
     );
     assert!(rest.contains("process 1,"), "{line}");
 }
+
+/// Place 8: a .NET call in flight that does not return. `ManualResetEvent.WaitOne(60000)` is an allowed member
+/// (`Thread.Sleep` is denied, al-vm `dotnet/policy.txt:86`). The call never reads the stop flag (a cut lands only at a
+/// loop head, al-vm `Op::CheckStop`), so the 1 s limit does not end it: the sidecar's own limit does
+/// (`--dotnet-timeout-secs 12`, al-testrun `dotnet.rs`), and the row then carries the wall clock. MEASURED: the daemon is
+/// clean after it, and the next request too. Takes about 12 s.
+const BLOCK: &str = r#"
+dotnet { assembly(mscorlib) { type(System.Threading.ManualResetEvent; MRE) { } } }
+codeunit 50877 "Cut Block"
+{
+    Subtype = Test;
+    [Test] procedure Cut() var C: Codeunit "Cut State"; E: DotNet MRE; Ok: Boolean;
+    begin
+        C.Write();
+        E := E.ManualResetEvent(false);
+        Ok := E.WaitOne(60000);
+        Error('waited %1', Ok);
+    end;
+}
+"#;
+
+#[test]
+#[ignore = "needs the .NET 8 sidecar and a BC 28 target; takes about 12 s"]
+fn a_daemon_is_clean_after_a_dotnet_call_the_time_limit_could_not_cut() {
+    let cut = cut_check(
+        "1",
+        &[("cutblock", BLOCK)],
+        &[],
+        "Codeunit50883.",
+        "Codeunit50877.",
+        &["--bc-version", "28", "--dotnet-timeout-secs", "12"],
+    );
+    cut.assert_cut_and_readers_agree();
+    let c = cut.cutter();
+    assert_eq!(c["clock"], "wall", "{c}");
+    assert!(
+        c["durationMs"].as_u64().unwrap() >= 10_000,
+        "the 1 s limit did not end the call: {c}"
+    );
+    assert_eq!(cut.lines, vec![clean("replay", 1, 1)], "{:?}", cut.answers);
+}
