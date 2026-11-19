@@ -1,91 +1,12 @@
 //! `al-runner serve` end to end (ADR-028): the v2 protocol on stdin and stdout.
 
 use serde_json::{Value, json};
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::Stdio;
 
-struct Server {
-    child: Child,
-    stdin: Option<ChildStdin>,
-    stdout: BufReader<ChildStdout>,
-}
-
-impl Server {
-    fn start(extra: &[&str]) -> Server {
-        Server::start_with(extra, &[])
-    }
-
-    fn start_with(extra: &[&str], env: &[(&str, &str)]) -> Server {
-        Server::start_with_stderr(extra, env, Stdio::null())
-    }
-
-    fn start_with_stderr(extra: &[&str], env: &[(&str, &str)], stderr: Stdio) -> Server {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_al-runner"))
-            .arg("serve")
-            .args(extra)
-            .env_remove("ALRUNNER_SEED")
-            .env_remove("AL_RUNNER_SEED")
-            .envs(env.iter().copied())
-            .env("AL_CHECK_THREADS", "2")
-            .env("AL_LOWER_THREADS", "2")
-            .env("AL_TEST_THREADS", "2")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(stderr)
-            .spawn()
-            .expect("start al-runner serve");
-        let stdin = child.stdin.take();
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-        Server { child, stdin, stdout }
-    }
-
-    fn send(&mut self, v: Value) {
-        let stdin = self.stdin.as_mut().unwrap();
-        writeln!(stdin, "{v}").unwrap();
-        stdin.flush().unwrap();
-    }
-
-    /// The next line, which must be one JSON object.
-    fn line(&mut self) -> Value {
-        let mut s = String::new();
-        assert!(self.stdout.read_line(&mut s).unwrap() > 0, "the server closed stdout");
-        serde_json::from_str(&s).unwrap_or_else(|e| panic!("stdout holds more than protocol: {e}: {s}"))
-    }
-
-    /// Lines up to and including the first one of `type` summary or an error.
-    fn until_summary(&mut self) -> Vec<Value> {
-        let mut out = Vec::new();
-        loop {
-            let l = self.line();
-            let done = l["type"] == "summary" || l.get("error").is_some();
-            out.push(l);
-            if done {
-                return out;
-            }
-        }
-    }
-}
-
-fn write(dir: &Path, rel: &str, content: &str) {
-    let p = dir.join(rel);
-    std::fs::create_dir_all(p.parent().unwrap()).unwrap();
-    std::fs::write(p, content).unwrap();
-}
-
-fn app(root: &Path, name: &str, al: &str) -> PathBuf {
-    let dir = root.join(name);
-    write(
-        &dir,
-        "app.json",
-        &format!(
-            r#"{{"id":"11111111-0000-0000-0000-0000000000{:02}","name":"{name}","publisher":"Test","version":"1.0.0.0","dependencies":[]}}"#,
-            name.len() % 100
-        ),
-    );
-    write(&dir, "src/T.al", al);
-    dir
-}
+mod support;
+use support::server::{Server, app, write};
 
 const MIXED: &str = r#"
 codeunit 50100 "Mixed Tests"

@@ -1,6 +1,8 @@
 //! Helpers the CLI test binaries share.
 #![allow(dead_code)]
 
+pub mod server;
+
 pub fn crc32(data: &[u8]) -> u32 {
     let mut crc = !0u32;
     for &b in data {
