@@ -5,7 +5,11 @@
 //! the fresh daemon and feeds both.
 //!
 //! What is rendered, by kind ([`KINDS`]), is what a later request of the same process can read:
-//! - `store`: the install baseline kept on this thread (`baseline_cache::read_kept`) and the one carried over an edit;
+//! - `store`: the install baseline kept on this thread (`baseline_cache::read_kept`) and the one carried over an edit,
+//!   each with the login records a session over it can replay (`install::replayable_login_records`): those the process
+//!   recorded or read for its origin and those its file held when it was read. Not the file's records alone: a daemon
+//!   keeps the baseline as read before its first request recorded the login and wrote it back to the file, which a
+//!   fresh daemon then reads (`runtime/corpus.rs` `keep_login`), and both replay the same records;
 //! - `engines`: the kept engines (`Compiled::kept`): what they serve (their key), and what a run leaves on them that the
 //!   next request's take (`corpus.rs` `take_kept_engines`, `Engine::reset_run_state`) does not reset: the login memo's
 //!   verdict (`install::LoginMemo`). The fields a run sets are reset there, each named, so they are not rendered;
@@ -21,11 +25,11 @@
 //!
 //! Not rendered, because a fresh daemon fills them the same from the same program or input, or because they number things
 //! per process: the caches of the engine worked out from the program (`Engine::reset_run_state` names them), the
-//! other `Engine::derived` values, the login records kept per baseline origin (`install.rs` `LOGIN_RECORDS`), the shared
-//! virtual-table listings (al-vm `platform` `SHARED`), engine uids and baseline origins. The .NET sidecar host is made for
-//! each request (alrunner-cli `run.rs` `test_inner`) and shut down at its end; a kept engine holds that host until the
-//! next request takes it and sets its own (`corpus.rs` `take_kept_engines`). Whether a helper process outlives a request
-//! is measured, not assumed: the `process` line `helper processes alive`.
+//! other `Engine::derived` values, the login records of baseline origins other than a kept baseline's (`install.rs`
+//! `LOGIN_RECORDS`), the shared virtual-table listings (al-vm `platform` `SHARED`), engine uids and baseline origins. The
+//! .NET sidecar host is made for each request (alrunner-cli `run.rs` `test_inner`) and shut down at its end; a kept
+//! engine holds that host until the next request takes it and sets its own (`corpus.rs` `take_kept_engines`). Whether a
+//! helper process outlives a request is measured, not assumed: the `process` line `helper processes alive`.
 //!
 //! Not rendered either, because they live in the codeunit's session, which a request drops (issue 8334): the locks of the
 //! open transaction (al-vm `state.rs:91,113`, `OpenTx` in the session's `TxState`) and the in-memory `File` system (each
@@ -96,7 +100,10 @@ fn store() -> Vec<String> {
                 run.filled,
                 content(&run.unseeded),
                 content(&run.notes),
-                content(&run.login)
+                content(&crate::install::replayable_login_records(
+                    run.baseline.origin(),
+                    &run.login
+                ))
             ));
             out.extend(run.restored_lines().into_iter().map(|l| format!("{what} restored {l}")));
             baseline_lines(what, &run.baseline, out);

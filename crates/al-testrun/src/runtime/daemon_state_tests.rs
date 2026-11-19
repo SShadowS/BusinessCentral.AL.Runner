@@ -417,3 +417,106 @@ fn a_helper_process_left_alive_is_reported() {
         "{report}"
     );
 }
+
+/// A login record of the login code (`install::login_work_date`) over the baseline of these tests.
+fn login_record(day: i32) -> crate::baseline::LoginRecord {
+    crate::baseline::LoginRecord {
+        company: "CRONUS International Ltd.".into(),
+        work_date: 739_000,
+        day,
+        globals: vec![(3, day, false)],
+        hits: al_builtins::assumptions::HitBits::EMPTY,
+    }
+}
+
+/// Writes the install baseline file of a daemon's compile cache (`dir`), with the login records `login`.
+fn write_store(dir: &std::path::Path, engine: &Arc<Engine>, login: Vec<crate::baseline::LoginRecord>) {
+    let run = crate::baseline::BaselineRun {
+        baseline: Session::new(engine.clone()).capture_baseline(),
+        unseeded: Default::default(),
+        filled: 0,
+        notes: Vec::new(),
+        ran: 0,
+        total: 0,
+        restored: Vec::new(),
+        trace: None,
+        login,
+        read_resources: false,
+    };
+    crate::baseline_cache::write(dir, "dc", &run, 0);
+}
+
+/// A daemon's request over the baseline file of `dir`, as `corpus.rs` runs it: it reads and keeps the file
+/// (`read_kept`), makes the login records the file holds replayable (`install::keep_login_records`), its sessions record
+/// `recorded`, and with `write_back` the records go back to the file (`baseline_cache::keep_login`).
+fn login_request(
+    dir: std::path::PathBuf,
+    recorded: Vec<crate::baseline::LoginRecord>,
+    write_back: bool,
+) -> impl FnOnce() {
+    move || {
+        let (run, _, _) = crate::baseline_cache::read_kept(&dir, "dc", "frame", "prepared", |r| r).unwrap();
+        let origin = run.baseline.origin();
+        crate::install::keep_login_records(origin, &run.login);
+        crate::install::keep_login_records(origin, &recorded);
+        if write_back {
+            crate::baseline_cache::keep_login(&dir, "dc", &crate::install::login_records(origin));
+        }
+    }
+}
+
+// The login records after a cut (PERF-15): the kept daemon read its baseline file before its first request recorded the
+// login code's run and wrote it back to the file; the fresh daemon reads the file with the record. Both replay the same
+// record in their next request, so they are equal.
+#[test]
+fn a_login_record_the_kept_daemon_wrote_back_to_its_file_after_reading_it_is_not_a_difference() {
+    let (engine, _) = compiled();
+    let dir = tempfile::tempdir().unwrap();
+    write_store(dir.path(), &engine, Vec::new());
+    let kept = daemon(login_request(
+        dir.path().to_path_buf(),
+        vec![login_record(739_100)],
+        true,
+    ));
+    let fresh = daemon(login_request(dir.path().to_path_buf(), Vec::new(), false));
+    assert_eq!(line_of(Cause::Cut, &kept, &fresh), CLEAN_CUT);
+}
+
+// A login record the kept daemon's next request replays and a fresh daemon has not (the cut request recorded it and it
+// did not reach the file) is reported in `store`.
+#[test]
+fn a_login_record_only_the_kept_daemon_replays_is_reported() {
+    let (engine, _) = compiled();
+    let dir = tempfile::tempdir().unwrap();
+    write_store(dir.path(), &engine, vec![login_record(739_100)]);
+    let kept = daemon(login_request(
+        dir.path().to_path_buf(),
+        vec![login_record(739_200)],
+        false,
+    ));
+    let fresh = daemon(login_request(dir.path().to_path_buf(), Vec::new(), false));
+    let report = line_of(Cause::Cut, &kept, &fresh);
+    eprintln!("{report}");
+    assert!(
+        report.contains("1 differ (not comparable 0, answers 0, store 1,"),
+        "{report}"
+    );
+    assert!(report.contains("day: 739200"), "{report}");
+}
+
+// A kept daemon that reads its baseline file again after its first request wrote the login record back (a request
+// whose baseline key changed, `baseline_cache::read_kept`) holds the record as the file does: equal to a fresh daemon.
+#[test]
+fn a_kept_daemon_that_read_its_baseline_file_again_after_the_login_write_back_equals_a_fresh_one() {
+    let (engine, _) = compiled();
+    let dir = tempfile::tempdir().unwrap();
+    write_store(dir.path(), &engine, Vec::new());
+    let path = dir.path().to_path_buf();
+    let kept = daemon(move || {
+        login_request(path.clone(), vec![login_record(739_100)], true)();
+        crate::baseline_cache::forget_kept();
+        login_request(path, Vec::new(), false)();
+    });
+    let fresh = daemon(login_request(dir.path().to_path_buf(), Vec::new(), false));
+    assert_eq!(line_of(Cause::Cut, &kept, &fresh), CLEAN_CUT);
+}

@@ -1709,6 +1709,22 @@ pub(crate) fn login_records(origin: u64) -> Vec<crate::baseline::LoginRecord> {
         .unwrap_or_default()
 }
 
+/// The login runs a session over the baseline of origin `origin` can replay once its request made those read from the
+/// baseline's file (`read`) available ([`keep_login_records`]), in the order [`kept_login_record`] looks through them. It
+/// changes nothing (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn replayable_login_records(
+    origin: u64,
+    read: &[crate::baseline::LoginRecord],
+) -> Vec<crate::baseline::LoginRecord> {
+    let mut all = login_records(origin);
+    for r in read {
+        if !all.contains(r) {
+            all.push(r.clone());
+        }
+    }
+    all
+}
+
 fn note_login_record(run: &MemoRun) {
     let record = crate::baseline::LoginRecord {
         company: run.key.company.clone(),
