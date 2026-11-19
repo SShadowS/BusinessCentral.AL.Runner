@@ -1182,6 +1182,8 @@ mod chain_walk;
 mod compile_halt;
 mod compiled;
 mod corpus;
+#[cfg(test)]
+mod daemon_state_tests;
 mod data_driven;
 #[cfg(test)]
 mod diagnostics_tests;

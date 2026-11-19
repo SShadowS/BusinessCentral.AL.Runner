@@ -74,6 +74,12 @@ impl SystemClock {
     pub fn started() -> bool {
         RUN_START.get().is_some()
     }
+
+    /// The instant the run clock started at, without starting it: `None` before anything read it (the daemon clean
+    /// check, `daemon_state.rs`).
+    pub fn start_if_started() -> Option<i64> {
+        RUN_START.get().copied()
+    }
 }
 
 /// A clock that stands still at one instant.

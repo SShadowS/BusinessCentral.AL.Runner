@@ -1647,6 +1647,17 @@ thread_local! {
     pub(crate) static CARRIED: std::cell::RefCell<Option<Carried>> = const { std::cell::RefCell::new(None) };
 }
 
+/// What [`CARRIED`] holds on this thread, for `look` to read (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn look_carried<R>(look: impl FnOnce(Option<&Carried>) -> R) -> R {
+    CARRIED.with(|c| look(c.borrow().as_ref()))
+}
+
+/// What [`LANE_SINGLES`] holds on this thread: `None` no lane, `Some(false)` a lane that moved nothing, `Some(true)` single
+/// instances moved (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn lane_singles() -> Option<bool> {
+    LANE_SINGLES.with(|c| c.borrow().as_ref().map(Option::is_some))
+}
+
 /// What a codeunit with RequiredTestIsolation = Disabled left for the codeunits after it ([`CARRIED`]).
 pub(crate) struct Carried {
     /// Its committed data at its end: where a later codeunit that reads one of `tables` starts. `None`: it did not run,

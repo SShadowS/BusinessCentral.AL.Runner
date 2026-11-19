@@ -22,8 +22,9 @@ type Out = Result<String, String>;
 type Handle = Rc<RefCell<LibraryValue>>;
 
 /// The content of a value as the debug format writes it: the one place the state lines use it. The text is compared
-/// across sessions and shown only in the check's report line (`ALRUNNER_LOGIN_REPLAY_CHECK`).
-pub(crate) fn content(x: &dyn std::fmt::Debug) -> String {
+/// across sessions or daemons and shown only in the checks' report lines (`ALRUNNER_LOGIN_REPLAY_CHECK`,
+/// `ALRUNNER_DAEMON_CLEAN_CHECK`).
+pub fn content(x: &dyn std::fmt::Debug) -> String {
     format!("{x:?}")
 }
 

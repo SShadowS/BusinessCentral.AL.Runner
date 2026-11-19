@@ -9,7 +9,6 @@
 //! ([`first_difference`]). Outcomes do not change. [`report`] is the line the front ends print.
 
 use al_vm::{Engine, Session};
-use std::collections::BTreeSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, PoisonError};
@@ -62,7 +61,7 @@ impl Key {
     /// the session took.
     pub(crate) fn of(session: &mut Session, disabled: bool, flags: crate::runtime::session_flags::SessionFlags) -> Key {
         let store = session.store_mut();
-        let database = digest(&committed_rows(store));
+        let database = digest(&crate::state_diff::committed_rows(store));
         let uncommitted = store.has_uncommitted();
         let backing = store.backing_identity();
         let resources = {
@@ -127,7 +126,7 @@ impl LoginState {
     /// What `session` holds now, with the marks `hits` the company open made.
     pub(crate) fn of(session: &mut Session, hits: al_builtins::assumptions::HitBits) -> LoginState {
         LoginState {
-            rows: committed_rows(session.store_mut()),
+            rows: crate::state_diff::committed_rows(session.store_mut()),
             state: session.state_lines(),
             hits,
         }
@@ -141,28 +140,9 @@ const KINDS: [&str; 4] = ["not comparable", "rows", "session state", "marks"];
 /// What differs between `a` and `b`, the states of two sessions of one key: per kind of [`KINDS`] that differs, its index
 /// and its first difference. One kind does not hide another.
 pub(crate) fn differences(a: &LoginState, b: &LoginState) -> Vec<(usize, String)> {
-    let lines = |x: &[String], y: &[String], what: &str| {
-        let n = x
-            .iter()
-            .zip(y)
-            .position(|(p, q)| p != q)
-            .unwrap_or(x.len().min(y.len()));
-        (x.len() != y.len() || n < x.len()).then(|| {
-            format!(
-                "{what} {}: {} | {}",
-                n + 1,
-                x.get(n).map_or("(none)", String::as_str),
-                y.get(n).map_or("(none)", String::as_str)
-            )
-        })
-    };
-    let opaque: BTreeSet<&String> = a.state.opaque.iter().chain(&b.state.opaque).collect();
-    let opaque = (!opaque.is_empty()).then(|| {
-        let what: Vec<&str> = opaque.into_iter().map(String::as_str).collect();
-        format!("not comparable: {}", what.join("; "))
-    });
+    let lines = crate::state_diff::line_difference;
     [
-        opaque,
+        crate::state_diff::not_comparable(&a.state.opaque, &b.state.opaque),
         lines(&a.rows, &b.rows, "row"),
         lines(&a.state.lines, &b.state.lines, "session state"),
         (a.hits != b.hits).then(|| format!("assumption marks: {:?} | {:?}", a.hits, b.hits)),
@@ -196,11 +176,8 @@ struct CheckState {
 #[derive(Default)]
 struct Tally {
     firsts: Vec<(Key, LoginState)>,
-    compared: u64,
-    differ: u64,
-    /// Per kind of [`KINDS`], the compared sessions that differ in it.
-    differ_by: [u64; KINDS.len()],
-    first_difference: Option<String>,
+    /// The sessions compared with the first of their key, by kind of [`KINDS`] that differs.
+    seen: crate::state_diff::Tally,
 }
 
 impl Tally {
@@ -210,30 +187,12 @@ impl Tally {
             self.firsts.push((key, state));
             return true;
         };
-        let differs = differences(first, &state);
-        self.compared += 1;
-        if let Some((_, what)) = differs.first() {
-            self.differ += 1;
-            self.first_difference.get_or_insert(what.clone());
-        }
-        for (k, _) in &differs {
-            self.differ_by[*k] += 1;
-        }
+        self.seen.note(&differences(first, &state));
         false
     }
 
     fn counts(&self) -> String {
-        let by: Vec<String> = (KINDS.iter().zip(&self.differ_by))
-            .map(|(kind, n)| format!("{kind} {n}"))
-            .collect();
-        format!(
-            "{} compared, {} differ{}",
-            self.compared,
-            self.differ,
-            self.first_difference
-                .as_ref()
-                .map_or(String::new(), |w| format!(" ({}; first: {w})", by.join(", ")))
-        )
+        self.seen.counts(&KINDS)
     }
 }
 
@@ -267,13 +226,13 @@ impl Check {
         if s.exact.firsts.is_empty() {
             return None;
         }
-        let sessions = s.exact.compared + s.exact.firsts.len() as u64;
+        let sessions = s.exact.seen.compared + s.exact.firsts.len() as u64;
         Some(format!(
             "login replay check: {sessions} sessions over {} keys (a key seen before: {} sessions, {}%), {}; across test \
              codeunits: {}",
             s.exact.firsts.len(),
-            s.exact.compared,
-            s.exact.compared * 100 / sessions,
+            s.exact.seen.compared,
+            s.exact.seen.compared * 100 / sessions,
             s.exact.counts(),
             s.across_codeunits.counts()
         ))
@@ -288,18 +247,6 @@ pub(crate) fn check(engine: &Engine) -> std::sync::Arc<Check> {
 /// The report line of `engine`'s check: `None` when no session raised the login under the check.
 pub(crate) fn report(engine: &Engine) -> Option<String> {
     check(engine).line()
-}
-
-/// Every committed row of `store`, one line each: company, table object and the row with its system fields.
-fn committed_rows(store: &al_data::memory::MemStore) -> Vec<String> {
-    let tables = store.export_committed().unwrap_or_default();
-    let mut out = Vec::new();
-    for t in &tables {
-        for (_, row) in &t.rows {
-            out.push(format!("{}|{}|{row:?}", t.company, t.object));
-        }
-    }
-    out
 }
 
 /// A digest of `lines`, for a key field (compared within one process only).

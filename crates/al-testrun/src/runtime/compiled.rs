@@ -733,6 +733,11 @@ impl Warm {
         self.slot.as_ref().map(|s| &s.compiled)
     }
 
+    /// The kept compile with its key and the texts of the workspace files it was made from (the daemon clean check).
+    pub(crate) fn kept_slot(&self) -> Option<&WarmSlot> {
+        self.slot.as_ref()
+    }
+
     /// Runs like [`CorpusRuntime::try_run_suites_with`], keeping the compile for the next call. `key` names everything
     /// the compile depends on except the selection and the text of the workspace files (the dependency apps, the
     /// symbols, the target, the names of the files); `files` are those texts. With the same key, nothing is compiled

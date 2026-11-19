@@ -1750,6 +1750,19 @@ pub(crate) struct LoginMemo {
     pub(crate) replays: AtomicU64,
 }
 
+/// What `engine`'s login memo decided that outlives a request on a kept engine (the daemon clean check,
+/// `daemon_state.rs`): `none` before a session used it, else whether it gave up replaying. The recorded runs are not
+/// written: they are keyed by baseline origins, numbers of their process.
+pub(crate) fn memo_line(engine: &Engine) -> String {
+    match engine.derived_if_made::<LoginMemo>() {
+        None => "none".into(),
+        Some(m) => format!(
+            "gave up {}",
+            m.state.lock().unwrap_or_else(PoisonError::into_inner).gave_up
+        ),
+    }
+}
+
 /// The recorded runs over one test data.
 #[derive(Default)]
 struct MemoState {

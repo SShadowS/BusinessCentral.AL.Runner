@@ -302,6 +302,22 @@ pub fn read_kept(
     Some((run, at, kept))
 }
 
+/// What [`read_kept`] keeps on this thread (its file, what came of it, the instant it began) and what [`carry`] carries,
+/// for `look` to read (the daemon clean check, `daemon_state.rs`).
+pub(crate) fn look_kept<R>(
+    look: impl FnOnce(Option<(&Path, &BaselineRun, i64)>, Option<(&BaselineRun, i64)>) -> R,
+) -> R {
+    KEPT.with(|k| {
+        CARRIED.with(|c| {
+            let (k, c) = (k.borrow(), c.borrow());
+            look(
+                k.as_ref().map(|k| (k.path.as_path(), &k.run, k.at)),
+                c.as_ref().map(|c| (&c.raw, c.at)),
+            )
+        })
+    })
+}
+
 /// Drops what [`read_kept`] keeps on this thread and what [`carry`] carries (the program it was prepared for is about
 /// to change).
 pub fn forget_kept() {

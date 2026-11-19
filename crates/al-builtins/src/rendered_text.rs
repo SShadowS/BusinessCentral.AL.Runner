@@ -78,6 +78,12 @@ pub fn active() -> bool {
     ACTIVE.load(Ordering::Relaxed)
 }
 
+/// How many renders the process registered ([`RENDERS`]; at [`MAX_RENDERS`] a later one is refused). Read by the daemon
+/// clean check (al-testrun `daemon_state.rs`).
+pub fn renders() -> usize {
+    RENDERS.lock().map_or_else(|e| e.into_inner().len(), |r| r.len())
+}
+
 /// Registers a render nothing more is known of ([`register_with`]).
 pub fn register(report: &str, format: &str, layout: &str) -> Option<u32> {
     register_with(report, format, layout, RgbaReplace::default())
