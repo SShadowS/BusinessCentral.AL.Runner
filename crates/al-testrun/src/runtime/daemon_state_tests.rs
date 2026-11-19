@@ -26,7 +26,21 @@ codeunit 50804 "DC Tests"
     Subtype = Test;
     [Test] procedure Refused() var C: Codeunit "DC Refused"; begin C.Run(); end;
 }
+codeunit 50805 "DC Cut"
+{
+    procedure Run() var R: Record "DC Row";
+    begin R.K := 1; R.Insert(); GlobalLanguage(1031); repeat Sleep(2000); until false; end;
+}
+codeunit 50806 "DC Cut Tests"
+{
+    Subtype = Test;
+    [Test] procedure Cut() var C: Codeunit "DC Cut"; begin C.Run(); end;
+}
 "#;
+
+/// The time limit of the cut tests: the first `Sleep(2000)` passes it, which stops the test at once (al-vm
+/// `hostvalues.rs` Sleep, through the branch of the CPU limit, `run.rs` `slept_out`).
+const CUT_LIMIT: std::time::Duration = std::time::Duration::from_secs(1);
 
 fn compiled() -> (Arc<Engine>, Arc<Lowered>) {
     let (ws, l) = al_sema::lower::compile_apps(
@@ -63,6 +77,18 @@ fn daemon(request: impl FnOnce() + Send + 'static) -> DaemonState {
 /// Runs test codeunit `name` as a request does (`run_codeunit_core`, from no baseline), under `isolation`; with `plant`,
 /// a refused test is not rolled back (`stopped_state::SKIP_ROLL_BACK`). Its one test is refused.
 fn run_refused(engine: &Arc<Engine>, l: &Lowered, name: &str, isolation: TestIsolation, plant: bool) {
+    run_stopped(engine, l, name, isolation, plant, None);
+}
+
+/// [`run_refused`] under the time limit `limit`.
+fn run_stopped(
+    engine: &Arc<Engine>,
+    l: &Lowered,
+    name: &str,
+    isolation: TestIsolation,
+    plant: bool,
+    limit: Option<std::time::Duration>,
+) -> Vec<(String, Outcome)> {
     crate::stopped_state::SKIP_ROLL_BACK.with(|s| s.set(plant));
     let oi = l.program.objects.iter().position(|o| o.name == name).unwrap();
     let outcomes = run_codeunit_core(
@@ -76,11 +102,28 @@ fn run_refused(engine: &Arc<Engine>, l: &Lowered, name: &str, isolation: TestIso
         &mut Vec::new(),
         &mut Vec::new(),
         &mut Scratch::default(),
-        None,
+        limit,
         false,
     );
     crate::stopped_state::SKIP_ROLL_BACK.with(|s| s.set(false));
     assert!(matches!(outcomes[..], [(_, Outcome::NotRun(_))]), "{outcomes:?}");
+    outcomes
+}
+
+/// Runs test codeunit "DC Cut Tests" as [`run_refused`] does, under [`CUT_LIMIT`]: its one test is cut by the time limit.
+fn run_cut(engine: &Arc<Engine>, l: &Lowered, plant: bool) {
+    let outcomes = run_stopped(
+        engine,
+        l,
+        "DC Cut Tests",
+        TestIsolation::Codeunit,
+        plant,
+        Some(CUT_LIMIT),
+    );
+    assert!(
+        matches!(&outcomes[..], [(_, Outcome::NotRun(why))] if why.starts_with("the test used more than the time limit of 1 s")),
+        "{outcomes:?}"
+    );
 }
 
 /// Keeps `baseline` as the install baseline of this thread (`baseline_cache::read_kept`), as a daemon keeps the baseline
@@ -105,10 +148,18 @@ fn keep_store(baseline: al_vm::Baseline) {
 
 /// The report line of one comparison of the state after a refused request with a fresh daemon's.
 fn line(kept: &DaemonState, fresh: &DaemonState) -> String {
-    let mut check = Check::default();
-    check.note_after(Cause::Refused, &differences(None, kept, fresh));
-    check.line("unit", Cause::Refused)
+    line_of(Cause::Refused, kept, fresh)
 }
+
+/// [`line`] for a request of `cause`.
+fn line_of(cause: Cause, kept: &DaemonState, fresh: &DaemonState) -> String {
+    let mut check = Check::default();
+    check.note_after(cause, &differences(None, kept, fresh));
+    check.line("unit", cause)
+}
+
+const CLEAN_CUT: &str =
+    "daemon clean check (unit): after the cut request: 1 compared, 0 differ; next request: 0 compared, 0 differ";
 
 const CLEAN: &str =
     "daemon clean check (unit): after the refused request: 1 compared, 0 differ; next request: 0 compared, 0 differ";
@@ -158,6 +209,75 @@ fn a_kept_store_holding_the_rows_of_a_refused_test_is_reported() {
     );
     assert!(
         report.contains("first: store 3: kept row CRONUS International Ltd.|"),
+        "{report}"
+    );
+}
+
+// The store after a cut (issue 8334): the test the time limit stopped runs in a session restored from the kept baseline,
+// as the refused one above; the plant keeps its session, not rolled back, as the kept store.
+#[test]
+fn a_kept_store_holding_the_rows_of_a_cut_test_is_reported() {
+    let (engine, l) = compiled();
+    let baseline = |engine: &Arc<Engine>| Session::new(engine.clone()).capture_baseline();
+    let fresh = {
+        let engine = engine.clone();
+        daemon(move || keep_store(baseline(&engine)))
+    };
+    let cut = |engine: Arc<Engine>, l: Arc<Lowered>, plant: bool| {
+        move || {
+            let kept = baseline(&engine);
+            let mut session = Session::new(engine.clone());
+            session.restore_baseline(&kept);
+            crate::stopped_state::SKIP_ROLL_BACK.with(|s| s.set(plant));
+            let carried = session.carried_state();
+            let o = l.program.objects.iter().position(|o| o.name == "DC Cut").unwrap();
+            let r = l.program.objects[o]
+                .routines
+                .iter()
+                .position(|r| r.name == "Run")
+                .unwrap();
+            let inst = session.instance(o);
+            session.start_sleep_budget(Some(CUT_LIMIT));
+            let res = session.call(o, r, inst, Vec::new());
+            assert!(session.sleep_budget_passed(), "{res:?}");
+            session.end_sleep_budget();
+            assert!(matches!(res, Err(Signal::Unsupported(_))), "{res:?}");
+            crate::stopped_state::roll_back_refused_test(&mut session, carried);
+            crate::stopped_state::SKIP_ROLL_BACK.with(|s| s.set(false));
+            keep_store(if plant { session.capture_baseline() } else { kept });
+            drop(session);
+            al_builtins::instance_cycles::collect();
+        }
+    };
+    let clean = daemon(cut(engine.clone(), l.clone(), false));
+    assert_eq!(line_of(Cause::Cut, &clean, &fresh), CLEAN_CUT);
+    let planted = daemon(cut(engine, l, true));
+    let report = line_of(Cause::Cut, &planted, &fresh);
+    eprintln!("{report}");
+    assert!(
+        report.contains("1 differ (not comparable 0, answers 0, store 1,"),
+        "{report}"
+    );
+    assert!(
+        report.contains("first: store 3: kept row CRONUS International Ltd.|"),
+        "{report}"
+    );
+}
+
+// The language after a cut (issue 8334): a test the time limit stopped, run as a request runs it (`run_codeunit_core`
+// under a limit), leaves its language on the request thread unless rolled back.
+#[test]
+fn a_language_a_cut_test_left_on_the_request_thread_is_reported() {
+    let (engine, l) = compiled();
+    let fresh = daemon(|| {});
+    let (e, l2) = (engine.clone(), l.clone());
+    let clean = daemon(move || run_cut(&e, &l2, false));
+    assert_eq!(line_of(Cause::Cut, &clean, &fresh), CLEAN_CUT);
+    let planted = daemon(move || run_cut(&engine, &l, true));
+    let report = line_of(Cause::Cut, &planted, &fresh);
+    eprintln!("{report}");
+    assert!(
+        report.contains("first: language 1: filter language 1031 turkic code false | filter language 1033"),
         "{report}"
     );
 }
