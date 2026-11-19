@@ -1001,7 +1001,7 @@ pub(crate) fn spawn_helper(cfg: &SidecarConfig, r: &Resolved, folder: &str, args
         let _ = tx.send(None);
     });
     Ok(Proc {
-        alive: Alive::new(),
+        _alive: Alive::new(),
         child,
         stdin,
         replies: rx,
@@ -1048,7 +1048,7 @@ impl Drop for Alive {
 
 pub(crate) struct Proc {
     /// Counts the process in [`helpers_alive`] until the process is killed (fields drop after `Proc::drop`).
-    alive: Alive,
+    _alive: Alive,
     pub(crate) child: Child,
     pub(crate) stdin: ChildStdin,
     pub(crate) replies: Receiver<Option<Vec<u8>>>,
