@@ -154,6 +154,7 @@ mod sqltime;
 mod stale_buffer_origin;
 mod stale_own_modify;
 mod stale_rename;
+mod state_render;
 mod state_stamp;
 mod table_facts;
 mod tasks;
