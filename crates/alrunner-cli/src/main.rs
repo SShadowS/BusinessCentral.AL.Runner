@@ -56,6 +56,10 @@ fn write_permission_shadow(path: &std::ffi::OsStr) {
 }
 
 fn main() -> ExitCode {
+    // PERF-28 measurement (throwaway): what happens first to each Record variable the design would build on first use.
+    if std::env::var_os("ALRUNNER_COUNT_LAZY_RECORD").is_some_and(|v| v == "1") {
+        al_vm::enable_lazy_record_count();
+    }
     let shadow = std::env::var_os("AL_PERMISSION_SHADOW");
     if shadow.is_some() {
         al_builtins::permission_shadow::enable();
@@ -78,6 +82,9 @@ fn main() -> ExitCode {
     al_testrun::profiling::finish_legacy();
     if std::env::var_os("AL_EXEC_REPORT").is_some() {
         eprintln!("{}", al_vm::exec_report());
+    }
+    if let Some(line) = al_vm::lazy_record_count_line() {
+        eprintln!("{line}");
     }
     match joined {
         Ok(code) => code,

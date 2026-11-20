@@ -1454,6 +1454,7 @@ impl Session {
             ir::Place::RecGlobal(base, o, i) => {
                 let inst = self.record_instance(base, *o, f)?;
                 let v = inst.borrow().globals.get(*i).cloned();
+                v.iter().for_each(crate::lazy_count::touch_other);
                 v.ok_or_else(|| base_slot_missing(*i))
             }
             ir::Place::Index(base, idx) => {

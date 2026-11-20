@@ -21,6 +21,7 @@ mod blob_transfer;
 mod clientless;
 mod consistent_marks;
 mod get_key_value;
+mod lazy_count;
 mod package_data;
 mod partial_gone;
 mod placeholder_files;
@@ -48,6 +49,7 @@ pub use debug::{DebugFrame, DebugHook, DebugView, Resume};
 pub use exec::{disassemble as exec_disassemble, report as exec_report};
 pub use faultsite::FaultFrame;
 pub(crate) use interp::constant;
+pub use lazy_count::{enable_lazy_record_count, lazy_record_count_line};
 #[doc(hidden)]
 pub use platform::{FieldGetByKey, field_get_by_key_pairs};
 pub use profile::frame_name as profile_frame_name;
@@ -2160,7 +2162,9 @@ impl Session {
                 if Some(i) == rs || Some(i) == xs {
                     Value::Null
                 } else {
-                    self.slot_default(s)
+                    let v = self.slot_default(s);
+                    self.lazy_birth(s, &v, lazy_count::Kind::Global);
+                    v
                 }
             })
             .collect();
@@ -2411,6 +2415,7 @@ impl Session {
         // (a parser or a hash reading a stream, `Format` of a Blob), ends the run when the outermost call returns:
         // the result, or the error the empty bytes caused, is replaced by the refusal. One branch per outermost call.
         if self.depth == 0 {
+            lazy_count::sweep();
             if let Some(refusal) = al_builtins::stream::take_pending_observation() {
                 if !matches!(r, Err(Signal::Unsupported(_))) {
                     self.fault_site_lost = true;
@@ -2489,6 +2494,9 @@ impl Session {
                 locals.push(Value::Null);
             } else {
                 let v = self.slot_default(s);
+                if i >= r.params && Some(i) != r.ret_local {
+                    self.lazy_birth(s, &v, lazy_count::Kind::Local);
+                }
                 if blob_transfer::measured_local(engine.program.objects[object].kind, r, i) {
                     blob_transfer::new_variable(&v, self.commits, &mut self.blob_sources);
                 }

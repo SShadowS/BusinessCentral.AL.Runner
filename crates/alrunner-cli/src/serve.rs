@@ -204,7 +204,12 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
                 eprintln!("[server] request {} done", n + 1);
                 return Ok(());
             }
-            "runtests" => run_tests(&base, fields, &mut ctx, &flags),
+            "runtests" => {
+                run_tests(&base, fields, &mut ctx, &flags);
+                if let Some(line) = al_vm::lazy_record_count_line() {
+                    eprintln!("{line}");
+                }
+            }
             "execute" => execute(&base, fields, &mut ctx, &flags),
             "" => error("a request needs a `command`"),
             other => error(format!("unknown command `{other}`")),

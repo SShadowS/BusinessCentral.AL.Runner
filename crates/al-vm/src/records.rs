@@ -1669,6 +1669,7 @@ impl Session {
                     continue;
                 }
                 let v = self.slot_default(slot);
+                self.lazy_birth(slot, &v, crate::lazy_count::Kind::Global);
                 inst.borrow_mut().globals[i] = v;
             }
         }

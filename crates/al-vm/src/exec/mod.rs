@@ -27,6 +27,13 @@ pub(crate) enum Op {
         d: u16,
         k: u32,
     },
+    /// PERF-28 count (throwaway): the statement that starts names local or global `i` (`lazy_count.rs`); emitted only
+    /// while the counter is on.
+    LazyTouch {
+        i: u16,
+        global: bool,
+        replaces: bool,
+    },
     /// `d := Global i`.
     LoadGlobal {
         d: u16,

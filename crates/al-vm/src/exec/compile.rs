@@ -57,6 +57,7 @@ fn compile_form(o: &ir::Object, routine: usize, captured: bool, debug: bool) -> 
         debug,
         params: r.params,
         by_var: &r.by_var,
+        lazy: crate::lazy_count::Eligible::of(o, r),
     };
     c.block(&r.body).ok()?;
     c.chunk.temps = c.max - nlocals;
@@ -95,6 +96,8 @@ struct Compiler<'a> {
     params: usize,
     /// Which parameters are `var`.
     by_var: &'a [bool],
+    /// PERF-28 count (throwaway): the slots whose references emit `Op::LazyTouch`; `None` while the counter is off.
+    lazy: Option<crate::lazy_count::Eligible>,
 }
 
 type R<T> = Result<T, ()>;
@@ -1044,6 +1047,9 @@ impl<'a> Compiler<'a> {
 
     fn stmt(&mut self, s: &'a ir::Stmt) -> R<()> {
         use ir::Stmt as S;
+        for (i, global, replaces) in self.lazy.as_ref().map(|l| l.touches(s)).unwrap_or_default() {
+            self.emit(Op::LazyTouch { i, global, replaces });
+        }
         match s {
             S::Pos(p) => {
                 self.emit(Op::Pos { p: *p });
