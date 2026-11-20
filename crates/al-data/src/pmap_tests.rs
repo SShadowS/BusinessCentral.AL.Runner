@@ -77,7 +77,7 @@ fn random_operations_match_btreemap() {
         for step in 0..3000u64 {
             let k = r.below(space);
             match r.below(10) {
-                0..=4 => assert_eq!(p.insert(k, step), m.insert(k, step)),
+                0..=4 => assert_eq!(p.insert(k, step).map(|o| *o), m.insert(k, step)),
                 5..=7 => assert_eq!(p.remove(&k), m.remove(&k)),
                 8 => {
                     if let (Some(a), Some(b)) = (p.get_mut(&k), m.get_mut(&k)) {
@@ -104,7 +104,7 @@ fn random_operations_match_btreemap() {
                     same(fp, fm);
                     // Mutate the fork.
                     let k = r.below(space);
-                    assert_eq!(fp.insert(k, 7), fm.insert(k, 7));
+                    assert_eq!(fp.insert(k, 7).map(|o| *o), fm.insert(k, 7));
                     let k = r.below(space);
                     assert_eq!(fp.remove(&k), fm.remove(&k));
                     same(fp, fm);

@@ -1206,10 +1206,8 @@ impl Session {
             return unsupported("TestField with an ErrorInfo");
         }
         let pos = arg_pos(args, 0)?;
-        let (current, row) = {
-            let r = rec.borrow();
-            (r.fields[pos].clone(), r.fields.clone())
-        };
+        // Only the field is copied; an error path reads the key from the record itself (nothing writes it in between).
+        let current = rec.borrow().fields[pos].clone();
         let caption = self.field_caption(t, pos);
         let table = self.caption(t);
         match args.get(1) {
@@ -1218,7 +1216,7 @@ impl Session {
                     // "<field> must not be <caption of the zero member> in <table>: <key>", code TestField
                     // (record/TestTestFieldOptionEnumContracts.al:TestField_ZeroMember_RaisesMustNotBeTheCaption).
                     if matches!(current, Value::Option(..) | Value::Enum(..)) {
-                        let key = self.key_text(t, &row)?;
+                        let key = self.key_text(t, &rec.borrow().fields)?;
                         let member = self.member_caption(t, pos, &current)?;
                         // The flag hides the key and keeps the member (errors/last-error/
                         // TestFieldOptionEnumExcludeFlag.al:80, :83, :111, :114).
@@ -1228,7 +1226,7 @@ impl Session {
                             format!("{caption} must not be {member} in {table}: <redacted>"),
                         ));
                     }
-                    let key = self.key_text(t, &row)?;
+                    let key = self.key_text(t, &rec.borrow().fields)?;
                     // The flag hides the key: P86LastError.al:233, :236, P70_02LastErrFlag.al:123, :141.
                     return Err(error_redacted(
                         format!("{caption} must have a value in {table}: {key}. It cannot be zero or empty."),
@@ -1377,7 +1375,7 @@ impl Session {
                     if byte_unpinned {
                         return unsupported("TestField against a Byte whose escaped form is not pinned");
                     }
-                    let key = self.key_text(t, &row)?;
+                    let key = self.key_text(t, &rec.borrow().fields)?;
                     // record/TestRecordRuntimeTextsAndViews.al:Record_TestField_MismatchTexts: the
                     // wanted and the current value are quoted, and two spaces precede "in".
                     // The flag hides the key and both values: P86LastError.al:229, :233, P70_02LastErrFlag.al:129, :135.

@@ -781,30 +781,23 @@ impl Session {
                 self.document_service_trigger_refused(&t, rec, run, "Modify")?;
                 // A key value the column rounds finds the rounded row (P130DateFilters.al:635-637, `modify var`).
                 let pk = Self::sql_key(rec, &t, &rec.borrow().fields);
-                let stored = self
+                let stored_row = self
                     .store_for(rec)?
                     .get(&cx, &t, &pk)
                     .map_err(|e| Signal::unsupported(format!("{e}")))?;
-                self.feature_key_read_only_change(&t, rec, stored.as_deref())?;
+                self.feature_key_read_only_change(&t, rec, stored_row.as_deref())?;
                 if let Some(e) = self.read_only_platform_table(&t, rec, RecordOp::Modify) {
-                    return match stored {
+                    return match stored_row {
                         Some(_) => Err(Signal::Error(Box::new(e))),
                         None => unsupported(format!("a Modify of a {} row that does not exist (not pinned)", t.name)),
                     };
                 }
-                if let Some(answer) = self.modify_version_checks(&t, rec, &cx, &pk, run, stored.as_deref())? {
+                if let Some(answer) = self.modify_version_checks(&t, rec, &cx, &pk, run, stored_row.as_deref())? {
                     return Ok(answer);
                 }
                 // Modify never changes the stored SystemId, whatever the buffer carries
                 // (corpus record/TestRecordSystemId.al:176-215, :285-330).
-                let (audit, kept) = self.modify_audit(&t, rec, stored.as_deref(), run);
-                // One xRec handle for the events, the triggers and the global trigger, so a change a
-                // subscriber makes to it reaches the rest. When code drives the Modify, xRec equals
-                // Rec (record/TestXRecContracts.al:69-87 OnModify_xRec_MirrorsRecValues_WhenCalledFromCode;
-                // record/TestTableEventSequenceContracts.al:ModifyRenameDelete_EventsAndTrigger pins the
-                // same for the events). A row a page saves carries the page's own previous row
-                // (record/TestXRecDriverContracts.al:32-51 Record_Modify_FromPage_xRecHoldsPreviousValue).
-                let stored_row = stored.clone();
+                let (audit, kept) = self.modify_audit(&t, rec, stored_row.as_deref(), run);
                 // The buffer's version before this Modify and its origin, for the own Modify after an own Insert or Get below.
                 let version_before = t.fields.iter().position(|f| f.id == 2_000_000_005).map(|i| {
                     let r = rec.borrow();
@@ -814,7 +807,7 @@ impl Session {
                         r.row_origin,
                     )
                 });
-                if let Some(old) = &stored {
+                if let Some(old) = &stored_row {
                     self.check_modify_auto_increment(&t, rec, old, run)?;
                     self.refuse_rolled_modify_with_code(&t, old, run)?;
                 }
@@ -825,13 +818,19 @@ impl Session {
                 // What it writes: the loaded and the assigned fields; a field never loaded or assigned keeps the stored value
                 // (record/load-fields/P81LoadFields.al:1127-1243, al-runner issue 5764).
                 // A row that is gone fails below as RecordNotFound, partial or not (P170JitLoadGone.al:550-600 PG_Modify_*).
-                if !rec.borrow().temporary && stored.is_some() {
+                if !rec.borrow().temporary && stored_row.is_some() {
                     self.load_missing_fields(rec, None)?;
                 }
                 if let Some(b) = &mut rec.borrow_mut().load.buffer {
                     b.have = al_builtins::value::FieldSet::All;
                     b.unsure = al_builtins::value::FieldSet::Of(Vec::new());
                 }
+                // One xRec handle for the events, the triggers and the global trigger, so a change a
+                // subscriber makes to it reaches the rest. When code drives the Modify, xRec equals
+                // Rec (record/TestXRecContracts.al:69-87 OnModify_xRec_MirrorsRecValues_WhenCalledFromCode;
+                // record/TestTableEventSequenceContracts.al:ModifyRenameDelete_EventsAndTrigger pins the
+                // same for the events). A row a page saves carries the page's own previous row
+                // (record/TestXRecDriverContracts.al:32-51 Record_Modify_FromPage_xRecHoldsPreviousValue).
                 let before_image = self
                     .pages
                     .page_xrec

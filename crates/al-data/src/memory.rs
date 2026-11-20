@@ -1762,7 +1762,7 @@ impl Store for MemStore {
         let new_row = carry.then(|| row.clone());
         let old = table.insert(k, row);
         let stale = match &new_row {
-            Some(new) => self.stale_adhoc_orders(&sl, t, &moved, old.as_ref(), new),
+            Some(new) => self.stale_adhoc_orders(&sl, t, &moved, old.as_deref(), new),
             None => Vec::new(),
         };
         self.touch(cx, t);
@@ -1775,7 +1775,7 @@ impl Store for MemStore {
         for j in moved {
             let from = self.moves.get(&(sl.clone(), j)).copied().unwrap_or(0);
             self.moves.insert((sl.clone(), j), self.counter);
-            if let (Some(k), Some(old)) = (&kept, &old) {
+            if let (Some(k), Some(old)) = (&kept, old.as_deref()) {
                 self.carry_moved(&sl, j, t, k, old, from);
             }
         }

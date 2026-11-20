@@ -18,6 +18,24 @@ const FILL: usize = 48;
 /// Entries are shared too, so copying a chunk on the first write after a fork bumps counters and copies no rows.
 type Chunk<K, V> = Vec<Arc<(K, V)>>;
 
+/// The value [`PMap::insert`] replaced, read through `Deref`.
+pub enum Replaced<K, V> {
+    /// The entry was this map's alone: its value, moved out.
+    Owned(V),
+    /// Another map still shares the entry: the entry itself, uncopied.
+    Shared(Arc<(K, V)>),
+}
+
+impl<K, V> std::ops::Deref for Replaced<K, V> {
+    type Target = V;
+    fn deref(&self) -> &V {
+        match self {
+            Replaced::Owned(v) => v,
+            Replaced::Shared(e) => &e.1,
+        }
+    }
+}
+
 pub struct PMap<K, V> {
     spine: Arc<Vec<Arc<Chunk<K, V>>>>,
     len: usize,
@@ -156,8 +174,9 @@ impl<K: Ord + Clone, V: Clone> PMap<K, V> {
         Some(&mut Arc::make_mut(&mut Arc::make_mut(&mut spine[ci])[i]).1)
     }
 
-    /// Sets `k` to `v`; returns the value it replaced.
-    pub fn insert(&mut self, k: K, v: V) -> Option<V> {
+    /// Sets `k` to `v`; returns the value it replaced. An entry another map still shares (a fork) is not copied: this map
+    /// gets a new entry under the old key, and the shared one is handed back as it is.
+    pub fn insert(&mut self, k: K, v: V) -> Option<Replaced<K, V>> {
         if self.spine.is_empty() {
             Arc::make_mut(&mut self.spine).push(Arc::new(vec![Arc::new((k, v))]));
             self.len = 1;
@@ -168,7 +187,14 @@ impl<K: Ord + Clone, V: Clone> PMap<K, V> {
         let spine = Arc::make_mut(&mut self.spine);
         let chunk = Arc::make_mut(&mut spine[ci]);
         match found {
-            Ok(i) => Some(std::mem::replace(&mut Arc::make_mut(&mut chunk[i]).1, v)),
+            Ok(i) => Some(match Arc::get_mut(&mut chunk[i]) {
+                Some(e) => Replaced::Owned(std::mem::replace(&mut e.1, v)),
+                // The old key stays: keys that compare equal need not be the same value.
+                None => {
+                    let new = Arc::new((chunk[i].0.clone(), v));
+                    Replaced::Shared(std::mem::replace(&mut chunk[i], new))
+                }
+            }),
             Err(i) => {
                 chunk.insert(i, Arc::new((k, v)));
                 self.len += 1;

@@ -229,6 +229,7 @@ mod ternary_label_variant;
 mod ternary_matrix;
 mod ternary_maxlength_label;
 mod test_contexts;
+mod testfield_after_modify;
 mod text_append;
 mod text_constant_variant_readers;
 mod text_decimal_args;
