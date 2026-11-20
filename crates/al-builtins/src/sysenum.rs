@@ -305,9 +305,23 @@ pub fn option_members(name: &str) -> Option<Vec<String>> {
 /// al-sema writes where such a value goes into a Variant): one shared list, so [`is_transaction_type`] tells it by identity from
 /// an Option with the same members (an app Option, the TransactionType field of "XmlPort Metadata").
 pub fn transaction_type_members() -> std::sync::Arc<[String]> {
-    static LIST: std::sync::OnceLock<std::sync::Arc<[String]>> = std::sync::OnceLock::new();
-    LIST.get_or_init(|| option_members("transactiontype").expect("known").into())
-        .clone()
+    static LIST: SharedList = SharedList::new();
+    shared_list(&LIST, "transactiontype")
+}
+
+/// The member list of every `ExecutionContext` value `GetExecutionContext` returns: one shared list, built once (a
+/// subscriber often asks at its top on every raise). Nothing tells an option by the identity of its members except
+/// [`is_transaction_type`], whose list this is not.
+pub fn execution_context_members() -> std::sync::Arc<[String]> {
+    static LIST: SharedList = SharedList::new();
+    shared_list(&LIST, "executioncontext")
+}
+
+type SharedList = std::sync::OnceLock<std::sync::Arc<[String]>>;
+
+/// The member list of system option `name`, built into `list` at the first call and shared after it.
+fn shared_list(list: &'static SharedList, name: &str) -> std::sync::Arc<[String]> {
+    list.get_or_init(|| option_members(name).expect("known").into()).clone()
 }
 
 /// Whether an option value with these members is a TransactionType value in a Variant (see [`transaction_type_members`]).

@@ -276,7 +276,7 @@ impl Session {
         refresh(args);
         self.events.trial.allowed = true;
         self.events.trial.picked.clear();
-        let targets = self.event_targets(object, event, element);
+        let targets = self.event_targets(&engine, object, event, element);
         self.events.trial.allowed = false;
         let trials = std::mem::take(&mut self.events.trial.picked);
         let targets = targets?;
@@ -355,7 +355,7 @@ impl Session {
                     .collect();
             }
             self.events.next_is_subscriber = true;
-            self.events.next_event_args = self.event_args(by_value_publisher.as_ref(), &s, &map, subscribers);
+            self.events.next_event_args = self.event_args(by_value_publisher.as_ref(), s, &map, subscribers);
             self.events.next_blob_event = crate::blob_transfer::measured_subscriber(blob_publisher, s.manual);
             let manual_inst = s.manual.then(|| inst.clone());
             // What the event recursion error would name (see `Session::call`): the publisher and the subscriber routine, for the
@@ -445,7 +445,8 @@ impl Session {
         if !self.engine.events.is_subscribed(object, event) {
             return false;
         }
-        !matches!(self.event_targets(object, event, None), Ok(v) if v.is_empty())
+        let engine = self.engine.clone();
+        !matches!(self.event_targets(&engine, object, event, None), Ok(v) if v.is_empty())
     }
 
     /// The first subscriber of a dependency app that raising `event` under the runtime-raised platform key `key` would reach now,
@@ -486,14 +487,15 @@ impl Session {
 
     /// The subscribers an event reaches right now, each with the instance it
     /// runs on: static subscribers always, manual ones once per bound instance.
-    /// `element` filters field events by field name.
-    fn event_targets(
+    /// `element` filters field events by field name. The subscribers are borrowed from `engine`'s registry
+    /// (the session's engine, which the caller holds), not copied per raise.
+    fn event_targets<'e>(
         &mut self,
+        engine: &'e crate::Engine,
         object: usize,
         event: &str,
         element: Option<&str>,
-    ) -> Result<Vec<(crate::events::Subscriber, Inst)>, Signal> {
-        let engine = self.engine.clone();
+    ) -> Result<Vec<(&'e crate::events::Subscriber, Inst)>, Signal> {
         // A subscriber BC would run and this program has no code for: running the event without it
         // would be a wrong answer (ADR-013 decision 6, hard rule 4).
         // A raise to some subscribers only (`Session::raise_to`) does not reach the others, compiled or not.
@@ -579,7 +581,7 @@ impl Session {
                 // running it may make the order visible (order_trial.rs, al-runner issues 6972 and 6644).
                 if self.events.trial.allowed && self.events.trial.depth == 0 {
                     self.events.trial.picked.push((s.object, s.routine));
-                    targets.push((s.clone(), self.static_instance(s.object)?));
+                    targets.push((s, self.static_instance(s.object)));
                     continue;
                 }
                 self.note_order_unknown_hit(app);
@@ -606,10 +608,10 @@ impl Session {
             if s.manual {
                 for inst in self.bound_instances(s.object) {
                     self.refuse_unpinned_page_binding(&inst)?;
-                    targets.push((s.clone(), inst));
+                    targets.push((s, inst));
                 }
             } else {
-                targets.push((s.clone(), self.static_instance(s.object)?));
+                targets.push((s, self.static_instance(s.object)));
             }
         }
         // Inside one app, subscribers run in ascending codeunit id, a bound manual one among them (corpus
@@ -619,7 +621,7 @@ impl Session {
         let program = &engine.program;
         let id_of = |s: &crate::events::Subscriber| program.objects[s.object].id.unwrap_or(0);
         let app_of = |s: &crate::events::Subscriber| program.objects[s.object].app as usize;
-        if targets.windows(2).all(|w| app_of(&w[0].0) == app_of(&w[1].0)) {
+        if targets.windows(2).all(|w| app_of(w[0].0) == app_of(w[1].0)) {
             targets.sort_by_key(|(s, _)| id_of(s));
             return Ok(targets);
         }
@@ -657,7 +659,7 @@ impl Session {
             order.push(left.remove(at));
         }
         // One block per app in `order`, subscribers of one app in ascending subscriber codeunit id.
-        let sorted = |order: &[usize], mut targets: Vec<(crate::events::Subscriber, Inst)>| {
+        let sorted = |order: &[usize], mut targets: Vec<(&'e crate::events::Subscriber, Inst)>| {
             let blocks: Vec<(usize, usize)> = order.iter().copied().enumerate().map(|(i, app)| (app, i)).collect();
             let rank = |s: &crate::events::Subscriber| {
                 blocks
@@ -714,7 +716,8 @@ impl Session {
         if !self.engine.events.is_subscribed(object, event) {
             return Ok(false);
         }
-        Ok(!self.event_targets(object, event, element)?.is_empty())
+        let engine = self.engine.clone();
+        Ok(!self.event_targets(&engine, object, event, element)?.is_empty())
     }
 
     /// The subscribers `event` of table or codeunit `object` reaches right now (`event_targets`), without their instances.
@@ -723,10 +726,11 @@ impl Session {
         object: usize,
         event: &str,
     ) -> Result<Vec<crate::events::Subscriber>, Signal> {
+        let engine = self.engine.clone();
         Ok(self
-            .event_targets(object, event, None)?
+            .event_targets(&engine, object, event, None)?
             .into_iter()
-            .map(|(s, _)| s)
+            .map(|(s, _)| s.clone())
             .collect())
     }
 
@@ -734,12 +738,14 @@ impl Session {
     /// `SingleInstance` codeunit, else a fresh one per event, so its globals start at their defaults
     /// every time (corpus record/TestTableEventSequenceContracts.al:Insert_EventsAndTrigger_WithAndWithoutRunTrigger,
     /// where the After event sees `hits=0` after the Before event counted 1).
-    fn static_instance(&mut self, object: usize) -> Result<Inst, Signal> {
-        let fresh = al_builtins::instance_cycles::shared(Instance {
-            object: object as u32,
-            ..Default::default()
-        });
-        Ok(self.shared_instance(fresh))
+    /// The fresh instance is built only when it is used: a `SingleInstance` codeunit's is not (`shared_instance_or`).
+    fn static_instance(&mut self, object: usize) -> Inst {
+        self.shared_instance_or(object, || {
+            al_builtins::instance_cycles::shared(Instance {
+                object: object as u32,
+                ..Default::default()
+            })
+        })
     }
 
     /// Whether `inst` is bound right now.

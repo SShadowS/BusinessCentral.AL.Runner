@@ -168,11 +168,11 @@ pub(super) fn start_session_of(c: &mut dyn Ctx, args: &mut [Value], timeout: boo
 }
 
 pub(super) fn context_value(c: &dyn Ctx) -> Value {
-    let members: std::sync::Arc<[String]> = crate::sysenum::option_members("ExecutionContext")
-        .expect("a system option")
-        .into();
     // Install inside an install codeunit, Normal anywhere else (install-upgrade/TestInstallEnvVisible_Tests.al:90-127).
-    Value::Option(i32::from(c.install_scope()), members)
+    Value::Option(
+        i32::from(c.install_scope()),
+        crate::sysenum::execution_context_members(),
+    )
 }
 
 pub(super) fn execution_context(c: &mut dyn Ctx, _: Option<&mut Value>, _: &mut [Value]) -> Result<Value, Signal> {

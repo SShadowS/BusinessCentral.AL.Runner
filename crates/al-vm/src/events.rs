@@ -248,6 +248,46 @@ impl Default for Registry {
     }
 }
 
+/// A `(publisher object, lower-case event)` key of the registry's maps, borrowed: a raise asks several of them
+/// (`is_subscribed`, `missing_at`, `subscribers_at`), and an owned key would allocate the event name for every ask.
+/// It hashes and compares as the owned `(usize, String)` does (a tuple hashes its fields in order, a `String` as its
+/// `str`), as `Borrow` requires.
+trait EventKey {
+    fn parts(&self) -> (usize, &str);
+}
+
+impl EventKey for (usize, String) {
+    fn parts(&self) -> (usize, &str) {
+        (self.0, &self.1)
+    }
+}
+
+impl EventKey for (usize, &str) {
+    fn parts(&self) -> (usize, &str) {
+        *self
+    }
+}
+
+impl<'a> std::borrow::Borrow<dyn EventKey + 'a> for (usize, String) {
+    fn borrow(&self) -> &(dyn EventKey + 'a) {
+        self
+    }
+}
+
+impl PartialEq for dyn EventKey + '_ {
+    fn eq(&self, other: &Self) -> bool {
+        self.parts() == other.parts()
+    }
+}
+
+impl Eq for dyn EventKey + '_ {}
+
+impl std::hash::Hash for dyn EventKey + '_ {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.parts().hash(state);
+    }
+}
+
 fn is_manual(o: &ir::ObjectHead) -> bool {
     ir::ObjectFacts::of_properties(&o.properties).manual_subscriber
 }
@@ -914,21 +954,21 @@ impl Registry {
     pub fn is_subscribed(&self, object: usize, event: &str) -> bool {
         self.note_by_id_event(object, event);
         self.subscribers
-            .get(&(object, event.to_string()))
+            .get(&(object, event) as &dyn EventKey)
             .is_some_and(|v| !v.is_empty())
-            || self.missing.contains_key(&(object, event.to_string()))
+            || self.missing.contains_key(&(object, event) as &dyn EventKey)
     }
 
     /// The subscribers of `event` (lower case) of `object`, in the order they receive it.
     pub fn subscribers_at(&self, object: usize, event: &str) -> Option<&Vec<Subscriber>> {
         self.note_by_id_event(object, event);
-        self.subscribers.get(&(object, event.to_string()))
+        self.subscribers.get(&(object, event) as &dyn EventKey)
     }
 
     /// Marks the assumption `subscriber-publisher-by-id` when one of the subscribers of `event` of `object` is written with a bare
     /// publisher id (`by_id_assumed`).
     fn note_by_id_event(&self, object: usize, event: &str) {
-        if !self.by_id_assumed.is_empty() && self.by_id_assumed.contains(&(object, event.to_string())) {
+        if !self.by_id_assumed.is_empty() && self.by_id_assumed.contains(&(object, event) as &dyn EventKey) {
             al_builtins::assumptions::assume(al_builtins::assumptions::Assumption::SubscriberPublisherById);
         }
     }
@@ -1066,7 +1106,7 @@ impl Registry {
     /// The subscribers of `event` of `object` that are declared but cannot run, in program order, for every element.
     pub fn missing_at(&self, object: usize, event: &str) -> &[Missing] {
         self.missing
-            .get(&(object, event.to_string()))
+            .get(&(object, event) as &dyn EventKey)
             .map_or(&[], Vec::as_slice)
     }
 }

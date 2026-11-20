@@ -1176,8 +1176,18 @@ impl Session {
     /// singleton for `SingleInstance = true` codeunits, `i` itself otherwise.
     pub(crate) fn shared_instance(&mut self, i: Rc<RefCell<Instance>>) -> Rc<RefCell<Instance>> {
         let object = i.borrow().object as usize;
+        self.shared_instance_or(object, || i)
+    }
+
+    /// The instance a call on codeunit `object` runs on: the session's singleton for a `SingleInstance = true` codeunit,
+    /// else the one `fresh` makes (called only then).
+    pub(crate) fn shared_instance_or(
+        &mut self,
+        object: usize,
+        fresh: impl FnOnce() -> Rc<RefCell<Instance>>,
+    ) -> Rc<RefCell<Instance>> {
         if !self.engine.object_facts[object].single_instance {
-            return i;
+            return fresh();
         }
         if !self.singletons.contains_key(&object) {
             let inst = self.instance(object);
