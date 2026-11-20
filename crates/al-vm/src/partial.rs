@@ -309,7 +309,7 @@ impl Session {
             };
         }
         let mut r = rec.borrow_mut();
-        r.fields = merged;
+        r.fields = merged.into();
         if let Some(b) = &mut r.load.buffer {
             match only {
                 Some(o) => {

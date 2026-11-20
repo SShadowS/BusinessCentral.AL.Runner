@@ -55,7 +55,7 @@ pub use profile::{
     DbStat, PosStat, ProfFrame, ProfNode, ProfileMode, ProfileTree, reaches_database,
     routine_label as profile_routine_label,
 };
-pub use records::init_count::{enable_record_init_count, record_init_count_line};
+pub use records::init_count::{enable_record_init_count, record_init_count_line, record_init_lazy_line};
 pub use state_stamp::{LeftChange, LeftStamp, StateStamp};
 pub use test_runner_host::TestCodeunitHost;
 mod auto_format_writer;
@@ -1685,7 +1685,7 @@ impl Session {
                     company: None,
                     change_company_called: false,
                     crm: self.engine.object_facts[*table as usize].crm(),
-                    fields: self.initial_fields(*table as usize),
+                    fields: self.initial_record_fields(*table as usize),
                     filters: Vec::new(),
                     filter_group: 0,
                     marks: Vec::new(),

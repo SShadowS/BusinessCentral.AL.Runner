@@ -75,7 +75,7 @@ impl Session {
         }
         if !has_rows {
             let fields = self.initial_fields(rec.borrow().table as usize);
-            rec.borrow_mut().fields = fields;
+            rec.borrow_mut().fields = fields.into();
             self.page_first_row(st)?;
             // Page.Run runs OnAfterGetCurrRecord on the blank Rec (:271 `C:0`); TestPage.OpenView runs nothing (:325).
             if st.borrow().caught_by_trap {

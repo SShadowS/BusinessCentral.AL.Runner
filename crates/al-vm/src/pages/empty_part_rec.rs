@@ -47,7 +47,7 @@ impl Session {
         let rec = self.page_rec(st);
         let table_no = rec.borrow().table as usize;
         let fresh = self.initial_fields(table_no);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         st.borrow_mut().empty_list_landing = None;
         let Some(host) = st.borrow().host.as_ref().and_then(|(h, _)| h.upgrade()) else {
             return Ok(());

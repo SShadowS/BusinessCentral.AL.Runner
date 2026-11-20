@@ -31,7 +31,7 @@ impl Session {
         let in_key = self.still_reads_once_more(st);
         let before = self.xrec_before_move(st);
         let rec = self.page_rec(st);
-        rec.borrow_mut().fields = left;
+        rec.borrow_mut().fields = left.into();
         let outside = self.marked_refill_outside(st, &rec)?;
         let left_key = self.row_key(&rec)?;
         let of_recs_row = Self::same_key(want, &left_key);
@@ -59,7 +59,7 @@ impl Session {
         if self.nav_next(st, 1)? {
             return refuse("with marked rows after the row Rec was left on");
         }
-        rec.borrow_mut().fields = stored.clone();
+        rec.borrow_mut().fields = stored.clone().into();
         let mut above = Vec::new();
         while self.nav_next(st, -1)? {
             above.push((self.row_key(&rec)?, rec.borrow().fields.clone()));
@@ -75,12 +75,12 @@ impl Session {
                 Some(left) if i == 0 && in_key => left.clone(),
                 _ => stored.clone(),
             };
-            rec.borrow_mut().fields = read;
+            rec.borrow_mut().fields = read.into();
             self.populate_current(st)?;
         }
         let mut held = Vec::new();
         for (k, f) in &above {
-            rec.borrow_mut().fields = f.clone();
+            rec.borrow_mut().fields = f.clone().into();
             self.populate_current(st)?;
             held.push(crate::pages::WindowRow {
                 key: k.clone(),
@@ -98,7 +98,7 @@ impl Session {
         }
         let stored = rec.borrow().fields.clone();
         for _ in 0..reads + 1 {
-            rec.borrow_mut().fields = stored.clone();
+            rec.borrow_mut().fields = stored.clone().into();
             self.populate_current(st)?;
         }
         let shown = rec.borrow().fields.clone();

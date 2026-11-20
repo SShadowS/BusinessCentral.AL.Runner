@@ -152,7 +152,7 @@ impl Session {
             self.page_xrec_fields(child),
         );
         self.populate_current(child)?;
-        rec.borrow_mut().fields = typed;
+        rec.borrow_mut().fields = typed.into();
         child.borrow_mut().dirty = dirty;
         self.set_xrec_fields(child, x);
         Ok(())

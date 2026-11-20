@@ -63,7 +63,7 @@ impl Session {
         };
         // The reads up to the row before the first one.
         for f in up.iter().take(up.len() - 1) {
-            rec.borrow_mut().fields = f.clone();
+            rec.borrow_mut().fields = f.clone().into();
             self.populate_current(st)?;
         }
         {

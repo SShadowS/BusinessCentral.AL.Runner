@@ -274,7 +274,7 @@ impl Session {
             s.dirty = false;
             s.refresh.cancel_update();
         }
-        rec.borrow_mut().fields = row;
+        rec.borrow_mut().fields = row.into();
         Ok(())
     }
 

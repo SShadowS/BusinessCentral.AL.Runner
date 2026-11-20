@@ -183,7 +183,7 @@ impl Session {
             .collect();
         let saved_captions = st.borrow().field_captions.clone();
         let saved_row = st.borrow().field_captions_row.clone();
-        let own = std::mem::replace(&mut rec.borrow_mut().fields, fields);
+        let own = std::mem::replace(&mut rec.borrow_mut().fields, fields.into());
         let r = self.fill_field_captions_with_row(st, &t, &exprs, 1);
         rec.borrow_mut().fields = own;
         if keep {
@@ -529,7 +529,7 @@ impl Session {
                 return self.read_rows_up_from_the_last(st, keys);
             }
             if let Some(first) = keys.first() {
-                rec.borrow_mut().fields = first.stored.clone();
+                rec.borrow_mut().fields = first.stored.clone().into();
             }
             // A view of one row is not read again before OnNextRecord(-1) (pages/list-order/AiListOrderTests.al:535
             // Next_OneRow_Nav `F:=><=Yes;R:R1001;N:1=0;N:-1=0`, :565 Next_OneRow_NavCurr; testpage/
@@ -572,7 +572,7 @@ impl Session {
                         break;
                     }
                 }
-                rec.borrow_mut().fields = keys[0].stored.clone();
+                rec.borrow_mut().fields = keys[0].stored.clone().into();
                 self.populate_current(st)?;
                 keys[0].shown = rec.borrow().fields.clone();
                 above.reverse();
@@ -595,7 +595,7 @@ impl Session {
                 self.nav_find(st, "=")?;
             }
             if let Some(row) = keys.first() {
-                rec.borrow_mut().fields = row.shown.clone();
+                rec.borrow_mut().fields = row.shown.clone().into();
                 self.set_xrec_fields(st, row.stored.clone());
             }
             above.extend(keys);
@@ -651,7 +651,7 @@ impl Session {
                 }
                 above.reverse();
                 if let Some(row) = keys.first() {
-                    rec.borrow_mut().fields = row.shown.clone();
+                    rec.borrow_mut().fields = row.shown.clone().into();
                     self.set_xrec_fields(st, row.stored.clone());
                 }
                 above.extend(keys);
@@ -677,7 +677,7 @@ impl Session {
                 // OpenView_FindNext5Rows_ReadsAtOpen `F0;N2;N3;N4;N5;N5;N1`, _FindNext30Rows `...;N20;N1`).
                 // The client puts its first row back and asks OnNextRecord(-1) once, which answers 0 there.
                 if let Some(first) = keys.first() {
-                    rec.borrow_mut().fields = first.stored.clone();
+                    rec.borrow_mut().fields = first.stored.clone().into();
                 }
                 self.nav_next(st, -1)?;
                 if ascending_find_list_ended {
@@ -696,7 +696,7 @@ impl Session {
         }
         // The row buffer the page keeps for the row it stands on is what OnAfterGetRecord left.
         if let Some(row) = keys.first() {
-            rec.borrow_mut().fields = row.shown.clone();
+            rec.borrow_mut().fields = row.shown.clone().into();
             self.set_xrec_fields(st, row.stored.clone());
         }
         st.borrow_mut().window = keys;
@@ -865,7 +865,7 @@ impl Session {
             }
         }
         let first = forward[0].clone();
-        rec.borrow_mut().fields = first.stored.clone();
+        rec.borrow_mut().fields = first.stored.clone().into();
         // A view of one row: nothing above it, so the row is not read again before `=` (PnF06FindListMoves.al:348
         // PW_FindList_Descending_1Rows `F(=><);R1;N(1);N(-1);F(=);R1;C`; two rows read it again, :362).
         if !above.is_empty() {
@@ -902,7 +902,7 @@ impl Session {
         let before = self.xrec_before_move(st);
         let rec = self.page_rec(st);
         let top = st.borrow().window[0].stored.clone();
-        rec.borrow_mut().fields = top;
+        rec.borrow_mut().fields = top.into();
         self.populate_current(st)?;
         let mut new_rows = Vec::new();
         while self.nav_next(st, -1)? {
@@ -949,7 +949,7 @@ impl Session {
     fn first_above_the_find_list_window(&mut self, st: &St) -> Result<bool, Signal> {
         let rec = self.page_rec(st);
         let top = st.borrow().window[0].stored.clone();
-        rec.borrow_mut().fields = top;
+        rec.borrow_mut().fields = top.into();
         let mut new_rows = Vec::new();
         while self.nav_next(st, -1)? {
             if new_rows.len() == Self::WINDOW {
@@ -975,7 +975,7 @@ impl Session {
         let shown = s.window[0].shown.clone();
         let stored = s.window[0].stored.clone();
         drop(s);
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         self.set_xrec_fields(st, stored);
         Ok(true)
     }
@@ -1034,7 +1034,7 @@ impl Session {
         }
         before.reverse();
         let first = forward[0].clone();
-        rec.borrow_mut().fields = first.shown;
+        rec.borrow_mut().fields = first.shown.into();
         self.set_xrec_fields(st, first.stored);
         before.extend(forward);
         let mut s = st.borrow_mut();
@@ -1158,7 +1158,7 @@ impl Session {
                     .cloned();
                 match row {
                     Some(w) => {
-                        rec.borrow_mut().fields = w.shown;
+                        rec.borrow_mut().fields = w.shown.into();
                         self.set_xrec_fields(st, w.stored);
                     }
                     None => self.set_xrec(st),
@@ -1383,7 +1383,7 @@ impl Session {
         let saved = rec.borrow().fields.clone();
         let table = self.table(&rec)?;
         let saved_key = table.primary_key(&saved);
-        rec.borrow_mut().fields = anchor;
+        rec.borrow_mut().fields = anchor.into();
         self.ret_used = true;
         let mut pk = table.primary_key(&rec.borrow().fields);
         let found = matches!(self.record_op(RecordOp::Get, &rec, &mut pk)?, Value::Boolean(true));
@@ -1392,7 +1392,7 @@ impl Session {
             matches!(self.record_op(RecordOp::Next, &rec, &mut [Value::Integer(1)])?, Value::Integer(n) if n != 0)
                 && Self::same_key(&table.primary_key(&rec.borrow().fields), &saved_key)
         };
-        rec.borrow_mut().fields = saved;
+        rec.borrow_mut().fields = saved.into();
         Ok(found && !next_is_saved)
     }
 
@@ -1445,7 +1445,7 @@ impl Session {
         }
         let rec = self.page_rec(st);
         let saved = rec.borrow().fields.clone();
-        rec.borrow_mut().fields = anchor;
+        rec.borrow_mut().fields = anchor.into();
         self.ret_used = true;
         let mut pk = self.table(&rec)?.primary_key(&rec.borrow().fields);
         let found = matches!(self.record_op(RecordOp::Get, &rec, &mut pk)?, Value::Boolean(true));
@@ -1458,7 +1458,7 @@ impl Session {
         if moved && !same {
             return Ok(true);
         }
-        rec.borrow_mut().fields = saved;
+        rec.borrow_mut().fields = saved.into();
         Ok(false)
     }
 
@@ -1664,7 +1664,7 @@ impl Session {
             && self.filtered_find_list_without_row_triggers(st)
         {
             let last = window[target].stored.clone();
-            rec.borrow_mut().fields = last;
+            rec.borrow_mut().fields = last.into();
             let mut new_rows = 0;
             while self.nav_next(st, 1)? {
                 if new_rows == Self::WINDOW {
@@ -1720,7 +1720,7 @@ impl Session {
             let before = s.xrec_before_move(st);
             let edge = if up { 0 } else { len - 1 };
             let stored = st.borrow().window[edge].stored.clone();
-            rec.borrow_mut().fields = stored;
+            rec.borrow_mut().fields = stored.into();
             s.populate_current(st)?;
             let mut new_rows = Vec::new();
             while s.nav_next(st, if up { -1 } else { 1 })? {
@@ -1856,7 +1856,7 @@ impl Session {
         let held = st.borrow().window.iter().position(|w| Self::same_key(&w.key, want));
         if let Some(i) = held {
             let shown = st.borrow().window[i].shown.clone();
-            rec.borrow_mut().fields = shown;
+            rec.borrow_mut().fields = shown.into();
             self.set_xrec(st);
             return Ok(Some(true));
         }
@@ -1876,7 +1876,7 @@ impl Session {
             );
         }
         let last = st.borrow().window[Self::WINDOW - 1].stored.clone();
-        rec.borrow_mut().fields = last;
+        rec.borrow_mut().fields = last.into();
         let mut new_rows = 0;
         while self.nav_next(st, 1)? {
             let key = self.row_key(&rec)?;
@@ -1896,7 +1896,7 @@ impl Session {
         match st.borrow().window.iter().position(|w| Self::same_key(&w.key, want)) {
             Some(i) => {
                 let shown = st.borrow().window[i].shown.clone();
-                rec.borrow_mut().fields = shown;
+                rec.borrow_mut().fields = shown.into();
                 drop(rec);
                 self.set_xrec(st);
                 Ok(Some(true))
@@ -1919,7 +1919,7 @@ impl Session {
             // `G60` at the end of a full block) and _Both61Rows, and by pages/W1Navigation.al:GoToKey_List_FiftyRows_RowsReadByAFarJump.
             let rec = self.page_rec(st);
             let last = st.borrow().window[idx].stored.clone();
-            rec.borrow_mut().fields = last;
+            rec.borrow_mut().fields = last.into();
             self.populate_current(st)?;
             let mut new_rows = 0;
             while new_rows < Self::WINDOW && self.nav_next(st, 1)? {
@@ -2294,7 +2294,7 @@ impl Session {
                             .find(|w| Self::same_key(&w.key, &key))
                             .cloned();
                         if let Some(w) = row {
-                            rec.borrow_mut().fields = w.shown;
+                            rec.borrow_mut().fields = w.shown.into();
                             self.set_xrec_fields(st, w.stored);
                         }
                     } else {
@@ -2327,7 +2327,7 @@ impl Session {
                     at = self.nav_next(st, 1)?;
                 }
             }
-            rec.borrow_mut().fields = before_fields;
+            rec.borrow_mut().fields = before_fields.into();
             let mut s = st.borrow_mut();
             s.cursor = before_cursor;
             s.draft = before_draft;
@@ -2547,7 +2547,7 @@ impl Session {
                     }
                     return;
                 }
-                r.borrow_mut().fields = fields;
+                r.borrow_mut().fields = fields.into();
             }
         }
     }
@@ -2855,7 +2855,7 @@ impl Session {
                     {
                         let fields = page_rec.borrow().fields.clone();
                         if !Value::all_identical(&fields, &r.borrow().fields) {
-                            r.borrow_mut().fields = fields;
+                            r.borrow_mut().fields = fields.into();
                         }
                     }
                 }
@@ -2922,7 +2922,7 @@ impl Session {
                     if let Value::Record(r) = inst.borrow().globals[slot].clone() {
                         let initial = self.initial_fields(r.borrow().table as usize);
                         let mut r = r.borrow_mut();
-                        r.fields = initial;
+                        r.fields = initial.into();
                         r.filters.clear();
                     }
                 }

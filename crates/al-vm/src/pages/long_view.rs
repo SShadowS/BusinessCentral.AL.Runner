@@ -53,7 +53,7 @@ impl Session {
     pub(super) fn read_block_past_the_window(&mut self, st: &St, pinned_rows: Option<usize>) -> Result<(), Signal> {
         let rec = self.page_rec(st);
         let last = st.borrow().window[Self::WINDOW - 1].stored.clone();
-        rec.borrow_mut().fields = last;
+        rec.borrow_mut().fields = last.into();
         self.populate_current(st)?;
         let mut new_rows = 0;
         loop {
@@ -209,7 +209,7 @@ impl Session {
         let rec = self.page_rec(st);
         let opened_on = rec.borrow().fields.clone();
         self.read_block_past_the_window(st, Some(rows))?;
-        rec.borrow_mut().fields = opened_on;
+        rec.borrow_mut().fields = opened_on.into();
         Ok(())
     }
 

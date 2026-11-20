@@ -390,7 +390,7 @@ impl Session {
                     for &i in &t.keys[0] {
                         fresh[i] = r.fields[i].clone();
                     }
-                    let old = std::mem::replace(&mut r.fields, fresh);
+                    let old = std::mem::replace(&mut r.fields, fresh.into()).into_vec();
                     r.is_dirty_base = al_builtins::value::DirtyBase::Row {
                         base: old,
                         alt: None,
@@ -541,7 +541,7 @@ impl Session {
                 if let Some(a) = auto {
                     let mut row = rec.borrow().fields.clone();
                     taken = self.take_auto_increment(&t, a, &mut row, &cx.company)?;
-                    rec.borrow_mut().fields = row;
+                    rec.borrow_mut().fields = row.into();
                 }
                 let row = rec.borrow().fields.clone();
                 // A unique secondary key refuses the row after its AutoIncrement value was taken
@@ -2005,7 +2005,7 @@ impl Session {
                 // Rec carries the new key and xRec the old row in the events and the trigger
                 // (record/TestTableEventDispatch.al:TableEvent_OnAfterRename_Subscriber_FiresWithOldAndNewKeys).
                 let old_fields = old.clone();
-                rec.borrow_mut().fields = new.clone();
+                rec.borrow_mut().fields = new.clone().into();
                 let xrec = Self::xrec_handle(rec, old.clone());
                 // Rename always runs the trigger; RunTrigger is true (docs/probes-needed.md).
                 self.table_event(&t, "onbeforerenameevent", rec, Some(&xrec), true, None)?;
@@ -2020,7 +2020,7 @@ impl Session {
                 let _ = self.stamp_rename(&t, rec);
                 let row = audit.row(&rec.borrow().fields);
                 if let Some(unique_key) = self.unique_violation(rec, &t, &row, Some(&old_pk))? {
-                    rec.borrow_mut().fields = old.clone();
+                    rec.borrow_mut().fields = old.clone().into();
                     return self.fail_unique(&t, unique_key, &row);
                 }
                 // A temporary row whose Insert stored a FlowFilter value (`flow_filter_positions`): what a Rename keeps is not pinned.
@@ -2164,19 +2164,19 @@ impl Session {
                         if new_rounds
                             || (!rec.borrow().temporary && crate::sqltime::key_rounds(&t.primary_key(&old))) =>
                     {
-                        rec.borrow_mut().fields = old.clone();
+                        rec.borrow_mut().fields = old.clone().into();
                         unsupported(
                             "a failed Rename of a record whose Time or DateTime key value the SQL column rounds (its error is not pinned)",
                         )
                     }
                     RenameOutcome::NotFound => {
-                        rec.borrow_mut().fields = old.clone();
+                        rec.borrow_mut().fields = old.clone().into();
                         self.fail(&t, &old, false)
                     }
                     // A rename that cannot be done raises whether or not the Boolean is used (RfTWrite.al:Rename_Variants
                     // `rename_existing`: `B := RecRef.Rename('D2')`).
                     RenameOutcome::AlreadyExists => {
-                        rec.borrow_mut().fields = old;
+                        rec.borrow_mut().fields = old.into();
                         self.ret_used = false;
                         self.fail(&t, &row, true)
                     }
@@ -2215,7 +2215,7 @@ impl Session {
         // Clear resets the buffer, the filters and the keys but does not empty the table of a
         // temporary record: its rows stay and it stays temporary
         // (types/ProbeTypeFormsAndFilters.al:Clear_TemporaryRecordWithRows_ThenCount, BC 27.5).
-        let fresh = self.initial_fields(t.object as usize);
+        let fresh = self.initial_record_fields(t.object as usize);
         let old_row_id = Some(crate::partial::row_id(t, &rec.borrow().fields));
         // Clear sets the table's globals back to their initial values (ADR-021 decision 4;
         // corpus probe TableGlobals_Clear_WhatHappensToTheGlobals).

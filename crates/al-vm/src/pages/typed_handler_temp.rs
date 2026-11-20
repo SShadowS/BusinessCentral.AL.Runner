@@ -13,7 +13,7 @@ impl Session {
         let h = handed.borrow();
         let mut r = rec.borrow_mut();
         if !h.temporary {
-            r.fields = h.fields.clone();
+            r.fields = h.fields.clone().into();
             return Ok(());
         }
         if r.table != h.table {
@@ -27,7 +27,7 @@ impl Session {
         // pagecount=2 cur=2 temp=Yes`, _OnRowTwo, _Empty, TypedModalHandler_TempRecordStoredSource_PageRunModal_OnRowTwo; issue 7018).
         r.temporary = true;
         r.temp_id = h.temp_id.clone();
-        r.fields = h.fields.clone();
+        r.fields = h.fields.clone().into();
         r.filters = h.filters.clone();
         r.key = h.key;
         r.ascending = h.ascending;

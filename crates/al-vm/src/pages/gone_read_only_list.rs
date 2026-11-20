@@ -43,7 +43,7 @@ impl Session {
             return Ok(true);
         }
         let fresh = self.initial_fields(rec.borrow().table as usize);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         let mut s = st.borrow_mut();
         s.refresh.cancel();
         s.cursor = Cursor::None;

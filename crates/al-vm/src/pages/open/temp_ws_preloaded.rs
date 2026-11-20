@@ -85,7 +85,7 @@ impl Session {
         }
         let start = rec.borrow().fields.clone();
         self.populate_current(st)?;
-        rec.borrow_mut().fields = start.clone();
+        rec.borrow_mut().fields = start.clone().into();
         let mut below = Vec::new();
         loop {
             below.push(self.read_window_row(st)?);
@@ -98,11 +98,11 @@ impl Session {
                 );
             }
         }
-        rec.borrow_mut().fields = start.clone();
+        rec.borrow_mut().fields = start.clone().into();
         self.populate_current(st)?;
         let shown = rec.borrow().fields.clone();
         below[0].shown = shown.clone();
-        rec.borrow_mut().fields = start.clone();
+        rec.borrow_mut().fields = start.clone().into();
         let mut above = Vec::new();
         while self.nav_next(st, -1)? {
             if above.len() + below.len() == Self::WINDOW {
@@ -114,7 +114,7 @@ impl Session {
         }
         above.reverse();
         above.extend(below);
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         self.set_xrec_fields(st, start);
         {
             let mut s = st.borrow_mut();
@@ -135,7 +135,7 @@ impl Session {
         let key = self.row_key(&rec)?;
         let stored = rec.borrow().fields.clone();
         self.populate_current(st)?;
-        let shown = std::mem::replace(&mut rec.borrow_mut().fields, stored.clone());
+        let shown = std::mem::replace(&mut rec.borrow_mut().fields, stored.clone().into()).into_vec();
         Ok(crate::pages::WindowRow { key, stored, shown })
     }
 
@@ -221,7 +221,7 @@ impl Session {
         self.record_op(RecordOp::Get, &rec, &mut pk)?;
         let start = rec.borrow().fields.clone();
         self.populate_current(st)?;
-        rec.borrow_mut().fields = start.clone();
+        rec.borrow_mut().fields = start.clone().into();
         let mut rows = Vec::new();
         loop {
             rows.push(self.read_window_row(st)?);
@@ -234,7 +234,7 @@ impl Session {
                 );
             }
         }
-        rec.borrow_mut().fields = start.clone();
+        rec.borrow_mut().fields = start.clone().into();
         self.populate_current(st)?;
         rows[0].shown = rec.borrow().fields.clone();
         self.set_xrec_fields(st, start);

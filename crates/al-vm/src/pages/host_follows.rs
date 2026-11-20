@@ -78,11 +78,11 @@ impl Session {
             linked_rec.borrow().fields.clone(),
             host.borrow().instance.as_ref().map(|i| i.borrow().globals.clone()),
         );
-        host_rec.borrow_mut().fields = row.clone();
-        linked_rec.borrow_mut().fields = row;
+        host_rec.borrow_mut().fields = row.clone().into();
+        linked_rec.borrow_mut().fields = row.into();
         let r = self.host_reads_part_row(&host, &linked);
-        host_rec.borrow_mut().fields = saved.0;
-        linked_rec.borrow_mut().fields = saved.1;
+        host_rec.borrow_mut().fields = saved.0.into();
+        linked_rec.borrow_mut().fields = saved.1.into();
         if let (Some(globals), Some(i)) = (saved.2, host.borrow().instance.as_ref()) {
             i.borrow_mut().globals = globals;
         }

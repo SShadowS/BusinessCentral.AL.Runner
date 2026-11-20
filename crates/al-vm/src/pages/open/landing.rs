@@ -384,7 +384,7 @@ impl Session {
         } else if self.empty_temp_navigate_page_by_set_record(st) {
             let rec = self.page_rec(st);
             let blank = self.initial_fields(rec.borrow().table as usize);
-            rec.borrow_mut().fields = blank;
+            rec.borrow_mut().fields = blank.into();
             self.populate_expressions(st)
         } else {
             // A list part that shows no row of a host opened for view runs its OnNewRecord once, the link value set without
@@ -433,7 +433,7 @@ impl Session {
                 let rec = self.page_rec(st);
                 let table = rec.borrow().table as usize;
                 let fresh = self.initial_fields(table);
-                rec.borrow_mut().fields = fresh;
+                rec.borrow_mut().fields = fresh.into();
                 self.stamp_from_filters(st, false)?;
                 self.page_trigger(st, "onnewrecord", vec![Value::Boolean(true)])?;
                 self.page_event(st, "onnewrecordevent", None, Some(true))?;
@@ -519,7 +519,7 @@ impl Session {
         let table = rec.borrow().table as usize;
         self.note_lower_key(st)?;
         let fresh = self.initial_fields(table);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         {
             let mut s = st.borrow_mut();
             s.placeholder_line = true;

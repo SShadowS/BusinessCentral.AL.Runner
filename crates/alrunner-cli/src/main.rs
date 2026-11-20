@@ -85,6 +85,9 @@ fn main() -> ExitCode {
     if let Some(line) = al_vm::record_init_count_line() {
         eprintln!("{line}");
     }
+    if let Some(line) = al_vm::record_init_lazy_line() {
+        eprintln!("{line}");
+    }
     match joined {
         Ok(code) => code,
         Err(_) => {

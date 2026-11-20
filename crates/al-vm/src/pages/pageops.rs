@@ -1032,13 +1032,13 @@ impl Session {
                     // (ui-handlers/PSModalPageHandlerTyped.al: GetRecord answers the record SetRecord handed).
                     if st.borrow().typed_handler && self.has_source(st) {
                         let rec = self.page_rec(st);
-                        rec.borrow_mut().fields = r.borrow().fields.clone();
+                        rec.borrow_mut().fields = r.borrow().fields.clone().into();
                         st.borrow_mut().handler_set_record = true;
                         return Ok(Value::Null);
                     }
                     let kept = st.borrow().set_record.clone().filter(|_| st.borrow().set_view);
                     if let Some(view) = kept.filter(|v| v.borrow().table == r.borrow().table) {
-                        view.borrow_mut().fields = r.borrow().fields.clone();
+                        view.borrow_mut().fields = r.borrow().fields.clone().into();
                         return Ok(Value::Null);
                     }
                     let copy = Rc::new(RefCell::new(r.borrow().clone()));
@@ -1174,7 +1174,7 @@ impl Session {
                 }
                 dst.borrow_mut().filters.clear();
                 let fields = src.borrow().fields.clone();
-                dst.borrow_mut().fields = fields;
+                dst.borrow_mut().fields = fields.into();
                 // The primary key's fields alone get the filter, whatever the current key: a record with `SetCurrentKey(Grp, Name)` ends
                 // with `Id: 2` only and keeps its key (testpage/P135SelectionFilter.al:
                 // P135_SelFilter_FreshRecord_AndOtherFieldFilters `keyed`).

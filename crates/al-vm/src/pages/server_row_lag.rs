@@ -70,7 +70,7 @@ impl Session {
         let object = st.borrow().object as usize;
         self.engine.program.objects[object].rec_slot?;
         let rec = self.page_rec(st);
-        let now = std::mem::replace(&mut rec.borrow_mut().fields, lag);
+        let now = std::mem::replace(&mut rec.borrow_mut().fields, lag.into()).into_vec();
         Some((rec, now))
     }
 }

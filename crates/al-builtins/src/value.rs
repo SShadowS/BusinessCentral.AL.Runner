@@ -507,7 +507,7 @@ impl std::fmt::Debug for TempId {
 }
 
 /// Everything a record variable carries.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RecordState {
     /// Object index of the table.
     pub table: u32,
@@ -525,7 +525,7 @@ pub struct RecordState {
     /// (session-system/TestCrmTableNoConnectionContracts.al).
     pub crm: bool,
     /// Field values in the table's field order.
-    pub fields: Vec<Value>,
+    pub fields: crate::fields_track::Fields,
     pub filters: Vec<crate::filter::FieldFilter>,
     /// The filter group `SetRange` and `SetFilter` write to and `GetFilter` reads.
     pub filter_group: i32,

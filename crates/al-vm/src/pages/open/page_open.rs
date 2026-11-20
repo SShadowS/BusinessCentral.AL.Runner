@@ -118,7 +118,7 @@ impl Session {
         if view {
             rec.filters = given.filters.clone();
         } else {
-            rec.fields = given.fields.clone();
+            rec.fields = given.fields.clone().into();
         }
     }
 
@@ -416,7 +416,7 @@ impl Session {
             let rec = self.page_rec(st);
             let src = r.borrow();
             let mut dst = rec.borrow_mut();
-            dst.fields = src.fields.clone();
+            dst.fields = src.fields.clone().into();
             dst.filters = src.filters.clone();
             dst.key = src.key;
             dst.adhoc = src.adhoc.clone();

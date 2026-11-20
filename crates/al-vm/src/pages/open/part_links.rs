@@ -31,7 +31,7 @@ impl Session {
         let table = rec.borrow().table as usize;
         self.note_lower_key(st)?;
         let fresh = self.initial_fields(table);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         {
             let mut s = st.borrow_mut();
             s.placeholder_line = true;
@@ -143,7 +143,7 @@ impl Session {
                 let rec = self.page_rec(st);
                 let table = rec.borrow().table as usize;
                 let fresh = self.initial_fields(table);
-                rec.borrow_mut().fields = fresh;
+                rec.borrow_mut().fields = fresh.into();
                 let stamped = match blank_held.clone() {
                     _ if host_blank_on_open => self.stamp_from_filters(st, false),
                     Some(before) => self.stamp_from_filters_seen_as(st, before),
@@ -189,7 +189,7 @@ impl Session {
         let before = rec.borrow().fields.clone();
         self.stamp_from_filters(st, false)?;
         let stamped = rec.borrow().fields.clone();
-        rec.borrow_mut().fields = before.clone();
+        rec.borrow_mut().fields = before.clone().into();
         let table = self.table(&rec)?;
         for (pos, (was, now)) in before.iter().zip(&stamped).enumerate() {
             if Self::same_values(std::slice::from_ref(was), std::slice::from_ref(now)) {

@@ -212,7 +212,7 @@ impl Session {
             let rec = self.xp_record(inst, n)?;
             let tbl = rec.borrow().table as usize;
             let fresh = self.initial_fields(tbl);
-            rec.borrow_mut().fields = fresh;
+            rec.borrow_mut().fields = fresh.into();
             self.xp_run_trigger(inst, schema, table, "onafterinitrecord")?;
             import_encoding::encoding_unchanged_since_decoding(inst)?;
             // Fields are read as the values come; which line lengths are pinned: `line_length_pinned`.

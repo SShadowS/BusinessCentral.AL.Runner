@@ -75,7 +75,7 @@ impl Session {
         }
         let rec = self.page_rec(st);
         let fresh = self.initial_fields(rec.borrow().table as usize);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         self.populate_expressions(st)?;
         self.page_trigger(st, "onaftergetcurrrecord", vec![])?;
         self.page_event(st, "onaftergetcurrrecordevent", None, None)?;

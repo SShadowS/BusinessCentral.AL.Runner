@@ -209,6 +209,9 @@ pub fn serve(daemon: &[String]) -> Result<(), String> {
                 if let Some(line) = al_vm::record_init_count_line() {
                     eprintln!("{line}");
                 }
+                if let Some(line) = al_vm::record_init_lazy_line() {
+                    eprintln!("{line}");
+                }
             }
             "execute" => execute(&base, fields, &mut ctx, &flags),
             "" => error("a request needs a `command`"),

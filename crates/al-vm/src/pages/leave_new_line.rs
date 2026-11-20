@@ -171,7 +171,7 @@ impl Session {
         }
         st.borrow_mut().take_after_new();
         let found = probe.borrow().fields.clone();
-        rec.borrow_mut().fields = found;
+        rec.borrow_mut().fields = found.into();
         self.read_row_off_new_line(st)?;
         Ok(Some(true))
     }

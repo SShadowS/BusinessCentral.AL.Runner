@@ -27,7 +27,7 @@ impl Session {
         self.record_op(RecordOp::DeleteAll, &all, &mut [Value::Boolean(false)])?;
         let table = rec.borrow().table as usize;
         let blank = self.initial_fields(table);
-        rec.borrow_mut().fields = blank;
+        rec.borrow_mut().fields = blank.into();
         Ok(())
     }
 }

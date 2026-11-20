@@ -126,7 +126,7 @@ impl Session {
         let table = rec.borrow().table as usize;
         let fresh = self.initial_fields(table);
         let mut r = rec.borrow_mut();
-        r.fields = fresh;
+        r.fields = fresh.into();
         r.position = None;
         Ok(())
     }

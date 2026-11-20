@@ -25,7 +25,7 @@ impl Session {
         let mut key = st.borrow().window[idx].key.clone();
         self.ret_used = true;
         let found = self.record_op(RecordOp::Get, &rec, &mut key);
-        rec.borrow_mut().fields = saved;
+        rec.borrow_mut().fields = saved.into();
         Ok(matches!(found?, Value::Boolean(true)))
     }
 
@@ -88,7 +88,7 @@ impl Session {
         // The client re-reads the row the cursor stands on.
         let on_row = |s: &mut Self, rec: &Rec| -> Result<(), Signal> {
             let stored = st.borrow().window[at].stored.clone();
-            rec.borrow_mut().fields = stored;
+            rec.borrow_mut().fields = stored.into();
             s.reread_held_row(st, at)?;
             Ok(())
         };

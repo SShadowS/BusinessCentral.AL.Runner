@@ -48,7 +48,7 @@ impl Session {
         let rec = self.page_rec(st);
         let table = rec.borrow().table as usize;
         let fresh = self.initial_fields(table);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         {
             let mut s = st.borrow_mut();
             s.request_new_blank = true;
@@ -426,7 +426,7 @@ impl Session {
         };
         let inst = st.borrow().instance.clone().expect("open page");
         if let Value::Record(x) = &inst.borrow().globals[slot] {
-            x.borrow_mut().fields = fields;
+            x.borrow_mut().fields = fields.into();
         }
     }
 
@@ -551,7 +551,7 @@ impl Session {
         }
         let table = rec.borrow().table as usize;
         let fresh = self.initial_fields(table);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         // New() on a part that shows no row validates the link value with the blank xRec the part held (`stamp_from_filters_seen_as`).
         match part_xrec.as_ref().and_then(|x| self.blank_held_xrec(st, x)) {
             Some(before) => self.stamp_from_filters_seen_as(st, before)?,
@@ -1161,7 +1161,7 @@ impl Session {
                         edited = true;
                     }
                 }
-                hrec.borrow_mut().fields = merged;
+                hrec.borrow_mut().fields = merged.into();
                 if edited && host.borrow().dirty {
                     self.save_row(host)?;
                 } else {

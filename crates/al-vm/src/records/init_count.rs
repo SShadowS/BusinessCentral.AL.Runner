@@ -15,9 +15,15 @@ static ON: AtomicBool = AtomicBool::new(false);
 /// Calls by (table id, reason); the reason is `None` for an eligible call. Every thread counts here.
 static COUNTS: Mutex<BTreeMap<(u32, Option<String>), u64>> = Mutex::new(BTreeMap::new());
 
-/// Turns the counter on for the whole process.
+/// Turns the counter (and the PERF-22b first-access count of al-builtins `fields_track`) on for the whole process.
 pub fn enable_record_init_count() {
     ON.store(true, Ordering::Relaxed);
+    al_builtins::fields_track::enable();
+}
+
+/// The PERF-22b line, cumulative since the process started; `None` while the counter is off.
+pub fn record_init_lazy_line() -> Option<String> {
+    al_builtins::fields_track::lazy_line()
 }
 
 /// The summary line, cumulative since the process started; `None` while the counter is off.
@@ -73,21 +79,29 @@ fn ineligible_reason(fields: &[Value], fresh: &[usize], init_value_cleared: bool
     init_value_cleared.then(|| "InitValue".into())
 }
 
+/// Lazy-eligible (design.md section 9.2): not Shared-eligible, every fresh slot a Blob, no InitValue cleared.
+fn lazy_eligible(fields: &[Value], fresh: &[usize], init_value_cleared: bool) -> bool {
+    !fresh.is_empty() && !init_value_cleared && fresh.iter().all(|&i| matches!(fields.get(i), Some(Value::Blob(_))))
+}
+
 impl Session {
-    /// Counts one `initial_fields` call of `table` (an object index) when the counter is on.
+    /// Counts one `initial_fields` call of `table` (an object index) when the counter is on. Returns the table id when
+    /// the buffer is Lazy-eligible (PERF-22b: its fresh slots are all Blobs and no InitValue was cleared), else 0.
     #[inline]
-    pub(super) fn count_record_init(&self, table: usize, fields: &[Value], init_value_cleared: bool) {
+    pub(super) fn count_record_init(&self, table: usize, fields: &[Value], init_value_cleared: bool) -> u32 {
         if !ON.load(Ordering::Relaxed) {
-            return;
+            return 0;
         }
         let fresh = self.initial_cache.get(&table).map(|t| &t.fresh[..]).unwrap_or(&[]);
         let reason = ineligible_reason(fields, fresh, init_value_cleared);
         let id = self.engine.program.objects[table].id.unwrap_or(0);
+        let lazy = lazy_eligible(fields, fresh, init_value_cleared);
         *COUNTS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .entry((id, reason))
             .or_insert(0) += 1;
+        if lazy { id.max(1) } else { 0 }
     }
 }
 
@@ -111,6 +125,10 @@ mod tests {
         assert_eq!(ineligible_reason(&blob, &[1], false).as_deref(), Some("Blob"));
         let list = vec![Value::List(Default::default())];
         assert_eq!(ineligible_reason(&list, &[0], false).as_deref(), Some("List"));
+        assert!(lazy_eligible(&blob, &[1], false));
+        assert!(!lazy_eligible(&blob, &[1], true));
+        assert!(!lazy_eligible(&plain, &[], false));
+        assert!(!lazy_eligible(&list, &[0], false));
     }
 
     #[test]

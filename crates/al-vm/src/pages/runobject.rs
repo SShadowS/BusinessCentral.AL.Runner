@@ -563,7 +563,7 @@ impl Session {
                 matches!(a, Value::Blob(_)) || Self::same_values(std::slice::from_ref(a), std::slice::from_ref(b))
             });
         if !always && unchanged {
-            rec.borrow_mut().fields = shown;
+            rec.borrow_mut().fields = shown.into();
             return Ok(());
         }
         let r = (|| {

@@ -307,7 +307,7 @@ impl Session {
                 let rec = self.page_rec(st);
                 let table = rec.borrow().table as usize;
                 let fresh = self.initial_fields(table);
-                rec.borrow_mut().fields = fresh;
+                rec.borrow_mut().fields = fresh.into();
                 self.stamp_from_filters(st, false)?;
             }
         }

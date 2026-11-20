@@ -381,6 +381,23 @@ impl Session {
 
     /// Field values of a fresh record: `InitValue` where declared, else the type default.
     pub(crate) fn initial_fields(&mut self, table: usize) -> Vec<Value> {
+        let (fields, lazy) = self.initial_fields_counted(table);
+        if lazy != 0 {
+            al_builtins::fields_track::note_untracked(lazy);
+        }
+        fields
+    }
+
+    /// `initial_fields` as a record's buffer: tracked by the PERF-22b count when it is Lazy-eligible.
+    pub(crate) fn initial_record_fields(&mut self, table: usize) -> al_builtins::fields_track::Fields {
+        match self.initial_fields_counted(table) {
+            (fields, 0) => fields.into(),
+            (fields, lazy) => al_builtins::fields_track::Fields::tracked(fields, lazy),
+        }
+    }
+
+    /// `initial_fields`, and the table id when the count is on and the buffer is Lazy-eligible (else 0).
+    fn initial_fields_counted(&mut self, table: usize) -> (Vec<Value>, u32) {
         // The values are the same for every record of the table, so they are worked out once per session and copied
         // (a text shares its buffer, copy on write). A value that is a shared object (a Blob's buffer) is built fresh
         // for each record in its slot of the copy (issue 6133: a local record variable of a table with a Blob field
@@ -397,12 +414,12 @@ impl Session {
                 }
             }
             let cleared = self.clear_uninstalled_init_values(table, &mut fields);
-            self.count_record_init(table, &fields, cleared);
-            return fields;
+            let lazy = self.count_record_init(table, &fields, cleared);
+            return (fields, lazy);
         }
         let engine = self.engine.clone();
         let Some(t) = engine.program.objects[table].table.as_ref() else {
-            return Vec::new();
+            return (Vec::new(), 0);
         };
         let fields: Vec<Value> = t.fields.iter().map(|f| self.initial_field(f)).collect();
         let fresh: Rc<[usize]> = fields
@@ -441,8 +458,8 @@ impl Session {
         self.initial_cache.insert(table, InitialFields { values, fresh });
         let mut fields = fields;
         let cleared = self.clear_uninstalled_init_values(table, &mut fields);
-        self.count_record_init(table, &fields, cleared);
-        fields
+        let lazy = self.count_record_init(table, &fields, cleared);
+        (fields, lazy)
     }
 
     /// Whether object `o` belongs to an app that is not installed yet while an app installs (`Session::set_apps_not_installed`).
@@ -1008,7 +1025,7 @@ impl Session {
         // field's OnValidate below (events/binding-senders/DbtEvents.al:623 Validate_ErrorInSubscriber, `name`, `name3`).
         let restore = |rec: &Rec, e: Signal, snapshot: Vec<Value>| {
             if matches!(e, Signal::Error(_)) {
-                rec.borrow_mut().fields = snapshot;
+                rec.borrow_mut().fields = snapshot.into();
             }
             e
         };
@@ -1036,7 +1053,7 @@ impl Session {
                 // Validate_ThatRaises_RestoresTheWholeRecord; the validated field alone:
                 // record/TestTriggerRollback.al:OnValidate_Throws_FieldValueRolledBack).
                 if matches!(e, Signal::Error(_)) {
-                    rec.borrow_mut().fields = snapshot;
+                    rec.borrow_mut().fields = snapshot.into();
                 }
                 return Err(e);
             }
@@ -1613,8 +1630,8 @@ impl Session {
                 // variable do not reach it; only the globals it was given stay (corpus
                 // record/PWTableGlobals.al:196-260, XRecPlainProc_*).
                 let table = rec.borrow().table as usize;
-                let fields = self.initial_fields(table);
-                let mut st = state_with_fields(&rec, fields);
+                let mut st = state_with_fields(&rec, Vec::new());
+                st.fields = self.initial_record_fields(table);
                 st.globals = rec.borrow().globals.xrec();
                 // The blank xRec of a record that a partial fetch filled loads nothing from the row: every field reads empty, the
                 // key too (record/load-fields/XRecUnloadedFieldRead.al PartialGet_XRecFields_ReadInTableMethod,
@@ -1971,7 +1988,7 @@ impl Session {
             let mut r = rec.borrow_mut();
             r.rolled_read = rolled_read;
             r.position = passes.then_some(pk);
-            r.fields = row;
+            r.fields = row.into();
             r.row_origin = origin;
             r.own_read = own_read;
         }
@@ -2582,9 +2599,10 @@ impl Session {
             (s.temporary, s.table)
         };
         let key = if crate::sqlcount::SqlCounters::wants_key(method) {
-            self.table(rec)
-                .ok()
-                .map(|t| al_data::position(&t, 0, &rec.borrow().fields))
+            self.table(rec).ok().map(|t| {
+                rec.borrow().fields.note_plain_read();
+                al_data::position(&t, 0, &rec.borrow().fields)
+            })
         } else {
             None
         };
@@ -2944,6 +2962,6 @@ pub(crate) fn state_with_fields(rec: &Rec, fields: Vec<Value>) -> RecordState {
         }
         Err(_) => rec.borrow().clone(),
     };
-    st.fields = fields;
+    st.fields = fields.into();
     st
 }

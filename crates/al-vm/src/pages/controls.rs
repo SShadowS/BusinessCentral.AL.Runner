@@ -1033,7 +1033,7 @@ impl Session {
                 // The refused edit does not stay (corpus testpage/TestPageBooleanSpelling_Tests.al,
                 // SetValue_TrueFalseSpelling_IsRefused: the stored value is untouched).
                 if let (Some(rec), Some(before)) = (&rec, before) {
-                    rec.borrow_mut().fields = before;
+                    rec.borrow_mut().fields = before.into();
                 } else if let Some((slot, owner)) = ctl.binding.var_slot(ctl.owner) {
                     let inst = self.owner_instance(st, owner);
                     inst.borrow_mut().globals[slot] = current.clone();

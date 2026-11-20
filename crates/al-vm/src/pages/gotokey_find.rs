@@ -97,7 +97,7 @@ impl Session {
         }
         if !found {
             if !Self::same_key(&self.row_key(&rec)?, &cur) {
-                rec.borrow_mut().fields = origin_fields;
+                rec.borrow_mut().fields = origin_fields.into();
                 let r = self.arrive(st);
                 self.torn_down_on_error(st, r)?;
             }
@@ -138,7 +138,7 @@ impl Session {
         let rec = self.page_rec(st);
         for i in Self::WINDOW - 2..Self::WINDOW {
             let stored = st.borrow().window[i].stored.clone();
-            rec.borrow_mut().fields = stored;
+            rec.borrow_mut().fields = stored.into();
             self.populate_current(st)?;
             let shown = rec.borrow().fields.clone();
             st.borrow_mut().window[i].shown = shown;
@@ -172,7 +172,7 @@ impl Session {
             );
         };
         let shown = st.borrow().window[at].shown.clone();
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         self.set_xrec(st);
         Ok(Some(true))
     }

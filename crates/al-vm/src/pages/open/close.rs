@@ -296,7 +296,7 @@ impl Session {
         let pending = st.borrow_mut().pending.take();
         if let Some(fields) = pending {
             let rec = self.page_rec(st);
-            rec.borrow_mut().fields = fields;
+            rec.borrow_mut().fields = fields.into();
             self.ret_used = false;
             self.tx.immediate_errors = true;
             let inserted = self.record_op(RecordOp::Insert, &rec, &mut [Value::Boolean(true)]);

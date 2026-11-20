@@ -194,7 +194,7 @@ impl Session {
             return unsupported("First after the row behind the new-row line of an empty list is gone (not pinned)");
         }
         let fields = probe.borrow().fields.clone();
-        rec.borrow_mut().fields = fields.clone();
+        rec.borrow_mut().fields = fields.clone().into();
         {
             let mut s = st.borrow_mut();
             s.cursor = Cursor::Row;

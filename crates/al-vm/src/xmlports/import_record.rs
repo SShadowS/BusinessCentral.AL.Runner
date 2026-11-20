@@ -69,7 +69,7 @@ impl Session {
                 }
             }
         }
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         let mut assigned: Vec<usize> = Vec::new();
         let mut links: Vec<(usize, Value)> = Vec::new();
         // Nested table elements take their link fields from the record above
@@ -82,7 +82,7 @@ impl Session {
                 // (xmlports/shapes-properties/R6924eLinkSibling.al:251 LinkSibling_Import_HeadersFirst `ins line -1|;ins line -2|;`).
                 let ptable = parent.borrow().table as usize;
                 let init = self.initial_fields(ptable);
-                parent.borrow_mut().fields = init;
+                parent.borrow_mut().fields = init.into();
             }
             for &(own, other) in &n.link_fields {
                 let v = parent.borrow().fields[other].clone();

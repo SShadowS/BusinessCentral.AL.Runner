@@ -345,7 +345,7 @@ impl Session {
             let shown = rec.borrow().fields.clone();
             self.ret_used = true;
             self.record_op(RecordOp::Get, &rec, &mut current.clone())?;
-            rec.borrow_mut().fields = shown;
+            rec.borrow_mut().fields = shown.into();
             return Ok(());
         }
         // The client reads the rows again from the row it stands on.

@@ -128,7 +128,7 @@ impl Session {
         let mut first = None;
         let mut ran = Ok(());
         for row in rows {
-            rec.borrow_mut().fields = row.clone();
+            rec.borrow_mut().fields = row.clone().into();
             ran = self.run_data_caption_held_back(st);
             if ran.is_err() {
                 break;
@@ -137,7 +137,7 @@ impl Session {
                 first = st.borrow().data_caption_value.clone();
             }
         }
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         ran?;
         st.borrow_mut().data_caption_value = first;
         Ok(())

@@ -76,7 +76,7 @@ impl Session {
             return refuse("the view before the action held a full window of rows or more");
         }
         for fields in reads {
-            rec.borrow_mut().fields = fields;
+            rec.borrow_mut().fields = fields.into();
             self.populate_current(st)?;
         }
         {
@@ -89,7 +89,7 @@ impl Session {
         }
         let table = rec.borrow().table as usize;
         let fresh = self.initial_fields(table);
-        rec.borrow_mut().fields = fresh;
+        rec.borrow_mut().fields = fresh.into();
         Ok(())
     }
 

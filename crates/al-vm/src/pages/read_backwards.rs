@@ -44,7 +44,7 @@ impl Session {
             );
         }
         for row in rows.iter_mut().rev() {
-            rec.borrow_mut().fields = row.stored.clone();
+            rec.borrow_mut().fields = row.stored.clone().into();
             self.populate_current(st)?;
             row.shown = rec.borrow().fields.clone();
         }
@@ -56,7 +56,7 @@ impl Session {
         // Y80_SV_F1_HostMoves `previous log`; needs corpus bump).
         if self.declares(st, "onaftergetcurrrecord") && rows.len() > 1 {
             let last = rows.len() - 1;
-            rec.borrow_mut().fields = rows[last].stored.clone();
+            rec.borrow_mut().fields = rows[last].stored.clone().into();
             self.populate_current(st)?;
             rows[last].shown = rec.borrow().fields.clone();
             self.page_trigger(st, "onaftergetrecord", vec![])?;
@@ -65,7 +65,7 @@ impl Session {
             st.borrow_mut().window = rows;
             return Ok(true);
         }
-        rec.borrow_mut().fields = rows[0].shown.clone();
+        rec.borrow_mut().fields = rows[0].shown.clone().into();
         let first_stored = rows[0].stored.clone();
         self.set_xrec_fields(st, first_stored);
         st.borrow_mut().window = rows;

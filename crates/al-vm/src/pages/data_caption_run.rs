@@ -107,9 +107,9 @@ impl Session {
         let rec = self.page_rec(st);
         let shown = rec.borrow().fields.clone();
         let table = rec.borrow().table as usize;
-        rec.borrow_mut().fields = self.initial_fields(table);
+        rec.borrow_mut().fields = self.initial_fields(table).into();
         let blank = self.populate_current(st);
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         blank?;
         self.populate_current(st)?;
         // The two reads are the client's own; the expression runs after neither (same test: no `DC` before `OnFindRecord(=)`).
@@ -131,9 +131,9 @@ impl Session {
         let rec = self.page_rec(st);
         let shown = rec.borrow().fields.clone();
         let table = rec.borrow().table as usize;
-        rec.borrow_mut().fields = self.initial_fields(table);
+        rec.borrow_mut().fields = self.initial_fields(table).into();
         let read = self.populate_current(st);
-        rec.borrow_mut().fields = shown;
+        rec.borrow_mut().fields = shown.into();
         st.borrow_mut().data_caption_due = false;
         read
     }

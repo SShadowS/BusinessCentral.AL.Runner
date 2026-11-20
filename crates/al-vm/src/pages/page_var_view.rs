@@ -29,7 +29,7 @@ impl Session {
             Some(f) if f.len() == copy.borrow().fields.len() => f,
             _ => self.initial_fields(table),
         };
-        copy.borrow_mut().fields = fields;
+        copy.borrow_mut().fields = fields.into();
         let mut s = st.borrow_mut();
         s.set_record = Some(copy);
         s.set_view = true;
