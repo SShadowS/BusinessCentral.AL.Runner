@@ -1070,7 +1070,6 @@ impl Session {
                     }
                     let mut e = e;
                     e.code = format!("NSValidateField:{}", e.code);
-                    self.error_finals = None;
                     self.hold_error(*e)?;
                     return Ok(Value::Null);
                 }
@@ -1096,7 +1095,6 @@ impl Session {
                 if e.message.is_empty() && rec_bound && ctl.trigger("onvalidate").is_none() && pinned_shape {
                     let mut e = e;
                     e.code = format!("NSValidateField:{}", e.code);
-                    self.error_finals = None;
                     self.hold_error(*e)?;
                     return Ok(Value::Null);
                 }
