@@ -48,6 +48,7 @@ mod time_rollover;
 pub(crate) use stale_rule::{TrappedRollback, same_key};
 pub(crate) use time_rollover::rolled_read_end_for_operands;
 mod guarded_run_body;
+pub(crate) mod init_count;
 pub(crate) use guarded_run_body::GuardedBody;
 mod locking_read_cells;
 pub(crate) use locking_read_cells::{LockingReadNote, StaleWrite};
@@ -395,7 +396,8 @@ impl Session {
                     }
                 }
             }
-            self.clear_uninstalled_init_values(table, &mut fields);
+            let cleared = self.clear_uninstalled_init_values(table, &mut fields);
+            self.count_record_init(table, &fields, cleared);
             return fields;
         }
         let engine = self.engine.clone();
@@ -438,7 +440,8 @@ impl Session {
         }
         self.initial_cache.insert(table, InitialFields { values, fresh });
         let mut fields = fields;
-        self.clear_uninstalled_init_values(table, &mut fields);
+        let cleared = self.clear_uninstalled_init_values(table, &mut fields);
+        self.count_record_init(table, &fields, cleared);
         fields
     }
 
@@ -464,14 +467,16 @@ impl Session {
     /// The InitValue of a table extension field of an app not installed yet does not apply: the field holds its type's
     /// default (install-upgrade/install-order/Y8InstallOrderTests.al:88-110, row 1 that XApp A's install writes has an empty
     /// "Y8 XB Mark", XApp B's InitValue 'B init' applies to B's own install row and at test time).
-    fn clear_uninstalled_init_values(&mut self, table: usize, fields: &mut [Value]) {
+    /// Returns whether it cleared a slot.
+    fn clear_uninstalled_init_values(&mut self, table: usize, fields: &mut [Value]) -> bool {
         if self.events.not_installed_apps.as_ref().is_none_or(|a| a.is_empty()) {
-            return;
+            return false;
         }
         let engine = self.engine.clone();
         let Some(t) = engine.program.objects[table].table.as_ref() else {
-            return;
+            return false;
         };
+        let mut cleared = false;
         for (i, f) in t.fields.iter().enumerate() {
             if f.init.is_some()
                 && let Some(d) = f.declared_in
@@ -480,8 +485,10 @@ impl Session {
                 && let Some(slot) = fields.get_mut(i)
             {
                 *slot = self.default_value(&f.ty);
+                cleared = true;
             }
         }
+        cleared
     }
 
     /// The value of field `f` in a fresh record.

@@ -55,6 +55,10 @@ fn write_permission_shadow(path: &std::ffi::OsStr) {
 }
 
 fn main() -> ExitCode {
+    // PERF-22 measurement (throwaway): count `initial_fields` calls by table and eligibility.
+    if std::env::var_os("ALRUNNER_COUNT_RECORD_INIT").is_some_and(|v| v == "1") {
+        al_vm::enable_record_init_count();
+    }
     let shadow = std::env::var_os("AL_PERMISSION_SHADOW");
     if shadow.is_some() {
         al_builtins::permission_shadow::enable();
@@ -77,6 +81,9 @@ fn main() -> ExitCode {
     al_testrun::profiling::finish_legacy();
     if std::env::var_os("AL_EXEC_REPORT").is_some() {
         eprintln!("{}", al_vm::exec_report());
+    }
+    if let Some(line) = al_vm::record_init_count_line() {
+        eprintln!("{line}");
     }
     match joined {
         Ok(code) => code,
