@@ -460,6 +460,17 @@ impl TestResult {
     }
 }
 
+/// What the login starts of the engine did (`login_start.rs`, al-runner issue 8211), over every request it ran.
+#[derive(Debug, Clone, Default)]
+pub struct LoginReplay {
+    /// `RunOptions::login_replay_check`: the check's report lines (`login_replay.rs`); `None` without the check.
+    pub report: Option<String>,
+    /// How many test sessions took a login start in place of running the login.
+    pub replays: u64,
+    /// How many login starts the engine keeps.
+    pub starts: usize,
+}
+
 /// Wall time of the phases of a run (`--timings`).
 #[derive(Debug, Clone, Default)]
 pub struct Phases {
@@ -533,8 +544,8 @@ pub struct Phases {
     pub install_snapshot: Option<String>,
     /// A warm server ran the request on the engines an earlier request over the same compile kept.
     pub engine_kept: bool,
-    /// `RunOptions::login_replay_check`: the check's report line (`login_replay.rs`), counted over every request the engine ran.
-    pub login_replay: Option<String>,
+    /// The login starts (`login_start.rs`) and the login replay check, counted over every request the engine ran.
+    pub login_replay: LoginReplay,
     /// What the run did, counted (the work ratchet of `al-test-cli`).
     pub work: RunWork,
 }
