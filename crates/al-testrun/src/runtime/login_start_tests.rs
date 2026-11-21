@@ -333,7 +333,7 @@ fn the_image_line_reports_the_kept_bytes_and_the_nodes_per_kind() {
 /// The key of a new session of `engine` whose login skipped `skipped`.
 fn key_skipping(engine: &Arc<Engine>, skipped: &[al_vm::SkippedInstall]) -> Key {
     let mut session = al_vm::Session::new(engine.clone());
-    Key::of(&mut session, false, SessionFlags::default(), skipped)
+    Key::of(&mut session, Default::default(), SessionFlags::default(), skipped)
 }
 
 // The open runs under the watch of the skipped installs, whose hit marks or refuses: another list is another key (design
@@ -504,7 +504,7 @@ fn a_session_the_gate_refuses_runs_its_login_and_is_counted() {
 fn numbered_key(engine: &Arc<Engine>, n: i32) -> Key {
     let mut session = al_vm::Session::new(engine.clone());
     session.set_work_date(1000 + n);
-    Key::of(&mut session, false, SessionFlags::default(), &[])
+    Key::of(&mut session, Default::default(), SessionFlags::default(), &[])
 }
 
 /// A start whose image holds `bytes` of text in a SingleInstance codeunit's global: `kept_bytes` is a little more.
