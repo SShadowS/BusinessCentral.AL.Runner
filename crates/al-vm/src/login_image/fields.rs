@@ -7,6 +7,9 @@
 //! - `plain`: imaged by value ([`PlainFields`]); the type is written next to the name, so a wrong one does not compile.
 //! - `runner`: set by the runner before the login from the run's plan (al-testrun `enter_test_codeunit`); never imaged:
 //!   the thaw keeps the target's own value.
+//! - `counter`: a count read only as a difference around one call and never by AL code (the readers are cited next to
+//!   each): no input or output of the login, so neither imaged nor rendered nor in the key; the thaw keeps the target's
+//!   own, and a later difference around a call is the same.
 //!
 //! The rule for what the thaw writes (step 3 review H2, M1): a field it writes from the image or keeps from its target is
 //! an input of the login key by content and is compared by the check. [`Session::field_lines`] renders every `plain` and
@@ -86,8 +89,6 @@ macro_rules! session_fields {
             plain {
                 // A caught error of the login stays GetLastErrorText (state_stamp.rs `last error`).
                 last_error: al_builtins::native::AlError,
-                // Counts read as a difference around one call (install_left.rs): by value, so a later difference is the same.
-                caught_errors: u64,
                 // The object that raised the last error; goes with `last_error`.
                 error_raised_in: Option<usize>,
                 isolated_storage: HashMap<(String, String), (String, bool, bool)>,
@@ -111,7 +112,6 @@ macro_rules! session_fields {
                 randomized_with_seed: bool,
                 rng: al_host::random::NetRandom,
                 random_draws: u64,
-                calls_made: u64,
                 reseeded_in_test: bool,
                 inherited_draws: u64,
                 run_seeded_in_test: bool,
@@ -119,8 +119,6 @@ macro_rules! session_fields {
                 unseeded_randomizes: i32,
                 // Row-version counters (state_stamp.rs `counters`; `install_row_version`: `mark_install_end`).
                 next_row_version: i64,
-                deletes: u64,
-                rollbacks: u64,
                 install_row_version: i64,
                 autoinc: HashMap<(String, u32), i64>,
                 baseline_rows: BTreeSet<u32>,
@@ -152,6 +150,21 @@ macro_rules! session_fields {
                 // The key holds it in a field of its own (al-testrun `Key::test_codeunit`), not in the state lines, so the
                 // check can compare the logins of two test codeunits.
                 test_object [own_key_field],
+            }
+            counter {
+                // Read only as a difference around one call, never by AL code: `page_run_close.rs:310`, `:631`,
+                // `pages/rows.rs:2879`, `pages/document_handler_error.rs:261` (written by `caught_errors.rs:50`).
+                caught_errors,
+                // `records.rs:2537` (`SqlCounters::enter`), `:2574`, `isdirty.rs:266`, `:273`, `globaltriggers.rs:62-64`
+                // (written by `lib.rs:2360`). Real logins of one key differ in it: the WorkDate step's recorded run
+                // (al-testrun `install::LoginMemo`) answers without the call (step 3 review round 2, R2-M1).
+                calls_made,
+                // `pages.rs:432` (`write_mark`, compared before and after: `page_run_close.rs:309`, `:622`,
+                // `pages/next_held_row_read.rs:31`, `:92`, `pages/part_insert_swallowed.rs:41`,
+                // `pages/list_factbox_new_line.rs:191`, `:340`, `pages/code_inserted_new_line.rs:225`).
+                deletes,
+                // `pages/empty_part_rec.rs:222` (`landing_store_state`, compared at `:64` against `:149`).
+                rollbacks,
             }
             linked {
                 singletons,
@@ -319,6 +332,7 @@ macro_rules! image_fields {
     (
         plain { $($p:ident: $pt:ty,)* }
         runner { $($n:ident $([$nk:ident])?,)* }
+        counter { $($c:ident,)* }
         linked { $($l:ident,)* }
         fresh { $($f:ident,)* }
         refuse { $($r:ident $([$only:ident])? => $rp:expr,)* }
@@ -357,7 +371,7 @@ macro_rules! image_fields {
             /// The first field of the `refuse` class, or of the `own` class with a requirement, that does not hold what
             /// the image requires; `None` when each does. The `rest` class is [`Session::at_rest`].
             pub(crate) fn refused_field(&self) -> Option<&'static str> {
-                let Session { $($p: _,)* $($n: _,)* $($l: _,)* $($f: _,)* $($r: _,)* $($s: _,)* $($o: _,)* } = self;
+                let Session { $($p: _,)* $($n: _,)* $($c: _,)* $($l: _,)* $($f: _,)* $($r: _,)* $($s: _,)* $($o: _,)* } = self;
                 $(
                     let holds: fn(&Session) -> bool = $rp;
                     if !holds(self) {
