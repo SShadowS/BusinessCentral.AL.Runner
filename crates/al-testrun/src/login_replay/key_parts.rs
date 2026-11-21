@@ -22,17 +22,74 @@ pub(crate) struct KeyParts {
     session: BTreeMap<String, LinesDigest>,
 }
 
-impl KeyParts {
-    /// The parts of the committed rows `tables` (one line per row, as `rows` writes them) and the state `state`.
-    pub(crate) fn of(tables: &[al_data::memory::ExportedTable], state: &al_vm::StateLines) -> KeyParts {
-        let database = (tables.iter())
-            .map(|t| {
-                (
-                    (t.company.clone(), t.object),
-                    digest(&super::rows(std::slice::from_ref(t))),
-                )
+/// The digest of the committed row lines of table `t` (as `rows` writes them).
+fn table_digest(t: &al_data::memory::ExportedTable) -> LinesDigest {
+    digest(&super::rows(std::slice::from_ref(t)))
+}
+
+/// Per (company, table object), [`table_digest`] of each of `tables`.
+#[cfg(test)]
+pub(crate) fn table_digests(tables: &[al_data::memory::ExportedTable]) -> BTreeMap<(String, u32), LinesDigest> {
+    (tables.iter())
+        .map(|t| ((t.company.clone(), t.object), table_digest(t)))
+        .collect()
+}
+
+/// [`table_digests`] of the committed tables of `store`, each digest made once per state of its table: a table's stamp
+/// names one state of it in every store of the process (al-data `MemStore::committed_stamps`), so a digest kept for a
+/// stamp is the digest of the rows the table holds at that stamp (step 3 review H3: the rows were rendered and digested
+/// whole for every test session). A table with no stamp is digested each time. Kept per engine (`Engine::derived`).
+pub(crate) fn store_table_digests(
+    engine: &al_vm::Engine,
+    store: &al_data::memory::MemStore,
+) -> BTreeMap<(String, u32), LinesDigest> {
+    #[derive(Default)]
+    struct Memo(std::sync::Mutex<std::collections::HashMap<(String, u32, u64), LinesDigest>>);
+    /// How many table states the memo keeps before it starts again.
+    const KEPT: usize = 1 << 16;
+    let memo = engine.derived(Memo::default);
+    let mut out = BTreeMap::new();
+    for (company, object, stamp) in store.committed_stamps() {
+        let known = (stamp != 0)
+            .then(|| {
+                (memo.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
+                    .get(&(company.clone(), object, stamp))
+                    .copied()
             })
-            .collect();
+            .flatten();
+        let d = match known {
+            Some(d) => d,
+            None => {
+                let Some((table, _)) = store.committed_table(&company, object) else {
+                    continue;
+                };
+                let d = table_digest(&table);
+                if stamp != 0 {
+                    let mut m = memo.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    if m.len() >= KEPT {
+                        m.clear();
+                    }
+                    m.insert((company.clone(), object, stamp), d);
+                }
+                d
+            }
+        };
+        out.insert((company, object), d);
+    }
+    out
+}
+
+/// The `database` digest of a key: the digest of the per-table digests `tables`, each with its company and table.
+pub(crate) fn database_digest(tables: &BTreeMap<(String, u32), LinesDigest>) -> LinesDigest {
+    let lines: Vec<String> = (tables.iter())
+        .map(|((company, object), d)| format!("{company}|{object}|{}", d.hex()))
+        .collect();
+    digest(&lines)
+}
+
+impl KeyParts {
+    /// The parts of the committed rows (per table, [`table_digests`]) and the state `state`.
+    pub(crate) fn of(database: BTreeMap<(String, u32), LinesDigest>, state: &al_vm::StateLines) -> KeyParts {
         let mut by_name: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for line in &state.lines {
             let name = line.split(' ').next().unwrap_or_default();
