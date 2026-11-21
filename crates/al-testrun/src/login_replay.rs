@@ -21,7 +21,9 @@ use std::sync::{Mutex, PoisonError};
 /// static a request sets is a field here (`login_start/outside.rs`). Two sessions with the same
 /// key may share one run of the login only when they also hold the same after it ([`Check`]); a field left out of the
 /// key would let a replay hand a session the store of another input. The engine (the compiled program, its apps and
-/// their code) is not a field: the check lives on the engine (`Engine::derived`).
+/// their code) is not a field: the check lives on the engine (`Engine::derived`). Nor is `Engine::emit_version` (the
+/// build the missing-object error names): one daemon serves one BC build, so the engine fixes it. A daemon that took
+/// another build per request would need it as a field.
 ///
 /// The maintainer's two conditions for the replay (al-runner issue 8211): every field holds its input by content or by a
 /// SHA-256 digest ([`LinesDigest`]), never a 64-bit hash; and the test codeunit stays a field until a repeat across test
