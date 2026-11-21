@@ -232,12 +232,17 @@ fn open_company(
             let hits = al_builtins::assumptions::take_hit_bits();
             if let (Some(key), Some(base), true) = (key, base, wrote.raised) {
                 // The check's twin is made as `run_codeunit_inner` makes the session: the host of the same scratch, the
-                // run's flags.
+                // run's flags, the test codeunit entered.
+                let object = session.test_object;
                 let twin = || {
                     let mut host = crate::host::host_perturbed(scratch.clock_start, perturb);
                     host.run_seed = scratch.run_seed.seed;
                     let mut twin = Session::with_host(engine.clone(), host);
                     scratch.flags.apply(&mut twin);
+                    // What the runner set before the login, which the thaw keeps from its target (`runner` fields).
+                    if let Some(object) = object {
+                        enter_test_codeunit(&mut twin, scratch, object, isolation);
+                    }
                     twin
                 };
                 match (check, gate) {

@@ -3108,3 +3108,65 @@ codeunit 50821 "Probe Login Tests"
         on[1].last()
     );
 }
+
+/// The app of the review's `pg` and `ph` probes (step 3 review H2): a login subscriber adds a row both test codeunits read,
+/// and both take NumberSequence numbers, so under TestIsolation = Function in BC's order the second is refused when the
+/// numbers an earlier codeunit took are not known (al-runner issue 8152, `Scratch::numbers_unmeasured`).
+const NUMBERS_APP: &str = r#"table 50830 "RG Login Row" { fields { field(1; Code; Code[20]) { } field(2; Note; Text[50]) { } } keys { key(PK; Code) { Clustered = true; } } }
+codeunit 50820 "Probe Registration"
+{
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Guided Experience", 'OnRegisterManualSetup', '', false, false)]
+    local procedure RegisterManualSetup() var Row: Record "RG Login Row";
+    begin Row.Code := 'L'; Row.Note := 'from login'; if Row.Insert() then; end;
+}
+codeunit 50821 "RG Tests W"
+{
+    Subtype = Test;
+    [Test]
+    procedure TakesNumbers() var Row: Record "RG Login Row"; N: BigInteger;
+    begin
+        if not NumberSequence.Exists('RGSEQ') then NumberSequence.Insert('RGSEQ', 1, 1);
+        N := NumberSequence.Next('RGSEQ');
+        Error('W rows=%1 next=%2', Row.Count(), N);
+    end;
+}
+codeunit 50822 "RG Tests K"
+{
+    Subtype = Test;
+    [Test]
+    procedure ReadsNumbers() var Row: Record "RG Login Row"; N: BigInteger;
+    begin
+        if not NumberSequence.Exists('RGSEQ') then NumberSequence.Insert('RGSEQ', 1, 1);
+        N := NumberSequence.Next('RGSEQ');
+        Error('K rows=%1 next=%2', Row.Count(), N);
+    end;
+    [Test] procedure Plain() var Row: Record "RG Login Row"; begin Error('K plain rows=%1', Row.Count()); end;
+}
+"#;
+
+/// Step 3 review H2, `pg`: a plain request, then one in BC's order under TestIsolation = Function, where the numbers mark
+/// refuses `ReadsNumbers`. A start the plain request recorded without the mark must not run it.
+#[test]
+fn a_start_recorded_without_the_numbers_mark_does_not_run_a_refused_test() {
+    let strict = json!({"seed": 1, "testIsolation": "test", "strictOrder": true});
+    same_with_and_without_the_replay(
+        NUMBERS_APP,
+        &[json!({"seed": 1}), strict.clone(), json!({"seed": 1}), strict],
+    );
+}
+
+/// Step 3 review H2, `ph`: the strict request first, so a start is recorded with the mark; a later request without it must
+/// not refuse the test.
+#[test]
+fn a_start_recorded_with_the_numbers_mark_does_not_refuse_a_later_test() {
+    let strict = json!({"seed": 1, "testIsolation": "test", "strictOrder": true});
+    same_with_and_without_the_replay(
+        NUMBERS_APP,
+        &[
+            strict.clone(),
+            json!({"seed": 1, "testIsolation": "test"}),
+            json!({"seed": 1}),
+            strict,
+        ],
+    );
+}

@@ -5,6 +5,14 @@
 //!
 //! The classes:
 //! - `plain`: imaged by value ([`PlainFields`]); the type is written next to the name, so a wrong one does not compile.
+//! - `runner`: set by the runner before the login from the run's plan (al-testrun `enter_test_codeunit`); never imaged:
+//!   the thaw keeps the target's own value.
+//!
+//! The rule for what the thaw writes (step 3 review H2, M1): a field it writes from the image or keeps from its target is
+//! an input of the login key by content and is compared by the check. [`Session::field_lines`] renders every `plain` and
+//! `runner` field into [`Session::state_lines`], which the key digests before the login and the check compares after it;
+//! the `linked` fields are outputs of the login the image carries by hand, and the state lines render those AL code can read
+//! (state_stamp.rs, state_facts.rs).
 //! - `linked`: imaged by hand, in `session_parts.rs` and the arena.
 //! - `fresh`: caches and scratch with no AL value; the thawn session keeps its new value.
 //! - `refuse`: must hold a new session's value (the predicate next to it), else the session has no image. Install code
@@ -115,11 +123,6 @@ macro_rules! session_fields {
                 install_row_version: i64,
                 autoinc: HashMap<(String, u32), i64>,
                 baseline_rows: BTreeSet<u32>,
-                // Set by al-testrun `enter_test_codeunit` before the login.
-                in_test_codeunit: bool,
-                isolation_from_hub: bool,
-                hub_disabled: bool,
-                test_object: Option<usize>,
                 http_policy: Option<&'static str>,
                 tdd_reached: BTreeSet<String>,
                 // A record's own read is current against it (state_render.rs `own_read`).
@@ -138,8 +141,18 @@ macro_rules! session_fields {
                 caption_translations: Vec<(String, i32, String)>,
                 ui_caption_translated: Vec<(String, i32)>,
             }
-            linked {
+            runner {
+                // Set by al-testrun `enter_test_codeunit` before the login, from the run's plan: the number sequences'
+                // refusal mark (al-runner issue 8152) and the codeunit's isolation settings.
                 numbers_unmeasured,
+                in_test_codeunit,
+                isolation_from_hub,
+                hub_disabled,
+                // The key holds it in a field of its own (al-testrun `Key::test_codeunit`), not in the state lines, so the
+                // check can compare the logins of two test codeunits.
+                test_object [own_key_field],
+            }
+            linked {
                 singletons,
                 store,
                 temps,
@@ -296,6 +309,7 @@ macro_rules! session_fields {
 macro_rules! image_fields {
     (
         plain { $($p:ident: $pt:ty,)* }
+        runner { $($n:ident $([$nk:ident])?,)* }
         linked { $($l:ident,)* }
         fresh { $($f:ident,)* }
         refuse { $($r:ident $([$only:ident])? => $rp:expr,)* }
@@ -321,10 +335,20 @@ macro_rules! image_fields {
         }
 
         impl Session {
+            /// Every `plain` and `runner` field, one line each (`field.<name> <value>`, a map or set in sorted order):
+            /// the fields the thaw writes from the image or keeps from its target. [`Session::state_lines`] holds them,
+            /// so the login key holds each before the login and the check compares each after it (step 3 review H2, M1:
+            /// a field the thaw writes is an input of the key by content, or kept from the target).
+            pub(crate) fn field_lines(&self) -> Vec<String> {
+                let mut out = vec![$(format!("field.{} {}", stringify!($p), Canon::canon(&self.$p)),)*];
+                $(runner_line!(out, self, $n $([$nk])?);)*
+                out
+            }
+
             /// The first field of the `refuse` class, or of the `own` class with a requirement, that does not hold what
             /// the image requires; `None` when each does. The `rest` class is [`Session::at_rest`].
             pub(crate) fn refused_field(&self) -> Option<&'static str> {
-                let Session { $($p: _,)* $($l: _,)* $($f: _,)* $($r: _,)* $($s: _,)* $($o: _,)* } = self;
+                let Session { $($p: _,)* $($n: _,)* $($l: _,)* $($f: _,)* $($r: _,)* $($s: _,)* $($o: _,)* } = self;
                 $(
                     let holds: fn(&Session) -> bool = $rp;
                     if !holds(self) {
@@ -353,6 +377,71 @@ macro_rules! image_fields {
                 None
             }
         }
+    };
+}
+
+/// A field's value as one text that is the same for equal values: a map or a set in sorted order, everything else in its
+/// debug form ([`Session::field_lines`]).
+pub(crate) trait Canon {
+    fn canon(&self) -> String;
+}
+
+impl<K: std::fmt::Debug, V: std::fmt::Debug, S> Canon for HashMap<K, V, S> {
+    fn canon(&self) -> String {
+        let mut v: Vec<String> = self.iter().map(|(k, v)| format!("{k:?}: {v:?}")).collect();
+        v.sort();
+        format!("{{{}}}", v.join(", "))
+    }
+}
+
+impl<T: std::fmt::Debug, S> Canon for HashSet<T, S> {
+    fn canon(&self) -> String {
+        let mut v: Vec<String> = self.iter().map(|x| format!("{x:?}")).collect();
+        v.sort();
+        format!("{{{}}}", v.join(", "))
+    }
+}
+
+/// [`Canon`] in the debug form, for types whose debug form has one order.
+macro_rules! canon_by_debug {
+    ($($t:ty),* $(,)?) => { $(impl Canon for $t { fn canon(&self) -> String { format!("{self:?}") } })* };
+}
+
+canon_by_debug!(
+    bool,
+    i32,
+    i64,
+    u64,
+    String,
+    al_builtins::native::AlError,
+    al_host::random::NetRandom,
+    crate::blob_transfer::Sources,
+    crate::EncryptionKey,
+);
+
+impl<T: std::fmt::Debug> Canon for Option<T> {
+    fn canon(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl<T: std::fmt::Debug> Canon for Vec<T> {
+    fn canon(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl<T: std::fmt::Debug> Canon for BTreeSet<T> {
+    fn canon(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+/// The line of one `runner` field in [`Session::field_lines`]: none for one marked `[own_key_field]`.
+macro_rules! runner_line {
+    ($out:expr, $s:expr, $n:ident [own_key_field]) => {};
+    ($out:expr, $s:expr, $n:ident) => {
+        $out.push(format!("field.{} {}", stringify!($n), Canon::canon(&$s.$n)));
     };
 }
 

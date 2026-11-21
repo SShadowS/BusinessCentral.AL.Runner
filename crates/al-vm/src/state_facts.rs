@@ -107,7 +107,11 @@ mod tests {
         emptied.commit_transaction();
         fresh.commit_transaction();
         let (a, b) = (emptied.state_lines(), fresh.state_lines());
-        let differ: Vec<_> = a.lines.iter().zip(&b.lines).filter(|(x, y)| x != y).collect();
+        // The SQL counters are a line of one session and not of the other (the DeleteAll is a store operation after its
+        // Commit's): the lines without them.
+        let plain = |l: &Vec<String>| l.iter().filter(|l| !l.starts_with("sql ")).cloned().collect::<Vec<_>>();
+        let (a, b) = (plain(&a.lines), plain(&b.lines));
+        let differ: Vec<_> = a.iter().zip(&b).filter(|(x, y)| x != y).collect();
         assert_eq!(differ.len(), 1, "{differ:?}");
         assert!(differ[0].0.starts_with("emptied "), "{differ:?}");
     }
