@@ -1309,7 +1309,6 @@ fn run_version_inner(
         // The oracle leaves the runner's OnRun row out (oracle::RUNNER_PSEUDO_CASE).
         on_run_rows: runtime::OnRunRows::PerTest,
         tdd: false,
-        object_hashes: false,
         debug_ready: None,
         // The corpus compiles on real BC: an error found here is the front end's, printed, never a reason not to run.
         stop_on_compile_errors: false,
@@ -1329,6 +1328,7 @@ fn run_version_inner(
         // `dev_endpoint_ui` stays off: the corpus runs as Microsoft's Test Runner app does, so unhandled UI is an error.
         private_baseline: std::env::var_os("AL_PRIVATE_BASELINE").is_some(), // ADR-069 decision 11
         login_replay_check: std::env::var_os("ALRUNNER_LOGIN_REPLAY_CHECK").is_some(), // issue 8211, internal
+        login_replay_off: std::env::var_os("ALRUNNER_LOGIN_REPLAY").is_some_and(|v| v == "0"), // issue 8211, internal
         // Internal, for the ADR-070 step 2 comparison: the whole corpus in BC's order (`AL_STRICT_ORDER_ALL`), and the
         // sequential strict run (`AL_STRICT_SEQUENTIAL`).
         strict_order: std::env::var_os("AL_STRICT_ORDER_ALL").is_some(),

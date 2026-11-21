@@ -20,7 +20,7 @@ use al_vm::Session;
 use std::collections::BTreeSet;
 
 /// What the partner dependency apps' login subscribers left in the test session ([`raise`]).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct PartnerLogin {
     /// The tables they wrote: a test or an OnRun that reads or writes one is not run.
     pub tables: BTreeSet<u32>,

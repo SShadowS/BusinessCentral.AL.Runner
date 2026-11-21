@@ -48,6 +48,9 @@ pub struct LoginImage {
     bindings: Vec<arena::NodeId>,
     /// The live records of `Session::temp_blob_impl_fields`, by record node, with their field positions.
     temp_blob_fields: Vec<(arena::NodeId, usize)>,
+    /// The shape of the store the login started from ([`Session::base_shape`]): a replay needs the target's to be equal.
+    /// PERF-01 step 3 A1: always the empty shape until A2 takes it.
+    base_shape: BaseShape,
 }
 
 // The image is kept and given to sessions of other threads: `Send + Sync` by its types, no `unsafe`.
@@ -96,12 +99,87 @@ pub struct ImageSize {
     pub instances: usize,
     pub temp_tables: usize,
     pub temp_rows: usize,
+    /// What keeping the image costs ([`LoginImage::kept_bytes`]): what the starts' memory cap counts.
+    pub kept_bytes: u64,
+    /// Per kind of node, in the order of [`NODE_KINDS`]: how many the arena holds and their bytes (names only, no value).
+    pub kinds: [KindSize; NODE_KINDS.len()],
+}
+
+/// The kinds of arena node, as the image line names them ([`ImageSize::kinds`]).
+pub const NODE_KINDS: [&str; 12] = [
+    "instance",
+    "array",
+    "list",
+    "dictionary",
+    "record",
+    "table globals",
+    "library",
+    "blob",
+    "temporary table",
+    "row",
+    "query",
+    "dotnet",
+];
+
+/// How many nodes of one kind an image holds, and their bytes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct KindSize {
+    pub count: usize,
+    pub bytes: u64,
+}
+
+/// What a login's row delta assumes of the store it is put on, beyond the rows the key's digest sees: which tables have
+/// an entry (with their row counts), the tables a DeleteAll emptied, and the company copies (design section 3.2). A replay
+/// takes a start only onto a store of the same shape.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BaseShape {
+    /// (company, table object, committed rows) of every committed table entry, sorted.
+    pub tables: Vec<(String, u32, usize)>,
+    /// (company, table object) of every table a DeleteAll without filters emptied, sorted.
+    pub emptied: Vec<(String, u32)>,
+    /// (copy, source) of every company copy, sorted.
+    pub copies: Vec<(String, String)>,
+}
+
+/// The store a session's login starts from, taken before the login ([`Session::login_base`]), for the image's rows.
+/// It stays on the session's thread.
+pub struct LoginBase {
+    /// The store's change counter before the login (`MemStore::change_counter`), for `ImageSize::rows_own_bytes`.
+    before_login: u64,
+}
+
+#[cfg(test)]
+impl LoginBase {
+    /// A base before every change of the store: every table a write reached counts as the login's own.
+    pub(crate) fn before_everything() -> LoginBase {
+        LoginBase { before_login: 0 }
+    }
 }
 
 impl Session {
-    /// What this session holds, as an image any thread may keep. `before_login`: the store's change counter before the
-    /// login ran (`MemStore::change_counter`), for `ImageSize::rows_own_bytes`.
-    pub fn login_image(&self, before_login: u64) -> Result<LoginImage, NotImaged> {
+    /// The store this session's login starts from: take it before the login and give it to [`Session::login_image`].
+    pub fn login_base(&self) -> LoginBase {
+        LoginBase {
+            before_login: self.store.change_counter(),
+        }
+    }
+
+    /// The shape of this session's committed store ([`BaseShape`]). PERF-01 step 3 A1: inert, always the empty shape.
+    pub fn base_shape(&self) -> BaseShape {
+        BaseShape::default()
+    }
+
+    /// Why this session cannot take a login start in place of its login (the thaw's target rule: at rest, every `refuse`
+    /// field as a new session holds it, no access watch on the store); `None`: it can. PERF-01 step 3 A1: inert, always
+    /// `None`.
+    pub fn thaw_target_why(&self) -> Option<&'static str> {
+        None
+    }
+
+    /// What this session holds, as an image any thread may keep. `base`: the store before the login
+    /// ([`Session::login_base`]).
+    pub fn login_image(&self, base: &LoginBase) -> Result<LoginImage, NotImaged> {
+        let before_login = base.before_login;
         if let Some(field) = self.at_rest_why() {
             return Err(NotImaged::NotAtRest(field));
         }
@@ -129,6 +207,7 @@ impl Session {
             singletons: walk.singletons,
             bindings: walk.bindings,
             temp_blob_fields: walk.temp_blob_fields,
+            base_shape: BaseShape::default(),
         })
     }
 
