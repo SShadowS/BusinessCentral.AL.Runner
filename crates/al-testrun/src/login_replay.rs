@@ -71,14 +71,43 @@ pub(crate) struct Key {
     /// The install code that could not run (`runtime::install_once`): the open runs under the watch of its tables, whose
     /// hit marks an assumption or refuses the codeunit (`runtime/blocked.rs` `watching_skipped_installs`). By content.
     skipped: Vec<al_vm::SkippedInstall>,
+    /// The test isolation the codeunit runs under and whether BC's TestRunnerHub runs it (`Scratch::hub`): a request
+    /// sets both (`testIsolation`), and they set the session's isolation fields before the login.
+    isolation: (crate::isolation::TestIsolation, bool),
+    /// The settings of the process a serve request sets and the system host answers from ([`RunSettings`]).
+    run: RunSettings,
+}
+
+/// The process settings a serve request sets and the login can read through the system host (`host.rs`): the server
+/// base address (`GetUrl`), the companies of the database, the company name and whether the publish order is known. By
+/// content: two requests of one daemon with other settings never share a key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RunSettings {
+    server_url: (String, bool),
+    companies: al_host::Companies,
+    company_name: Option<String>,
+    publish_order_known: bool,
+}
+
+impl RunSettings {
+    /// The settings now.
+    fn now() -> RunSettings {
+        RunSettings {
+            server_url: crate::host::server_url(),
+            companies: crate::host::companies(),
+            company_name: crate::host::company_name(),
+            publish_order_known: crate::host::publish_order_known(),
+        }
+    }
 }
 
 impl Key {
-    /// The key of `session` before it opens the company; `disabled`: RequiredTestIsolation = Disabled; `flags`: the run options
-    /// the session took; `skipped`: the install code that could not run, whose tables the open is watched on.
+    /// The key of `session` before it opens the company; `isolation`: the codeunit's test isolation and whether the hub
+    /// runs it; `flags`: the run options the session took; `skipped`: the install code that could not run, whose tables
+    /// the open is watched on.
     pub(crate) fn of(
         session: &mut Session,
-        disabled: bool,
+        isolation: (crate::isolation::TestIsolation, bool),
         flags: crate::runtime::session_flags::SessionFlags,
         skipped: &[al_vm::SkippedInstall],
     ) -> Key {
@@ -116,12 +145,14 @@ impl Key {
             client: (
                 session.has_interactive_client(),
                 session.is_clientless_session(),
-                disabled,
+                isolation.0 == crate::isolation::TestIsolation::Disabled,
             ),
             flags,
             license: session.engine.license.clone(),
             parts: key_parts::KeyParts::of(&tables, &state),
             skipped: skipped.to_vec(),
+            isolation,
+            run: RunSettings::now(),
         }
     }
 }
@@ -146,6 +177,8 @@ impl Key {
             // A detail of `database` and `session` (see `differs_detail`), not a field of its own.
             parts: _,
             skipped,
+            isolation,
+            run,
         } = self;
         [
             (*database != other.database, "database"),
@@ -161,6 +194,8 @@ impl Key {
             (*flags != other.flags, "flags"),
             (*license != other.license, "license"),
             (*skipped != other.skipped, "skipped"),
+            (*isolation != other.isolation, "isolation"),
+            (*run != other.run, "run"),
         ]
         .into_iter()
         .filter_map(|(differs, name)| differs.then_some(name))
@@ -747,6 +782,13 @@ mod tests {
             license: None,
             parts: Default::default(),
             skipped: Vec::new(),
+            isolation: Default::default(),
+            run: RunSettings {
+                server_url: ("http://localhost:8080/BC".into(), true),
+                companies: Default::default(),
+                company_name: None,
+                publish_order_known: false,
+            },
         }
     }
 
@@ -772,6 +814,8 @@ mod tests {
             license,
             parts,
             skipped,
+            isolation,
+            run,
         } = &k;
         let digests: [&LinesDigest; 3] = [database, session, resources];
         let _: &Option<LinesDigest> = uncommitted;
@@ -784,6 +828,16 @@ mod tests {
         let _: &key_parts::KeyParts = parts;
         // The skipped installs by content: their tables, the tables left out on an assumption, and why.
         let _: &Vec<al_vm::SkippedInstall> = skipped;
+        let _: &(crate::isolation::TestIsolation, bool) = isolation;
+        // The process settings a request sets, each by content.
+        let RunSettings {
+            server_url,
+            companies,
+            company_name,
+            publish_order_known,
+        } = run;
+        let _: (&(String, bool), &al_host::Companies, &Option<String>, &bool) =
+            (server_url, companies, company_name, publish_order_known);
         for d in digests {
             assert_eq!(std::mem::size_of_val(&d.0), 32);
         }
@@ -797,6 +851,22 @@ mod tests {
     // Condition 2 of the maintainer's acceptance on al-runner issue 8211: the test codeunit stays in the key. Two sessions
     // that differ only in their test codeunit have other keys, so neither is compared with (nor, later, replayed from) the
     // other's first state; only the evidence tally across test codeunits sees them together.
+    // Step 3 review H1 and M2: the server base address a request sets, and the codeunit's isolation and hub, are inputs of
+    // the login (`GetUrl`, the isolation fields `enter_test_codeunit` sets): another value is another key.
+    #[test]
+    fn another_server_url_or_isolation_is_another_key() {
+        let mut url = key(1);
+        url.run.server_url = ("https://other.example/BC280/".into(), false);
+        assert_ne!(key(1), url);
+        assert_eq!(url.differs_in(&key(1)), vec!["run"]);
+        let mut hub = key(1);
+        hub.isolation.1 = true;
+        assert_eq!(hub.differs_in(&key(1)), vec!["isolation"]);
+        let mut function = key(1);
+        function.isolation.0 = crate::isolation::TestIsolation::Function;
+        assert_ne!(key(1), function);
+    }
+
     #[test]
     fn two_test_codeunits_never_share_a_key() {
         assert_ne!(key(1), key(2));
