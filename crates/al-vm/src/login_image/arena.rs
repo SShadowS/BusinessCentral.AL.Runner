@@ -4,7 +4,7 @@
 //! two places that hold one handle hold one node, a cycle ends at a node already numbered, and the arena is `Send + Sync`
 //! by its types.
 
-use al_builtins::plain::{Plain, PlainFilterExpr};
+use super::plain::{Plain, PlainFilterExpr};
 
 /// The number of a node: its index in [`Arena::nodes`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -8,8 +8,8 @@
 
 use super::NotImaged;
 use super::arena::{Arena, DotNetNode, Frozen, InstanceNode, Node, NodeId, QueryNode};
+use super::plain::{Plain, PlainFilter};
 use crate::Session;
-use al_builtins::plain::{Plain, PlainFilter};
 use al_builtins::value::{Instance, LibraryValue, ListVec, QueryState, RecordState, TableGlobals, TempId, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;

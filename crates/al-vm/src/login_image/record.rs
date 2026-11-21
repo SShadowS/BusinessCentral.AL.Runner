@@ -4,8 +4,8 @@
 use super::NotImaged;
 use super::arena::{Frozen, NodeId};
 use super::freeze::{Holder, Walker};
+use super::plain::PlainFilter;
 use super::thaw::Maker;
-use al_builtins::plain::PlainFilter;
 use al_builtins::value::{
     Buffer, DirtyBase, FetchedRow, FieldSet, LoadState, OwnRead, OwnReadAt, ProbedSource, RecordState, RowOrigin,
     TableGlobals, Value,

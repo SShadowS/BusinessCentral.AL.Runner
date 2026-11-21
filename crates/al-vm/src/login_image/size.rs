@@ -8,9 +8,9 @@
 
 use super::arena::{Frozen, Node};
 use super::library::LibraryNode;
+use super::plain::Plain;
 use super::temps::TempImage;
 use super::{ImageSize, LoginImage};
-use al_builtins::plain::Plain;
 use std::mem::size_of;
 
 impl LoginImage {

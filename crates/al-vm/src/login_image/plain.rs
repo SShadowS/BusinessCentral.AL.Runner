@@ -1,15 +1,17 @@
-//! A [`Value`] that holds no handle, as owned data any thread may hold (al-vm `login_image.rs`, al-runner issue 8211):
-//! the plain mirror of `Value` and of a record filter.
+//! A [`Value`] that holds no handle, as owned data any thread may hold (the session image, al-runner issue 8211): the plain
+//! mirror of `Value` and of a record filter. It lives with its only user rather than next to `Value` in al-builtins: there,
+//! its conversions alone, which no run without the login replay calls, changed how al-builtins' hot functions inline and
+//! cost every run about 0.1% more instructions.
 
-use crate::filter::{FieldFilter, FilterExpr};
-use crate::text::Txt;
-use crate::value::{TextConstFrom, Value};
+use al_builtins::filter::{FieldFilter, FilterExpr};
+use al_builtins::text::Txt;
+use al_builtins::value::{TextConstFrom, Value};
 use rust_decimal::Decimal;
 use std::sync::Arc;
 
 /// A value that holds no handle, as owned data any thread may hold. One variant per plain `Value` variant.
 #[derive(Debug, Clone)]
-pub enum Plain {
+pub(crate) enum Plain {
     Null,
     Boolean(bool),
     Integer(i32),
@@ -34,7 +36,7 @@ pub enum Plain {
 impl Plain {
     /// `None` for a value that holds a handle (a Blob included: its buffer is a node of the arena). No `_` arm: a new
     /// `Value` variant is a compile error here until it is classified.
-    pub fn of(v: &Value) -> Option<Plain> {
+    pub(crate) fn of(v: &Value) -> Option<Plain> {
         Some(match v {
             Value::Null => Plain::Null,
             Value::Boolean(b) => Plain::Boolean(*b),
@@ -72,7 +74,7 @@ impl Plain {
     }
 
     /// The value this plain value is.
-    pub fn value(&self) -> Value {
+    pub(crate) fn value(&self) -> Value {
         match self {
             Plain::Null => Value::Null,
             Plain::Boolean(b) => Value::Boolean(*b),
@@ -99,7 +101,7 @@ impl Plain {
 
 /// `FilterExpr` with `Plain` in place of `Value` (filter.rs:10-48), one variant per variant.
 #[derive(Debug, Clone)]
-pub enum PlainFilterExpr {
+pub(crate) enum PlainFilterExpr {
     Range(Option<Plain>, Option<Plain>),
     Eq(Plain),
     RangeSame(Plain),
@@ -184,16 +186,16 @@ impl PlainFilterExpr {
 
 /// A [`FieldFilter`] whose values are plain.
 #[derive(Debug, Clone)]
-pub struct PlainFilter {
-    pub lang: i32,
-    pub field: usize,
-    pub expr: PlainFilterExpr,
-    pub group: i32,
+pub(crate) struct PlainFilter {
+    pub(crate) lang: i32,
+    pub(crate) field: usize,
+    pub(crate) expr: PlainFilterExpr,
+    pub(crate) group: i32,
 }
 
 impl PlainFilter {
     /// `None` for a filter one of whose values holds a handle.
-    pub fn of(f: &FieldFilter) -> Option<PlainFilter> {
+    pub(crate) fn of(f: &FieldFilter) -> Option<PlainFilter> {
         Some(PlainFilter {
             lang: f.lang,
             field: f.field,
@@ -203,7 +205,7 @@ impl PlainFilter {
     }
 
     /// The filter this plain filter is.
-    pub fn filter(&self) -> FieldFilter {
+    pub(crate) fn filter(&self) -> FieldFilter {
         FieldFilter {
             lang: self.lang,
             field: self.field,

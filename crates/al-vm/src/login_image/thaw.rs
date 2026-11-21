@@ -287,7 +287,7 @@ fn fill(m: &Maker<'_>) {
                 let mut s = r.borrow_mut();
                 s.filters = (q.filters.iter())
                     .map(|(field, expr)| {
-                        let f = al_builtins::plain::PlainFilter {
+                        let f = super::plain::PlainFilter {
                             lang: 0,
                             field: *field,
                             expr: expr.clone(),
