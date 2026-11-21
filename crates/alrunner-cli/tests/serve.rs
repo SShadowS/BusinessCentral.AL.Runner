@@ -2914,3 +2914,124 @@ fn the_login_image_round_trips_across_entries_and_requests() {
         images[1]
     );
 }
+
+/// What a login start must not change about a test line: the entry, the test and its verdict (not the timings).
+fn verdicts(lines: &[Value]) -> Vec<(Value, Value, Value, Value)> {
+    let mut v: Vec<_> = (lines.iter().filter(|l| l["type"] == "test"))
+        .map(|t| {
+            (
+                t["id"].clone(),
+                t["name"].clone(),
+                t["status"].clone(),
+                t["message"].clone(),
+            )
+        })
+        .collect();
+    v.sort_by_key(|t| format!("{t:?}"));
+    v
+}
+
+/// The `loginReplays` of a request's summary (sessions that took a login start in place of their login), if it has one.
+fn login_replays(lines: &[Value]) -> Option<u64> {
+    lines.last().and_then(|s| s["timings"]["loginReplays"].as_u64())
+}
+
+/// Sends the entries of the login probe `rounds` times to one daemon (one seed, so one key per entry whatever the round)
+/// started with `env`; each round's lines up to its summary. `extra`: more entries of the first round only.
+fn login_probe_rounds(
+    env: &[(&str, &str)],
+    rounds: usize,
+    first_round_extra: &[Value],
+    timeout: bool,
+) -> Vec<Vec<Value>> {
+    let d = tempfile::tempdir().unwrap();
+    let (dep, main) = login_probe(d.path());
+    write(
+        &main,
+        "src/Hang.al",
+        r#"codeunit 50822 "Probe Hanger"
+{
+    Subtype = Test;
+    [Test] procedure Hangs() var i: Integer; begin while true do i := (i + 1) mod 7919; end;
+}
+"#,
+    );
+    let dep_arg = dep.to_string_lossy().to_string();
+    let mut s = Server::start_with(&["--no-download", "--no-test-data", "--dep", &dep_arg], env);
+    s.line();
+    let probe = json!([
+        {"id": "a", "resources": {"rpl.txt": "a"}, "test": "Codeunit50821."},
+        {"id": "b", "resources": {"rpl.txt": "abcd"}, "test": "Codeunit50821."},
+        {"id": "c", "resources": {"rpl.txt": "a"}, "test": "Codeunit50821."},
+    ]);
+    let mut out = Vec::new();
+    for round in 0..rounds {
+        let mut entries = probe.as_array().unwrap().clone();
+        if round == 0 {
+            entries.extend(first_round_extra.iter().cloned());
+        }
+        let mut request = json!({"command": "runTests", "sourcePaths": [main], "entries": entries, "seed": 7});
+        if timeout && round == 0 {
+            request["testTimeoutSecs"] = json!(1);
+        }
+        s.send(request);
+        out.push(s.until_summary());
+    }
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line(), json!({"status": "shutting down"}));
+    out
+}
+
+/// Al-runner issue 8211, step 3: a session whose login inputs another session of the daemon had takes what that login left
+/// in place of running it. The second request (the same seed, so the same keys) takes a start for each of its three
+/// entries (`timings.loginReplays`), and every test line equals those of the same requests with the replay off.
+#[test]
+fn a_second_request_takes_the_login_starts_of_the_first() {
+    let on = login_probe_rounds(&[], 2, &[], false);
+    let off = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "0")], 2, &[], false);
+    for round in 0..2 {
+        assert_eq!(on[round].last().unwrap()["passed"], json!(3), "{:?}", on[round]);
+        assert_eq!(verdicts(&on[round]), verdicts(&off[round]), "round {round}");
+    }
+    assert!(
+        login_replays(&on[1]).is_some_and(|n| n >= 3),
+        "the second request takes a start per entry: {:?}",
+        on[1].last()
+    );
+}
+
+/// Al-runner issue 8211, step 3: `ALRUNNER_LOGIN_REPLAY=0` turns the replay off: no session takes a start, and the field
+/// says so (0, not absent).
+#[test]
+fn with_the_replay_off_no_session_takes_a_start() {
+    let off = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "0")], 2, &[], false);
+    for (round, lines) in off.iter().enumerate() {
+        assert_eq!(lines.last().unwrap()["passed"], json!(3), "{lines:?}");
+        assert_eq!(login_replays(lines), Some(0), "round {round}: {:?}", lines.last());
+    }
+}
+
+/// Al-runner issue 8211, step 3: a kept daemon whose first request had a test the time limit stopped answers the next
+/// request as a new daemon does (the same verdicts), and takes the starts of the first request (the stopped test's session
+/// recorded none that could change the answer).
+#[test]
+fn a_kept_daemon_with_login_starts_answers_as_a_fresh_one() {
+    let hanger = json!({"id": "h", "test": "Codeunit50822."});
+    let kept = login_probe_rounds(&[], 2, &[hanger], true);
+    let h = kept[0]
+        .iter()
+        .find(|l| l["type"] == "test" && l["name"].as_str().is_some_and(|n| n.contains("Hangs")));
+    assert!(
+        h.is_some_and(|t| t["notRun"] == true),
+        "the hanger is stopped by the time limit: {:?}",
+        kept[0]
+    );
+    let fresh = login_probe_rounds(&[], 1, &[], false);
+    assert_eq!(verdicts(&kept[1]), verdicts(&fresh[0]));
+    assert_eq!(kept[1].last().unwrap()["passed"], json!(3), "{:?}", kept[1]);
+    assert!(
+        login_replays(&kept[1]).is_some_and(|n| n >= 1),
+        "the kept daemon replays: {:?}",
+        kept[1].last()
+    );
+}

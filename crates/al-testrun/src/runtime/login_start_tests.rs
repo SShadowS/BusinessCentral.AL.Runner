@@ -1,0 +1,701 @@
+// The scans of production code stop at the first `#[cfg(test)]` of a file; a test module in a file of its own starts with one.
+#![cfg(test)]
+//! Replaying the raised login (`login_start.rs`, al-runner issue 8211, PERF-01 step 3): the first session of a key runs the
+//! login and keeps what it left (a start); a later session of the key takes the start in place of running the login. The
+//! tests run over the stand-in of Microsoft's login (`login_tests::DEP`) and the sources of `login_replay_tests.rs`, as
+//! the step-1 and step-2 tests do (design `/coord/handoff/PERF-01/step3-design.md` section 7).
+//!
+//! Part (b)'s B1 tests, written red against the inert A1 stubs (`take` finds nothing, `record` keeps nothing, `why_not`
+//! always says no start): a test marked GUARD passes at A1 on purpose and must stay green.
+
+use super::login_replay_tests::{MAIN, OPAQUE_INSIDE, compiled, compiled_with};
+use super::session_flags::SessionFlags;
+use super::*;
+use crate::login_replay::{Key, first_difference};
+use crate::login_start::{self, MAX_BYTES, MAX_START_BYTES, MAX_STARTS, NotTaken, Start, starts};
+use al_builtins::assumptions::HitBits;
+use al_builtins::value::Value;
+
+/// What a run of `sessions_with` adds to the options: a change of the scratch, an install baseline, an observer.
+#[derive(Default)]
+struct Setup<'a> {
+    tweak: Option<&'a dyn Fn(&mut Scratch)>,
+    baseline: Option<&'a al_vm::Baseline>,
+    observed: bool,
+}
+
+/// What `sessions` ran: each session's state after its company open, the outcomes, and the assumption ids each test
+/// carries.
+struct Ran {
+    states: Vec<crate::login_replay::LoginState>,
+    outcomes: Vec<Vec<(String, Outcome)>>,
+    marks: Vec<Vec<(String, Vec<&'static str>)>>,
+}
+
+/// Runs test codeunit `name` of `l` `n` times on `engine`, one session each, with the session flags of `opts` and the
+/// scratch `tweak` leaves, under `OPENED` (each session's state after `open_company`, run or replayed).
+fn sessions_with(engine: &Arc<Engine>, l: &Lowered, name: &str, n: usize, opts: &RunOptions, setup: &Setup) -> Ran {
+    login_start::OPENED.with(|o| *o.borrow_mut() = Some(Vec::new()));
+    let oi = l.program.objects.iter().position(|o| o.name == name).unwrap();
+    let mut ran = Ran {
+        states: Vec::new(),
+        outcomes: Vec::new(),
+        marks: Vec::new(),
+    };
+    for _ in 0..n {
+        let mut scratch = Scratch {
+            flags: SessionFlags::of(opts),
+            ..Default::default()
+        };
+        if let Some(tweak) = setup.tweak {
+            tweak(&mut scratch);
+        }
+        let mut hits = Vec::new();
+        let mut observe = |_: &str, _: &Outcome, _: &Observed| {};
+        let observer: &mut Observer = &mut observe;
+        let outcomes = run_codeunit_core(
+            engine,
+            l,
+            oi,
+            setup.baseline,
+            TestIsolation::Codeunit,
+            setup.observed.then_some(observer),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut hits,
+            &mut scratch,
+            None,
+            false,
+        );
+        ran.outcomes.push(outcomes);
+        ran.marks.push(
+            hits.into_iter()
+                .map(|(t, h)| (t, h.iter().map(|a| a.info().id).collect()))
+                .collect(),
+        );
+    }
+    ran.states = login_start::OPENED.with(|o| o.borrow_mut().take()).unwrap_or_default();
+    ran
+}
+
+/// [`sessions_with`] with no tweak, no baseline and no observer.
+fn sessions(engine: &Arc<Engine>, l: &Lowered, name: &str, n: usize, opts: &RunOptions) -> Ran {
+    sessions_with(engine, l, name, n, opts, &Setup::default())
+}
+
+fn passes() -> Vec<(String, Outcome)> {
+    vec![("SeesTheRow".to_string(), Outcome::Pass)]
+}
+
+/// Asserts every session of `ran` passed and opened the company in one state (nothing differs after a replay).
+fn assert_one_state(ran: &Ran, what: &str) {
+    for (i, o) in ran.outcomes.iter().enumerate() {
+        assert_eq!(*o, passes(), "{what}: session {i}");
+    }
+    for (i, s) in ran.states.iter().enumerate().skip(1) {
+        assert_eq!(
+            first_difference(&ran.states[0], s),
+            None,
+            "{what}: session {i} holds another state than session 0 after the open"
+        );
+    }
+}
+
+// The step-2 compare, now on the replay path: the first session of a key runs the login, the later ones take its start, and
+// each holds after the open what a real login leaves (rows, session state, marks, what the open noted).
+// RED at A1: `take` finds nothing, so nothing replays (`replayed()` is 0).
+#[test]
+fn a_second_session_of_a_key_takes_the_start_and_holds_what_a_real_login_leaves() {
+    let (engine, l) = compiled();
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    assert_eq!(
+        starts(&engine).replayed(),
+        2,
+        "sessions 2 and 3 take the start of session 1"
+    );
+    assert_eq!(starts(&engine).kept(), 1);
+    assert_eq!(
+        ran.states.len(),
+        3,
+        "OPENED is handed the state of a replayed session too"
+    );
+    assert_one_state(&ran, "replay on");
+    // A real login on another engine leaves the same state (same inputs, same seed).
+    let (off_engine, l) = compiled();
+    let off = RunOptions {
+        login_replay_off: true,
+        ..Default::default()
+    };
+    let real = sessions(&off_engine, &l, "RPL Tests A", 1, &off);
+    assert_eq!(first_difference(&ran.states[1], &real.states[0]), None);
+}
+
+// GUARD (green at A1): with the switch off (`ALRUNNER_LOGIN_REPLAY=0`, `RunOptions::login_replay_off`) every session runs
+// the login, nothing is kept, and the outcomes and states are those of the replay's.
+#[test]
+fn the_switch_off_runs_every_login() {
+    let (engine, l) = compiled();
+    let off = RunOptions {
+        login_replay_off: true,
+        ..Default::default()
+    };
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &off);
+    assert_eq!(starts(&engine).replayed(), 0);
+    assert_eq!(starts(&engine).kept(), 0, "nothing is kept with the switch off");
+    assert_one_state(&ran, "replay off");
+    assert_eq!(starts(&engine).line(), None);
+}
+
+// The check replays nothing: every session runs the login, and each later session of a key is compared with a thaw of the
+// key's start (design decision 5). RED at A1: no start is kept and the report has no `replay vs run` count.
+#[test]
+fn the_check_replays_nothing_and_compares_each_later_session_with_a_thaw_of_its_start() {
+    let (engine, l) = compiled();
+    let ran = sessions(
+        &engine,
+        &l,
+        "RPL Tests A",
+        3,
+        &RunOptions {
+            login_replay_check: true,
+            ..Default::default()
+        },
+    );
+    assert_one_state(&ran, "check");
+    assert_eq!(
+        starts(&engine).replayed(),
+        0,
+        "GUARD: under the check no session replays"
+    );
+    assert_eq!(
+        starts(&engine).kept(),
+        1,
+        "the check keeps starts exactly as the replay does"
+    );
+    let report = crate::login_replay::report(&engine).expect("a report");
+    assert!(report.contains("replay vs run: 2 checked, 0 differ"), "{report}");
+    // GUARD: the first two lines keep the shape of step 1 and step 2.
+    assert!(
+        report.starts_with(
+            "login replay check: 3 sessions over 1 keys (a key seen before: 2 sessions, 66%), 2 compared, 0 differ; across test codeunits: 0 compared, 0 differ\nlogin image: 1 keys, 1 imaged, 0 not imaged; round trips 1, 0 differ"
+        ),
+        "{report}"
+    );
+}
+
+// A planted difference in the thaw the check compares with is reported (`TWIN_PLANT`, as the round trip's is). RED at A1.
+#[test]
+fn a_planted_difference_in_the_replay_is_reported() {
+    let (engine, l) = compiled();
+    crate::login_replay::TWIN_PLANT.with(|p| p.set(Some(|twin| twin.set_work_date(1))));
+    sessions(
+        &engine,
+        &l,
+        "RPL Tests A",
+        3,
+        &RunOptions {
+            login_replay_check: true,
+            ..Default::default()
+        },
+    );
+    crate::login_replay::TWIN_PLANT.with(|p| p.set(None));
+    let report = crate::login_replay::report(&engine).expect("a report");
+    let line = report
+        .lines()
+        .find(|l| l.contains("replay vs run: "))
+        .unwrap_or_else(|| panic!("{report}"));
+    assert!(
+        line.contains("replay vs run: 2 checked, 2 differ"),
+        "the plant is found by the replay-vs-run compare: {line}"
+    );
+}
+
+/// A login that also makes an assumption mark when the company opens (`OnCompanyOpenCompleted`, a Variant to Integer
+/// conversion): every test of the session is a flagged pass (al-runner issue 8060; `login_tests.rs`
+/// `an_assumption_the_company_open_step_relied_on_flags_every_test_of_the_session`).
+const MARKS_INSIDE: &str = r#"
+codeunit 77470 "RPL Marks"
+{
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Company Triggers", 'OnCompanyOpenCompleted', '', false, false)]
+    local procedure Completed() var V: Variant; I: Integer; begin V := '55'; I := V; end;
+}
+"#;
+
+/// Sets `DROP_HITS` for its lifetime (a test that fails must not leave it set).
+struct DropHits;
+
+impl DropHits {
+    fn on() -> DropHits {
+        login_start::DROP_HITS.with(|d| d.set(true));
+        DropHits
+    }
+}
+
+impl Drop for DropHits {
+    fn drop(&mut self) {
+        login_start::DROP_HITS.with(|d| d.set(false));
+    }
+}
+
+// The marks the login made are raised again after a replay, so a flagged pass stays flagged (design decision 3). The plant
+// `DROP_HITS` takes a start without its marks: the replayed session's list then differs, which shows this test bites; without
+// it the lists are equal. RED at A1: nothing replays, so the plant changes nothing.
+#[test]
+fn a_replayed_session_flags_the_passes_a_real_login_flags() {
+    let flagged = vec![("SeesTheRow".to_string(), vec!["text-digits-to-integer"])];
+    let (engine, l) = compiled_with(&format!("{MAIN}{MARKS_INSIDE}"));
+    {
+        let _plant = DropHits::on();
+        let dropped = sessions(&engine, &l, "RPL Tests A", 2, &RunOptions::default());
+        assert_eq!(dropped.marks[0], flagged, "GUARD: the real login's pass is flagged");
+        assert_eq!(starts(&engine).replayed(), 1);
+        assert_ne!(
+            dropped.marks[0], dropped.marks[1],
+            "a start without its marks flags nothing"
+        );
+    }
+    let (engine, l) = compiled_with(&format!("{MAIN}{MARKS_INSIDE}"));
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    assert_eq!(starts(&engine).replayed(), 2);
+    for (i, marks) in ran.marks.iter().enumerate() {
+        assert_eq!(*marks, flagged, "session {i}");
+    }
+    assert_one_state(&ran, "marks");
+}
+
+// A key whose session the image refuses (`NotImaged`) runs the real login every time and is not frozen again: it is counted
+// once in the report, however many sessions it has. RED at A1: no report line.
+#[test]
+fn a_key_that_is_not_imaged_runs_the_login_every_time_and_is_frozen_once() {
+    let (engine, l) = compiled_with(&format!("{MAIN}{OPAQUE_INSIDE}"));
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    // The states of this app are "not comparable" (an HttpClient in a global): the outcomes are what is compared.
+    assert!(ran.outcomes.iter().all(|o| *o == passes()), "{:?}", ran.outcomes);
+    assert_eq!(
+        starts(&engine).replayed(),
+        0,
+        "GUARD: a session the image refuses takes no start"
+    );
+    assert_eq!(starts(&engine).kept(), 0);
+    let line = starts(&engine).line().expect("a line once a key was refused");
+    assert!(line.starts_with("login start: 0 replayed, 0 kept"), "{line}");
+    assert!(line.contains(", 1 not imaged"), "one key, frozen once: {line}");
+}
+
+// An uncaught error of the install code leaves `error_finals` on the session (`install_once`'s fallback makes the install
+// session the test session): the freeze refuses it (`NotAtRest`) and the gate would refuse it (`thaw_target_why`), so no start
+// is made or taken (design 3.5). RED at A1: no report line names it.
+#[test]
+fn an_uncaught_install_error_keeps_error_finals_and_no_start_is_made_or_taken() {
+    let failing = r#"
+codeunit 77495 "RPL Failing Install" { Subtype = Install; trigger OnInstallAppPerCompany() begin Error('install boom'); end; }
+"#;
+    let (engine, l) = compiled_with(&format!("{MAIN}{failing}"));
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    assert_eq!(starts(&engine).replayed(), 0, "GUARD");
+    assert_eq!(starts(&engine).kept(), 0);
+    assert_eq!(ran.outcomes[0], ran.outcomes[1]);
+    assert_eq!(ran.outcomes[0], ran.outcomes[2]);
+    let line = starts(&engine).line().expect("the refused key is reported");
+    assert!(line.contains("not at rest: error_finals"), "{line}");
+}
+
+// What the starts' report line says, names only (design 2, 4): replays, starts kept with their size, why keys were not
+// imaged, why sessions were refused. RED at A1: no line.
+#[test]
+fn the_report_names_the_starts() {
+    let (engine, l) = compiled();
+    sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    let line = starts(&engine).line().expect("a login start line");
+    assert!(line.starts_with("login start: 2 replayed, 1 kept ("), "{line}");
+    assert!(line.contains(" MB)"), "{line}");
+}
+
+// The image line under the check gains the kept bytes and the count per node kind, names only (design 4). RED at A1: neither.
+#[test]
+fn the_image_line_reports_the_kept_bytes_and_the_nodes_per_kind() {
+    let (engine, l) = compiled();
+    super::login_replay_tests::run(&engine, &l, "RPL Tests A");
+    let report = crate::login_replay::report(&engine).expect("a report");
+    let image = report
+        .lines()
+        .find(|l| l.starts_with("login image: "))
+        .expect("an image line");
+    let per_key = image.split("per key: ").nth(1).unwrap_or_else(|| panic!("{image}"));
+    assert!(per_key.contains(", kept "), "kept_bytes per start: {per_key}");
+    assert!(per_key.contains(" (delta)"), "the rows are a delta: {per_key}");
+    for kind in ["record", "temporary table"] {
+        assert!(per_key.contains(kind), "the count of {kind} nodes: {per_key}");
+    }
+    assert!(!per_key.contains("77401"), "no value in the line: {per_key}");
+}
+
+/// The key of a new session of `engine` whose login skipped `skipped`.
+fn key_skipping(engine: &Arc<Engine>, skipped: &[al_vm::SkippedInstall]) -> Key {
+    let mut session = al_vm::Session::new(engine.clone());
+    Key::of(&mut session, false, SessionFlags::default(), skipped)
+}
+
+// The open runs under the watch of the skipped installs, whose hit marks or refuses: another list is another key (design
+// 1, "What the key is"). RED at A1: the list is taken and not a field.
+#[test]
+fn another_skipped_install_list_is_another_key() {
+    let (engine, _) = compiled();
+    let skip = |tables: &[u32], why: &str| al_vm::SkippedInstall::new(tables.iter().copied().collect(), why.into());
+    let (a, b) = (skip(&[1990], "reads a table"), skip(&[1996], "reads a table"));
+    assert_eq!(
+        key_skipping(&engine, std::slice::from_ref(&a)),
+        key_skipping(&engine, std::slice::from_ref(&a)),
+        "GUARD"
+    );
+    assert_eq!(key_skipping(&engine, &[]), key_skipping(&engine, &[]), "GUARD");
+    assert_ne!(
+        key_skipping(&engine, std::slice::from_ref(&a)),
+        key_skipping(&engine, std::slice::from_ref(&b))
+    );
+    assert_ne!(
+        key_skipping(&engine, &[]),
+        key_skipping(&engine, std::slice::from_ref(&a))
+    );
+    assert_ne!(
+        key_skipping(&engine, std::slice::from_ref(&a)),
+        key_skipping(&engine, &[a.clone(), b.clone()])
+    );
+}
+
+// ---- the gate (design 3.4): why a session does not take a start ----
+
+/// A start taken from a new session of `engine` (nothing logged in: what the gate looks at is the target and the run).
+fn plain_start(engine: &Arc<Engine>) -> Start {
+    let mut session = al_vm::Session::new(engine.clone());
+    session.commit_transaction();
+    let base = session.login_base();
+    Start {
+        image: session
+            .login_image(&base)
+            .unwrap_or_else(|why| panic!("{}", why.reason())),
+        wrote: Default::default(),
+        hits: HitBits::EMPTY,
+    }
+}
+
+/// A new session of `engine` that can take a start.
+fn target(engine: &Arc<Engine>) -> al_vm::Session {
+    let mut session = al_vm::Session::new(engine.clone());
+    session.commit_transaction();
+    session
+}
+
+// A session that can take the start of its key takes it. RED at A1: `why_not` always answers `NoStart`.
+#[test]
+fn a_session_with_nothing_against_it_takes_the_start() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    assert_eq!(
+        login_start::why_not(&target(&engine), &start, false, false, false),
+        None
+    );
+}
+
+// One reason per row of design 3.4; each is counted in the report. RED at A1: always `NoStart`.
+#[test]
+fn the_gate_names_a_run_that_notes_code_a_perturbation_and_moved_in_singles() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let why = |notes, perturbed, moved| login_start::why_not(&target(&engine), &start, notes, perturbed, moved);
+    assert_eq!(why(true, false, false), Some(NotTaken::NotesCode));
+    assert_eq!(why(false, true, false), Some(NotTaken::Perturbed));
+    assert_eq!(why(false, false, true), Some(NotTaken::MovedIn));
+}
+
+#[test]
+fn the_gate_names_what_keeps_the_session_from_being_a_target() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let mut covering = target(&engine);
+    covering.enable_coverage();
+    assert_eq!(
+        login_start::why_not(&covering, &start, false, false, false),
+        Some(NotTaken::Target("coverage"))
+    );
+    let mut tracing = target(&engine);
+    tracing.trace_faults(true);
+    assert_eq!(
+        login_start::why_not(&tracing, &start, false, false, false),
+        Some(NotTaken::Target("fault_trace"))
+    );
+}
+
+// A target whose store has another shape than the start's (a table entry the start's base did not have: the key's digest
+// of the rows does not see an empty entry) is refused, `base shape`. RED at A1.
+#[test]
+fn the_gate_refuses_a_target_whose_base_has_another_shape() {
+    use al_data::Store;
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let mut other = target(&engine);
+    let at = engine
+        .program
+        .objects
+        .iter()
+        .position(|o| o.name == "Guided Experience Item")
+        .unwrap();
+    let table = engine.tables[at].clone().unwrap();
+    let cx = al_data::AccessContext {
+        company: other.access_company().into(),
+        user: other.user_id().into(),
+    };
+    let row: Vec<Value> = table.fields.iter().map(|f| Value::default_for(&f.ty)).collect();
+    assert!(other.store_mut().insert(&cx, &table, row).is_ok());
+    other.commit_transaction();
+    assert_ne!(other.base_shape(), *start.image.base_shape(), "the shapes differ");
+    assert_eq!(
+        login_start::why_not(&other, &start, false, false, false),
+        Some(NotTaken::BaseShape)
+    );
+}
+
+/// Runs "RPL Tests A" twice with `tweak` on both runs (and an observer when `observed`): the second session would take
+/// the first's start. Returns the report line of the starts.
+fn gated_line(tweak: &dyn Fn(&mut Scratch), observed: bool) -> (u64, Option<String>) {
+    let (engine, l) = compiled();
+    let ran = sessions_with(
+        &engine,
+        &l,
+        "RPL Tests A",
+        2,
+        &RunOptions::default(),
+        &Setup {
+            tweak: Some(tweak),
+            observed,
+            ..Default::default()
+        },
+    );
+    assert_one_state(&ran, "gated");
+    (starts(&engine).replayed(), starts(&engine).line())
+}
+
+// At run level: a run that follows the code it runs, a perturbation and a set clock start never take a start, and the
+// report counts the sessions the gate refused. RED at A1: no line (the zero replays are right for the wrong reason).
+#[test]
+fn a_session_the_gate_refuses_runs_its_login_and_is_counted() {
+    let perturbed = |s: &mut Scratch| s.perturb.library_seed = Some(3);
+    let clocked = |s: &mut Scratch| s.clock_start = Some(1_700_000_000_000);
+    let cases: [(&str, (u64, Option<String>)); 3] = [
+        ("--explain or an observer", gated_line(&|_| {}, true)),
+        ("a stability perturbation", gated_line(&perturbed, false)),
+        ("a set clock start", gated_line(&clocked, false)),
+    ];
+    for (what, (replayed, line)) in cases {
+        assert_eq!(replayed, 0, "{what}");
+        let line = line.unwrap_or_else(|| panic!("{what}: no report line"));
+        assert!(line.contains("refused by the gate"), "{what}: {line}");
+    }
+    crate::coverage::begin();
+    let (replayed, line) = gated_line(&|_| {}, false);
+    crate::coverage::finish();
+    assert_eq!(replayed, 0, "coverage");
+    assert!(line.is_some_and(|l| l.contains("refused by the gate")), "coverage");
+}
+
+// ---- the caps (design 4): 8 starts, 64 MB, a start of at most 16 MB, least recently used out ----
+
+/// The key of a new session of `engine` whose work date is `n` (so every `n` is another key).
+fn numbered_key(engine: &Arc<Engine>, n: i32) -> Key {
+    let mut session = al_vm::Session::new(engine.clone());
+    session.set_work_date(1000 + n);
+    Key::of(&mut session, false, SessionFlags::default(), &[])
+}
+
+/// A start whose image holds `bytes` of text in a SingleInstance codeunit's global: `kept_bytes` is a little more.
+fn start_of_size(engine: &Arc<Engine>, l: &Lowered, bytes: usize) -> Start {
+    let mut session = al_vm::Session::new(engine.clone());
+    let big = l.program.objects.iter().position(|o| o.name == "RPL Big").unwrap();
+    session.codeunit_instance(big).borrow_mut().globals[0] = Value::Text("x".repeat(bytes).into());
+    session.commit_transaction();
+    let base = session.login_base();
+    Start {
+        image: session
+            .login_image(&base)
+            .unwrap_or_else(|why| panic!("{}", why.reason())),
+        wrote: Default::default(),
+        hits: HitBits::EMPTY,
+    }
+}
+
+const BIG: &str = r#"
+codeunit 77490 "RPL Big"
+{
+    SingleInstance = true;
+    var Payload: Text;
+}
+"#;
+
+const MIB: usize = 1 << 20;
+
+fn big_engine() -> (Arc<Engine>, Lowered) {
+    compiled_with(&format!("{MAIN}{BIG}"))
+}
+
+#[test]
+fn the_caps_are_eight_starts_sixty_four_mb_and_sixteen_mb_a_start() {
+    assert_eq!((MAX_STARTS, MAX_BYTES, MAX_START_BYTES), (8, 64 << 20, 16 << 20));
+}
+
+// A start is kept with its bytes counted. RED at A1: `record` keeps nothing.
+#[test]
+fn a_recorded_start_is_kept_and_its_bytes_are_counted() {
+    let (engine, l) = big_engine();
+    let st = starts(&engine);
+    let start = start_of_size(&engine, &l, 2 * MIB);
+    let bytes = start.image.kept_bytes();
+    assert!(bytes > 2 * MIB as u64, "kept_bytes counts the text: {bytes}");
+    st.record(numbered_key(&engine, 0), Ok(start));
+    assert_eq!(st.kept(), 1);
+    assert_eq!(st.bytes(), bytes);
+    assert!(st.take(&numbered_key(&engine, 0)).is_some());
+    assert!(st.knows(&numbered_key(&engine, 0)));
+}
+
+// At most eight starts, the least recently used out; a take refreshes. RED at A1.
+#[test]
+fn starts_are_bounded_by_eight_least_recently_used_out() {
+    let (engine, l) = big_engine();
+    let st = starts(&engine);
+    for n in 0..MAX_STARTS as i32 {
+        st.record(numbered_key(&engine, n), Ok(start_of_size(&engine, &l, 1000)));
+    }
+    assert_eq!(st.kept(), 8);
+    // Key 0 is used again: key 1 is now the least recently used.
+    assert!(st.take(&numbered_key(&engine, 0)).is_some());
+    st.record(numbered_key(&engine, 8), Ok(start_of_size(&engine, &l, 1000)));
+    assert_eq!(st.kept(), 8, "the ninth start pushes one out");
+    assert!(
+        st.take(&numbered_key(&engine, 1)).is_none(),
+        "the least recently used is out"
+    );
+    for n in [0, 2, 3, 4, 5, 6, 7, 8] {
+        assert!(st.take(&numbered_key(&engine, n)).is_some(), "key {n}");
+    }
+}
+
+// At most 64 MB of kept bytes; an eviction gives its bytes back to the count the memory pool reads. RED at A1.
+#[test]
+fn starts_are_bounded_by_sixty_four_mb_and_an_eviction_returns_the_bytes() {
+    let (engine, l) = big_engine();
+    let st = starts(&engine);
+    // Seven starts of 9 MiB fit (63 MiB plus their small parts), an eighth does not: the oldest goes.
+    for n in 0..7 {
+        st.record(numbered_key(&engine, n), Ok(start_of_size(&engine, &l, 9 * MIB)));
+    }
+    assert_eq!(st.kept(), 7);
+    let seven = st.bytes();
+    assert!(seven > 63 * MIB as u64 && seven <= MAX_BYTES, "{seven}");
+    st.record(numbered_key(&engine, 7), Ok(start_of_size(&engine, &l, 9 * MIB)));
+    assert_eq!(
+        st.kept(),
+        7,
+        "an eighth start of 9 MiB would pass 64 MB: the least recently used is out"
+    );
+    assert!(st.bytes() <= MAX_BYTES, "{}", st.bytes());
+    assert!(st.take(&numbered_key(&engine, 0)).is_none());
+    assert!(st.take(&numbered_key(&engine, 7)).is_some());
+    // The bytes of the one pushed out are not counted any more: 7 starts, not 8.
+    assert!(st.bytes() < seven + 100 * 1024, "{} against {seven}", st.bytes());
+}
+
+// A start over 16 MB is not kept, with its own reason `too large`, so one start never empties the others. RED at A1.
+#[test]
+fn a_start_over_sixteen_mb_is_not_kept_and_says_too_large() {
+    let (engine, l) = big_engine();
+    let st = starts(&engine);
+    st.record(numbered_key(&engine, 0), Ok(start_of_size(&engine, &l, 17 * MIB)));
+    assert_eq!(st.kept(), 0);
+    assert_eq!(st.bytes(), 0);
+    let line = st.line().expect("a line");
+    assert!(line.contains("too large"), "{line}");
+    // The key is remembered as refused: its session is not frozen again.
+    assert!(st.knows(&numbered_key(&engine, 0)));
+    // A start of 15 MiB is kept: the bound is on the start, not near it.
+    st.record(numbered_key(&engine, 1), Ok(start_of_size(&engine, &l, 15 * MIB)));
+    assert_eq!(st.kept(), 1);
+}
+
+// A refused key (no image) is remembered with why, so its session runs the login every time. RED at A1.
+#[test]
+fn a_refused_key_is_remembered_and_never_taken() {
+    let (engine, _) = compiled();
+    let st = starts(&engine);
+    let key = numbered_key(&engine, 0);
+    assert!(!st.knows(&key));
+    st.record(key.clone(), Err(al_vm::NotImaged::Field("tasks")));
+    assert!(st.knows(&key));
+    assert!(st.take(&key).is_none());
+    assert_eq!(st.kept(), 0);
+    assert!(st.line().is_some_and(|l| l.contains("field tasks")));
+}
+
+// Two threads that meet one new key both run the login; the first `record` wins and one start is kept. RED at A1.
+#[test]
+fn two_threads_with_one_new_key_keep_one_start() {
+    let (engine, l) = compiled();
+    let states: Vec<_> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..2)
+            .map(|_| scope.spawn(|| sessions(&engine, &l, "RPL Tests A", 1, &RunOptions::default())))
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    for ran in &states {
+        assert_one_state(ran, "a thread");
+    }
+    assert_eq!(starts(&engine).kept(), 1);
+}
+
+// ---- the rows of a start are the login's own (design 3.2, 4) ----
+
+const BULK: &str = r#"
+table 77480 "RPL Bulk" { fields { field(1; Id; Integer) { } } keys { key(PK; Id) { } } }
+codeunit 77481 "RPL Seed Small" { trigger OnRun() var R: Record "RPL Bulk"; i: Integer; begin for i := 1 to 50 do begin R.Id := i; R.Insert(); end; end; }
+codeunit 77482 "RPL Seed Large" { trigger OnRun() var R: Record "RPL Bulk"; i: Integer; begin for i := 1 to 5000 do begin R.Id := i; R.Insert(); end; end; }
+"#;
+
+/// The bytes the one start of "RPL Tests A" keeps over the base left by codeunit `seed`'s OnRun.
+fn kept_over_base(seed: &str) -> u64 {
+    let (engine, l) = compiled_with(&format!("{MAIN}{BULK}"));
+    let mut session = al_vm::Session::new(engine.clone());
+    let s = l.program.objects.iter().position(|o| o.name == seed).unwrap();
+    let on_run = l.program.objects[s]
+        .routines
+        .iter()
+        .position(|r| r.name == "OnRun")
+        .unwrap();
+    let inst = session.instance(s);
+    assert!(session.call(s, on_run, inst, Vec::new()).is_ok());
+    let baseline = session.capture_baseline();
+    let ran = sessions_with(
+        &engine,
+        &l,
+        "RPL Tests A",
+        2,
+        &RunOptions::default(),
+        &Setup {
+            baseline: Some(&baseline),
+            ..Default::default()
+        },
+    );
+    assert_one_state(&ran, seed);
+    assert_eq!(starts(&engine).kept(), 1, "{seed}");
+    starts(&engine).bytes()
+}
+
+// An install codeunit that leaves 5,000 rows does not make the start larger than one over 50 rows: the start keeps the rows
+// the login wrote, as a delta over the session's own store (`big1` against `with` in design section 4). RED at A1: 0.
+#[test]
+fn a_start_from_a_large_install_base_keeps_only_the_logins_rows() {
+    let (small, large) = (kept_over_base("RPL Seed Small"), kept_over_base("RPL Seed Large"));
+    assert!(small > 0, "kept_bytes counts what the start holds: {small}");
+    assert!(
+        large.abs_diff(small) < 16 * 1024,
+        "5,000 rows of base keep {large} bytes, 50 keep {small}: the base is in the start"
+    );
+}

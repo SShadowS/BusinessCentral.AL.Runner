@@ -1219,6 +1219,8 @@ mod login_image_tests;
 #[cfg(test)]
 mod login_replay_tests;
 #[cfg(test)]
+mod login_start_tests;
+#[cfg(test)]
 mod login_tests;
 pub mod memory;
 #[cfg(test)]
