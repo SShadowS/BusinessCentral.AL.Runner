@@ -78,6 +78,14 @@ fn sessions_with(engine: &Arc<Engine>, l: &Lowered, name: &str, n: usize, opts: 
     ran
 }
 
+/// The options of a run with the replay on (`RunOptions::login_replay`).
+fn on() -> RunOptions {
+    RunOptions {
+        login_replay: true,
+        ..Default::default()
+    }
+}
+
 /// [`sessions_with`] with no tweak, no baseline and no observer.
 fn sessions(engine: &Arc<Engine>, l: &Lowered, name: &str, n: usize, opts: &RunOptions) -> Ran {
     sessions_with(engine, l, name, n, opts, &Setup::default())
@@ -107,7 +115,7 @@ fn assert_one_state(ran: &Ran, what: &str) {
 #[test]
 fn a_second_session_of_a_key_takes_the_start_and_holds_what_a_real_login_leaves() {
     let (engine, l) = compiled();
-    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &on());
     assert_eq!(
         starts(&engine).replayed(),
         2,
@@ -122,23 +130,17 @@ fn a_second_session_of_a_key_takes_the_start_and_holds_what_a_real_login_leaves(
     assert_one_state(&ran, "replay on");
     // A real login on another engine leaves the same state (same inputs, same seed).
     let (off_engine, l) = compiled();
-    let off = RunOptions {
-        login_replay_off: true,
-        ..Default::default()
-    };
+    let off = RunOptions::default();
     let real = sessions(&off_engine, &l, "RPL Tests A", 1, &off);
     assert_eq!(first_difference(&ran.states[1], &real.states[0]), None);
 }
 
-// GUARD (green at A1): with the switch off (`ALRUNNER_LOGIN_REPLAY=0`, `RunOptions::login_replay_off`) every session runs
+// GUARD (green at A1): with the switch off (the default; `ALRUNNER_LOGIN_REPLAY=1`, `RunOptions::login_replay`, turns it on) every session runs
 // the login, nothing is kept, and the outcomes and states are those of the replay's.
 #[test]
 fn the_switch_off_runs_every_login() {
     let (engine, l) = compiled();
-    let off = RunOptions {
-        login_replay_off: true,
-        ..Default::default()
-    };
+    let off = RunOptions::default();
     let ran = sessions(&engine, &l, "RPL Tests A", 3, &off);
     assert_eq!(starts(&engine).replayed(), 0);
     assert_eq!(starts(&engine).kept(), 0, "nothing is kept with the switch off");
@@ -246,7 +248,7 @@ fn a_replayed_session_flags_the_passes_a_real_login_flags() {
     let (engine, l) = compiled_with(&format!("{MAIN}{MARKS_INSIDE}"));
     {
         let _plant = DropHits::on();
-        let dropped = sessions(&engine, &l, "RPL Tests A", 2, &RunOptions::default());
+        let dropped = sessions(&engine, &l, "RPL Tests A", 2, &on());
         assert_eq!(dropped.marks[0], flagged, "GUARD: the real login's pass is flagged");
         assert_eq!(starts(&engine).replayed(), 1);
         assert_ne!(
@@ -255,7 +257,7 @@ fn a_replayed_session_flags_the_passes_a_real_login_flags() {
         );
     }
     let (engine, l) = compiled_with(&format!("{MAIN}{MARKS_INSIDE}"));
-    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &on());
     assert_eq!(starts(&engine).replayed(), 2);
     for (i, marks) in ran.marks.iter().enumerate() {
         assert_eq!(*marks, flagged, "session {i}");
@@ -268,7 +270,7 @@ fn a_replayed_session_flags_the_passes_a_real_login_flags() {
 #[test]
 fn a_key_that_is_not_imaged_runs_the_login_every_time_and_is_frozen_once() {
     let (engine, l) = compiled_with(&format!("{MAIN}{OPAQUE_INSIDE}"));
-    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &on());
     // The states of this app are "not comparable" (an HttpClient in a global): the outcomes are what is compared.
     assert!(ran.outcomes.iter().all(|o| *o == passes()), "{:?}", ran.outcomes);
     assert_eq!(
@@ -291,7 +293,7 @@ fn an_uncaught_install_error_keeps_error_finals_and_no_start_is_made_or_taken() 
 codeunit 77495 "RPL Failing Install" { Subtype = Install; trigger OnInstallAppPerCompany() begin Error('install boom'); end; }
 "#;
     let (engine, l) = compiled_with(&format!("{MAIN}{failing}"));
-    let ran = sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    let ran = sessions(&engine, &l, "RPL Tests A", 3, &on());
     assert_eq!(starts(&engine).replayed(), 0, "GUARD");
     assert_eq!(starts(&engine).kept(), 0);
     assert_eq!(ran.outcomes[0], ran.outcomes[1]);
@@ -305,7 +307,7 @@ codeunit 77495 "RPL Failing Install" { Subtype = Install; trigger OnInstallAppPe
 #[test]
 fn the_report_names_the_starts() {
     let (engine, l) = compiled();
-    sessions(&engine, &l, "RPL Tests A", 3, &RunOptions::default());
+    sessions(&engine, &l, "RPL Tests A", 3, &on());
     let line = starts(&engine).line().expect("a login start line");
     assert!(line.starts_with("login start: 2 replayed, 1 kept ("), "{line}");
     assert!(line.contains(" MB)"), "{line}");
@@ -464,7 +466,7 @@ fn gated_line(tweak: &dyn Fn(&mut Scratch), observed: bool) -> (u64, Option<Stri
         &l,
         "RPL Tests A",
         2,
-        &RunOptions::default(),
+        &on(),
         &Setup {
             tweak: Some(tweak),
             observed,
@@ -641,7 +643,7 @@ fn two_threads_with_one_new_key_keep_one_start() {
     let (engine, l) = compiled();
     let states: Vec<_> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..2)
-            .map(|_| scope.spawn(|| sessions(&engine, &l, "RPL Tests A", 1, &RunOptions::default())))
+            .map(|_| scope.spawn(|| sessions(&engine, &l, "RPL Tests A", 1, &on())))
             .collect();
         handles.into_iter().map(|h| h.join().unwrap()).collect()
     });
@@ -677,7 +679,7 @@ fn kept_over_base(seed: &str) -> u64 {
         &l,
         "RPL Tests A",
         2,
-        &RunOptions::default(),
+        &on(),
         &Setup {
             baseline: Some(&baseline),
             ..Default::default()
