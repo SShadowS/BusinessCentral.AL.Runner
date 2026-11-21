@@ -3125,3 +3125,76 @@ fn a_kept_daemon_with_login_starts_answers_as_a_fresh_one() {
         kept[1].last()
     );
 }
+
+/// The requests `requests` (each a `runTests` request without `command` and `sourcePaths`) over the login stand-in and an
+/// app under test whose sources are `src`, on one daemon started with `env`: each request's lines up to its summary.
+fn login_app_requests(src: &str, requests: &[Value], env: &[(&str, &str)]) -> Vec<Vec<Value>> {
+    let d = tempfile::tempdir().unwrap();
+    let (dep, main) = login_probe(d.path());
+    write(&main, "src/T.al", src);
+    let dep_arg = dep.to_string_lossy().to_string();
+    let mut s = Server::start_with(&["--no-download", "--no-test-data", "--dep", &dep_arg], env);
+    s.line();
+    let mut out = Vec::new();
+    for r in requests {
+        let mut request = r.clone();
+        request["command"] = json!("runTests");
+        request["sourcePaths"] = json!([main]);
+        s.send(request);
+        out.push(s.until_summary());
+    }
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line(), json!({"status": "shutting down"}));
+    out
+}
+
+/// Runs `requests` with the replay on (the default) and off (`ALRUNNER_LOGIN_REPLAY=0`) and asserts every request gives
+/// the same verdicts (entry, test, status, message); returns the replay-on lines.
+fn same_with_and_without_the_replay(src: &str, requests: &[Value]) -> Vec<Vec<Value>> {
+    let on = login_app_requests(src, requests, &[]);
+    let off = login_app_requests(src, requests, &[("ALRUNNER_LOGIN_REPLAY", "0")]);
+    for (n, (a, b)) in on.iter().zip(&off).enumerate() {
+        assert_eq!(verdicts(a), verdicts(b), "request {n}: the replay changed a verdict");
+    }
+    on
+}
+
+/// Al-runner issue 8211, step 3 review H1: the login reads the request's `serverUrl` (`GetUrl`), so a session of another
+/// URL never takes the start of a login that read another one. Same seed, so every other key field is equal.
+#[test]
+fn a_request_with_another_server_url_takes_no_start_of_the_first() {
+    let src = r#"table 50830 "Probe Url" { fields { field(1; K; Integer) { } field(2; Url; Text[250]) { } } keys { key(PK; K) { } } }
+codeunit 50820 "Probe Registration"
+{
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Guided Experience", 'OnRegisterManualSetup', '', false, false)]
+    local procedure RegisterManualSetup() var U: Record "Probe Url";
+    begin U.K := 1; U.Url := CopyStr(GetUrl(ClientType::Web), 1, 250); U.Insert(); end;
+}
+codeunit 50821 "Probe Login Tests"
+{
+    Subtype = Test;
+    [Test] procedure SeesTheUrl() var U: Record "Probe Url"; begin U.Get(1); Error('URL=%1', U.Url); end;
+}
+"#;
+    let other = "https://other.example/BC280/";
+    let on = same_with_and_without_the_replay(
+        src,
+        &[
+            json!({"seed": 7}),
+            json!({"seed": 7}),
+            json!({"seed": 7, "serverUrl": other}),
+        ],
+    );
+    let message = |lines: &[Value]| {
+        (lines.iter())
+            .find(|l| l["type"] == "test")
+            .map(|t| t["message"].to_string())
+            .unwrap_or_default()
+    };
+    assert!(message(&on[2]).contains(other), "{:?}", on[2]);
+    assert!(
+        login_replays(&on[1]).is_some_and(|n| n >= 1),
+        "the same URL replays: {:?}",
+        on[1].last()
+    );
+}
