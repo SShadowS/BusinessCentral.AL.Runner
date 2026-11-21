@@ -3,7 +3,7 @@
 //! the login and keeps its al-vm `LoginImage` with the open's writes and assumption marks ([`record`]); a later session of
 //! the key thaws the image into itself in `runtime/run.rs` `open_company` ([`replay`]), when [`why_not`] finds nothing
 //! against it. A key whose session the image refuses (`NotImaged`) runs the real login every time and is not frozen again.
-//! `RunOptions::login_replay_off` (`ALRUNNER_LOGIN_REPLAY=0`) turns it off; under the login replay check
+//! It is off unless `RunOptions::login_replay` (`ALRUNNER_LOGIN_REPLAY=1`) turns it on; under the login replay check
 //! (`ALRUNNER_LOGIN_REPLAY_CHECK=1`) no session takes a start, and `login_replay.rs` compares each later session of a key
 //! with a thaw of its start instead.
 //!
