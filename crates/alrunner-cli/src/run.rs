@@ -568,6 +568,10 @@ pub struct RequestTimings {
     pub engine: std::time::Duration,
     /// The request ran on the engines an earlier request over the same compile kept.
     pub engine_kept: bool,
+    /// Test sessions that took a login start in place of running the login, and the starts kept (al-runner issue 8211),
+    /// over every request the engine ran.
+    pub login_replays: u64,
+    pub login_starts: usize,
     /// Setting up the install baseline: running the install code, or reading it.
     pub baseline: std::time::Duration,
     /// `ran`, `cache` or `kept` (`Phases::baseline_source`); `None`: no baseline.
@@ -588,6 +592,8 @@ impl RequestTimings {
             compile: p.warm_compile.unwrap_or(p.compile),
             engine: p.engine,
             engine_kept: p.engine_kept,
+            login_replays: p.login_replay.replays,
+            login_starts: p.login_replay.starts,
             baseline: p.baseline,
             baseline_source: p.baseline_source,
             tests: p.tests,
@@ -1807,7 +1813,7 @@ fn test_inner(
         }
     };
     let p = &rt.phases;
-    p.login_replay.iter().for_each(|l| eprintln!("{l}")); // ALRUNNER_LOGIN_REPLAY_CHECK (issue 8211)
+    p.login_replay.report.iter().for_each(|l| eprintln!("{l}")); // ALRUNNER_LOGIN_REPLAY_CHECK (issue 8211)
     let d = sidecar_host.stats();
     sidecar_host.shutdown();
 

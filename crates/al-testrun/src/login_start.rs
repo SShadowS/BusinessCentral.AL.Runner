@@ -1,24 +1,23 @@
 //! Login starts (al-runner issue 8211, PERF-01 step 3): a test session whose login inputs ([`crate::login_replay::Key`])
 //! were seen before takes what that login left (a [`Start`]) in place of running it again. The first session of a key runs
-//! the login and keeps its al-vm `LoginImage` with the open's writes and assumption marks; a later session of the key
-//! thaws the image into itself in `runtime/run.rs` `open_company`, when [`why_not`] finds nothing against it. A key whose
-//! session the image refuses (`NotImaged`) runs the real login every time. `RunOptions::login_replay_off`
-//! (`ALRUNNER_LOGIN_REPLAY=0`) turns it off; under the login replay check (`ALRUNNER_LOGIN_REPLAY_CHECK=1`) no session
-//! takes a start.
+//! the login and keeps its al-vm `LoginImage` with the open's writes and assumption marks ([`record`]); a later session of
+//! the key thaws the image into itself in `runtime/run.rs` `open_company` ([`replay`]), when [`why_not`] finds nothing
+//! against it. A key whose session the image refuses (`NotImaged`) runs the real login every time and is not frozen again.
+//! `RunOptions::login_replay_off` (`ALRUNNER_LOGIN_REPLAY=0`) turns it off; under the login replay check
+//! (`ALRUNNER_LOGIN_REPLAY_CHECK=1`) no session takes a start, and `login_replay.rs` compares each later session of a key
+//! with a thaw of its start instead.
 //!
 //! The starts live on the engine ([`starts`], `Engine::derived`): at most [`MAX_STARTS`] and [`MAX_BYTES`] of
-//! `LoginImage::kept_bytes`, least recently used out; one start over [`MAX_START_BYTES`] is not kept (`too large`).
-//!
-//! PERF-01 step 3 A1: the interface only. Nothing is kept and nothing is taken: `take` finds nothing, `record` keeps
-//! nothing, and `open_company` runs every login as before.
-// A1 stubs: used from A2 (the store) and A3 (the replay path) on.
-#![allow(dead_code)]
+//! `LoginImage::kept_bytes`, least recently used out; one start over [`MAX_START_BYTES`] is not kept (`too large`). The
+//! memory pool reads [`Starts::bytes`] through the shared-bytes meter (`runtime/corpus.rs`), so an eviction gives its
+//! bytes back.
 
 use crate::install::CompanyOpenWrites;
 use crate::login_replay::Key;
 use al_builtins::assumptions::HitBits;
-use al_vm::{Engine, LoginImage, NotImaged};
-use std::sync::{Arc, Mutex};
+use al_vm::{BaseShape, Engine, LoginImage, NotImaged, Session};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
 mod outside;
 
@@ -28,7 +27,7 @@ pub(crate) const MAX_STARTS: usize = 8;
 pub(crate) const MAX_BYTES: u64 = 64 << 20;
 /// The most bytes one start may hold: a larger one is not kept (`too large`), so one start never empties the others.
 pub(crate) const MAX_START_BYTES: u64 = 16 << 20;
-/// The most keys an engine remembers as refused (no image), with why.
+/// The most keys an engine remembers as refused (no image, or too large).
 pub(crate) const MAX_REFUSED: usize = 64;
 
 /// What the raised login left in the first session of a key: the session image, what the open noted for the tests, and
@@ -48,8 +47,6 @@ const _: fn() = || {
 /// Why a session does not take a start (design section 3.4), each counted in the report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NotTaken {
-    /// No start for the key, or the key's session was not imaged.
-    NoStart,
     /// The run notes the code it runs: `--explain` or an observer, coverage, the impact trace, the profiler.
     NotesCode,
     /// A stability perturbation or a set clock start: shapes the check never measured.
@@ -62,6 +59,19 @@ pub(crate) enum NotTaken {
     BaseShape,
 }
 
+impl NotTaken {
+    /// The reason as the report names it.
+    fn reason(self) -> String {
+        match self {
+            NotTaken::NotesCode => "the run notes the code it runs".into(),
+            NotTaken::Perturbed => "a stability perturbation or a set clock start".into(),
+            NotTaken::MovedIn => "single instances moved in".into(),
+            NotTaken::Target(field) => format!("target: {field}"),
+            NotTaken::BaseShape => "base shape".into(),
+        }
+    }
+}
+
 /// The starts of one engine (see the module comment).
 #[derive(Default)]
 pub(crate) struct Starts {
@@ -72,57 +82,121 @@ pub(crate) struct Starts {
 struct State {
     /// The kept starts, the one used last at the end.
     kept: Vec<(Key, Arc<Start>)>,
-    /// The keys whose session was not imaged, with why.
-    refused: Vec<(Key, String)>,
-    tally: Tally,
+    /// The keys whose start is not kept, the newest at the end.
+    refused: Vec<Key>,
+    replayed: u64,
+    /// Per reason (`NotImaged::reason`), the keys whose session was not imaged.
+    not_imaged: BTreeMap<String, u64>,
+    too_large: u64,
+    /// Per reason ([`NotTaken::reason`]), the sessions the gate kept from a start.
+    not_taken: BTreeMap<String, u64>,
 }
 
-/// What the starts of an engine did, for the report.
-#[derive(Default)]
-struct Tally {
-    replayed: u64,
-    recorded: u64,
-    /// Per reason (`NotImaged::reason`, or `too large`), the keys whose start was not kept.
-    not_kept: std::collections::BTreeMap<String, u64>,
-    /// Per reason, the sessions with a start that did not take it.
-    not_taken: std::collections::BTreeMap<String, u64>,
+impl State {
+    fn bytes(&self) -> u64 {
+        self.kept.iter().map(|(_, s)| s.image.kept_bytes()).sum()
+    }
+
+    fn refuse(&mut self, key: Key) {
+        if self.refused.len() == MAX_REFUSED {
+            self.refused.remove(0);
+        }
+        self.refused.push(key);
+    }
 }
 
 impl Starts {
-    /// Whether `key` has a start or was refused: its session is then not frozen again. A1: always `false`.
-    pub(crate) fn knows(&self, _key: &Key) -> bool {
-        false
+    fn state(&self) -> std::sync::MutexGuard<'_, State> {
+        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// The start of `key`, the one used last from now on. A1: always `None`.
-    pub(crate) fn take(&self, _key: &Key) -> Option<Arc<Start>> {
-        None
+    /// Whether `key` has a start or was refused: its session is then not frozen again.
+    pub(crate) fn knows(&self, key: &Key) -> bool {
+        let s = self.state();
+        s.kept.iter().any(|(k, _)| k == key) || s.refused.contains(key)
     }
 
-    /// Keeps the start of `key` (or why its session has none) within the caps. A1: keeps nothing.
-    pub(crate) fn record(&self, _key: Key, _start: Result<Start, NotImaged>) {}
+    /// The start of `key`, the one used last from now on.
+    pub(crate) fn take(&self, key: &Key) -> Option<Arc<Start>> {
+        let mut s = self.state();
+        let at = s.kept.iter().position(|(k, _)| k == key)?;
+        let entry = s.kept.remove(at);
+        let start = entry.1.clone();
+        s.kept.push(entry);
+        Some(start)
+    }
 
-    /// Counts a session that had a start and did not take it.
-    pub(crate) fn not_taken(&self, _why: NotTaken) {}
+    /// Keeps the start of `key` (or why its session has none) within the caps: the first of a key wins; a start over
+    /// [`MAX_START_BYTES`] is refused; the least recently used go until [`MAX_STARTS`] and [`MAX_BYTES`] hold.
+    pub(crate) fn record(&self, key: Key, start: Result<Start, NotImaged>) {
+        let mut s = self.state();
+        if s.kept.iter().any(|(k, _)| *k == key) || s.refused.contains(&key) {
+            return;
+        }
+        let start = match start {
+            Ok(start) => start,
+            Err(why) => {
+                *s.not_imaged.entry(why.reason()).or_default() += 1;
+                s.refuse(key);
+                return;
+            }
+        };
+        let bytes = start.image.kept_bytes();
+        if bytes > MAX_START_BYTES {
+            s.too_large += 1;
+            s.refuse(key);
+            return;
+        }
+        while !s.kept.is_empty() && (s.kept.len() >= MAX_STARTS || s.bytes() + bytes > MAX_BYTES) {
+            s.kept.remove(0);
+        }
+        s.kept.push((key, Arc::new(start)));
+    }
 
-    /// The bytes the kept starts hold (`LoginImage::kept_bytes`), for the memory pool's meter. A1: 0.
+    /// Counts a session the gate kept from a start.
+    pub(crate) fn not_taken(&self, why: NotTaken) {
+        *self.state().not_taken.entry(why.reason()).or_default() += 1;
+    }
+
+    /// The bytes the kept starts hold (`LoginImage::kept_bytes`), for the memory pool's meter.
     pub(crate) fn bytes(&self) -> u64 {
-        0
+        self.state().bytes()
     }
 
-    /// How many sessions took a start. A1: 0.
+    /// How many sessions took a start.
     pub(crate) fn replayed(&self) -> u64 {
-        0
+        self.state().replayed
     }
 
-    /// How many starts are kept. A1: 0.
+    /// How many starts are kept.
     pub(crate) fn kept(&self) -> usize {
-        0
+        self.state().kept.len()
     }
 
-    /// The report line (`login start: ...`): `None` before a start was recorded or taken. A1: `None`.
+    /// The report line, names and counts only: `None` before a start was recorded or refused, or a session gated.
     pub(crate) fn line(&self) -> Option<String> {
-        None
+        let s = self.state();
+        // `N what (n: reason, ...)`: the count, then the reasons when there are any.
+        let by = |what: &str, m: &BTreeMap<String, u64>| {
+            let n: u64 = m.values().sum();
+            let why: Vec<String> = m.iter().map(|(why, n)| format!("{n}: {why}")).collect();
+            match why.is_empty() {
+                true => format!("{n} {what}"),
+                false => format!("{n} {what} ({})", why.join(", ")),
+            }
+        };
+        if s.kept.is_empty() && s.refused.is_empty() && s.replayed == 0 && s.not_taken.is_empty() {
+            return None;
+        }
+        Some(format!(
+            "login start: {} replayed, {} kept ({:.1} MB), {}, {} too large, {}",
+            s.replayed,
+            s.kept.len(),
+            s.bytes() as f64 / 1_048_576.0,
+            by("not imaged", &s.not_imaged),
+            s.too_large,
+            by("refused by the gate", &s.not_taken),
+        ))
     }
 }
 
@@ -131,16 +205,102 @@ pub(crate) fn starts(engine: &Engine) -> Arc<Starts> {
     engine.derived(Starts::default)
 }
 
+/// What the starts of `engine` did, and the check's report, for the run's phases.
+pub(crate) fn phases(engine: &Engine) -> crate::runtime::LoginReplay {
+    let starts = starts(engine);
+    crate::runtime::LoginReplay {
+        report: crate::login_replay::report(engine),
+        replays: starts.replayed(),
+        starts: starts.kept(),
+    }
+}
+
+/// Why a run keeps every session from taking or recording a start: it notes the code it runs (`notes_code`), it is
+/// perturbed or has a set clock start (`perturbed`), or single instances were moved in (`moved_in`).
+pub(crate) fn run_gate(notes_code: bool, perturbed: bool, moved_in: bool) -> Option<NotTaken> {
+    if notes_code {
+        Some(NotTaken::NotesCode)
+    } else if perturbed {
+        Some(NotTaken::Perturbed)
+    } else if moved_in {
+        Some(NotTaken::MovedIn)
+    } else {
+        None
+    }
+}
+
+/// Why a session that was `target` (`Session::thaw_target_why`) with a store of shape `shape` before its login cannot take
+/// `start`.
+pub(crate) fn target_gate(target: Option<&'static str>, shape: &BaseShape, start: &Start) -> Option<NotTaken> {
+    match target {
+        Some(field) => Some(NotTaken::Target(field)),
+        None => (shape != start.image.base_shape()).then_some(NotTaken::BaseShape),
+    }
+}
+
 /// Why `session` does not take the start `start` of its key; `None`: it takes it. `notes_code`, `perturbed`, `moved_in`:
-/// what `run_codeunit_inner` knows of the run. A1: always `Some(NotTaken::NoStart)`.
+/// what `run_codeunit_inner` knows of the run ([`run_gate`]). The gate as one answer, for tests: [`replay`] asks the same
+/// two in this order, the run first (it counts a gated session whether its key has a start or not).
+#[cfg(test)]
 pub(crate) fn why_not(
-    _session: &al_vm::Session,
-    _start: &Start,
-    _notes_code: bool,
-    _perturbed: bool,
-    _moved_in: bool,
+    session: &Session,
+    start: &Start,
+    notes_code: bool,
+    perturbed: bool,
+    moved_in: bool,
 ) -> Option<NotTaken> {
-    Some(NotTaken::NoStart)
+    run_gate(notes_code, perturbed, moved_in)
+        .or_else(|| target_gate(session.thaw_target_why(), &session.base_shape(), start))
+}
+
+/// The login of `session`, whose key is `key`, replayed from the key's start in place of running it: the open's writes and
+/// the assumption marks of the start. `None`: the session runs its login (no start, or `gate` or the target keeps it from
+/// one; counted).
+pub(crate) fn replay(
+    engine: &Engine,
+    key: &Key,
+    session: &mut Session,
+    gate: Option<NotTaken>,
+) -> Option<(CompanyOpenWrites, HitBits)> {
+    let starts = starts(engine);
+    if let Some(why) = gate {
+        starts.not_taken(why);
+        return None;
+    }
+    let start = starts.take(key)?;
+    if let Some(why) = target_gate(session.thaw_target_why(), &session.base_shape(), &start) {
+        starts.not_taken(why);
+        return None;
+    }
+    session.thaw_login_image(&start.image);
+    starts.state().replayed += 1;
+    #[cfg(test)]
+    if DROP_HITS.with(std::cell::Cell::get) {
+        return Some((start.wrote.clone(), HitBits::EMPTY));
+    }
+    Some((start.wrote.clone(), start.hits))
+}
+
+/// After the real login of the first session of `key` (`base`: the session before it), its start, unless the key is known
+/// or `gate` keeps the run from starts.
+pub(crate) fn record(
+    engine: &Engine,
+    key: Key,
+    session: &Session,
+    base: &al_vm::LoginBase,
+    wrote: &CompanyOpenWrites,
+    hits: HitBits,
+) {
+    let starts = starts(engine);
+    if starts.knows(&key) {
+        return;
+    }
+    let start = session.login_image(base).map(|image| Start {
+        image,
+        wrote: wrote.clone(),
+        hits,
+    });
+    starts.record(key, start);
 }
 
 #[cfg(test)]
@@ -155,7 +315,7 @@ thread_local! {
 
 /// Notes `session`'s state after it opened the company in [`OPENED`], when a test asked for it.
 #[cfg(test)]
-pub(crate) fn opened(session: &mut al_vm::Session, wrote: &CompanyOpenWrites, hits: HitBits) {
+pub(crate) fn opened(session: &mut Session, wrote: &CompanyOpenWrites, hits: HitBits) {
     if OPENED.with(|o| o.borrow().is_some()) {
         let state = crate::login_replay::LoginState::of(session, wrote, hits);
         OPENED.with(|o| o.borrow_mut().as_mut().map(|v| v.push(state)));
