@@ -17,6 +17,7 @@ mod key_value_tests;
 mod order_carry;
 mod replace;
 mod row_changes;
+mod shape;
 #[cfg(test)]
 mod storage_tests;
 pub use frozen::{FrozenRows, FrozenStore, NotShareable, not_shareable, shareable};
