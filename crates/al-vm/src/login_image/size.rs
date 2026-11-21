@@ -39,7 +39,21 @@ impl LoginImage {
             instances: count(|n| matches!(n, Node::Instance(_))),
             temp_tables: count(|n| matches!(n, Node::TempTable(_))),
             temp_rows,
+            kept_bytes: self.kept_bytes(),
+            // PERF-01 step 3 A1: inert; the counts per kind come with A2.
+            kinds: Default::default(),
         }
+    }
+
+    /// What keeping this image costs in memory, the number the starts' caps count (design section 4). PERF-01 step 3
+    /// A1: inert, always 0.
+    pub fn kept_bytes(&self) -> u64 {
+        0
+    }
+
+    /// The shape of the store the login started from (`Session::base_shape`).
+    pub fn base_shape(&self) -> &super::BaseShape {
+        &self.base_shape
     }
 }
 

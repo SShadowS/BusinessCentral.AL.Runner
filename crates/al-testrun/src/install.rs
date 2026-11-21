@@ -1163,7 +1163,7 @@ fn run_subscribers(lowered: &Lowered, session: &mut Session, subs: &[(usize, usi
 }
 
 /// The tables the Company Triggers subscribers of the test session wrote ([`test_session_company_open`]).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct CompanyOpenWrites {
     /// The first subscriber that wrote, for the reason text.
     pub who: Option<String>,

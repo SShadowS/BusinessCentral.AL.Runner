@@ -72,8 +72,14 @@ pub(crate) struct Key {
 
 impl Key {
     /// The key of `session` before it opens the company; `disabled`: RequiredTestIsolation = Disabled; `flags`: the run options
-    /// the session took.
-    pub(crate) fn of(session: &mut Session, disabled: bool, flags: crate::runtime::session_flags::SessionFlags) -> Key {
+    /// the session took; `_skipped`: the install code that could not run, whose tables the open is watched on (PERF-01 step
+    /// 3 A1: taken, not yet a field).
+    pub(crate) fn of(
+        session: &mut Session,
+        disabled: bool,
+        flags: crate::runtime::session_flags::SessionFlags,
+        _skipped: &[al_vm::SkippedInstall],
+    ) -> Key {
         let store = session.store_mut();
         let tables = store.export_committed().unwrap_or_default();
         let database = digest(&rows(&tables));
@@ -385,18 +391,18 @@ impl Check {
 
     /// A new key's session after the raised login: frozen ([`Session::login_image`]), thawn into `twin` on a thread of
     /// its own (so nothing of the thaw reaches this thread's state: its store operation count, its assumption marks, its
-    /// instance registry), and the twin's state compared with `state` ([`differences`]). `before_login`: the store's
-    /// change counter before the login. Outcomes do not change: the twin is dropped and `session` is only read.
+    /// instance registry), and the twin's state compared with `state` ([`differences`]). `base`: the store before the login
+    /// (`Session::login_base`). Outcomes do not change: the twin is dropped and `session` is only read.
     pub(crate) fn round_trip(
         &self,
         session: &Session,
-        before_login: u64,
+        base: &al_vm::LoginBase,
         state: &LoginState,
         twin: impl FnOnce() -> Session + Send,
     ) {
         #[cfg(test)]
         let plant = TWIN_PLANT.with(std::cell::Cell::get);
-        let image = session.login_image(before_login);
+        let image = session.login_image(base);
         let thawn = image.as_ref().ok().map(|image| {
             std::thread::scope(|scope| {
                 // A test thread's stack: the drop of a deep graph recurses on it.
