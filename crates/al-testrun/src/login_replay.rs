@@ -920,6 +920,15 @@ mod tests {
         );
         let session = state_of(&[(1990, vec![Value::Integer(7)])], &["session y"]);
         assert_eq!(first_difference(&a, &session).as_deref(), Some("session state 1"));
+        // Step 3 review round 2, R2-L3: a `field.` line is named by its field (a name, never its value), and when more lines
+        // differ the text says how many.
+        let row = [(1990, vec![Value::Integer(7)])];
+        let fields = state_of(&row, &["session x", "field.a 1", "field.b 2", "field.c 3"]);
+        let other = state_of(&row, &["session x", "field.a 1", "field.b 9", "field.c 8"]);
+        assert_eq!(
+            first_difference(&fields, &other).as_deref(),
+            Some("session state 3 (field.b), 2 lines differ")
+        );
         let mut marked = a.clone();
         marked.hits.0[0] = 1;
         assert_eq!(first_difference(&a, &marked).as_deref(), Some("assumption marks"));
