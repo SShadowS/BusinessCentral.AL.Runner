@@ -3077,7 +3077,7 @@ fn login_probe_rounds(
 /// entries (`timings.loginReplays`), and every test line equals those of the same requests with the replay off.
 #[test]
 fn a_second_request_takes_the_login_starts_of_the_first() {
-    let on = login_probe_rounds(&[], 2, &[], false);
+    let on = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "1")], 2, &[], false);
     let off = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "0")], 2, &[], false);
     for round in 0..2 {
         assert_eq!(on[round].last().unwrap()["passed"], json!(3), "{:?}", on[round]);
@@ -3101,13 +3101,24 @@ fn with_the_replay_off_no_session_takes_a_start() {
     }
 }
 
+/// Step 3 review H3: the replay is off unless `ALRUNNER_LOGIN_REPLAY=1` turns it on. On a store a session does not start
+/// from a shared snapshot of (install code that runs in every session), the key's digest of every row costs more than the
+/// login it saves (review probe `py`), so it is opt-in until that cost is gone.
+#[test]
+fn the_replay_is_off_unless_turned_on() {
+    let default = login_probe_rounds(&[], 2, &[], false);
+    for (round, lines) in default.iter().enumerate() {
+        assert_eq!(login_replays(lines), Some(0), "round {round}: {:?}", lines.last());
+    }
+}
+
 /// Al-runner issue 8211, step 3: a kept daemon whose first request had a test the time limit stopped answers the next
 /// request as a new daemon does (the same verdicts), and takes the starts of the first request (the stopped test's session
 /// recorded none that could change the answer).
 #[test]
 fn a_kept_daemon_with_login_starts_answers_as_a_fresh_one() {
     let hanger = json!({"id": "h", "test": "Codeunit50822."});
-    let kept = login_probe_rounds(&[], 2, &[hanger], true);
+    let kept = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "1")], 2, &[hanger], true);
     let h = kept[0]
         .iter()
         .find(|l| l["type"] == "test" && l["name"].as_str().is_some_and(|n| n.contains("Hangs")));
@@ -3116,7 +3127,7 @@ fn a_kept_daemon_with_login_starts_answers_as_a_fresh_one() {
         "the hanger is stopped by the time limit: {:?}",
         kept[0]
     );
-    let fresh = login_probe_rounds(&[], 1, &[], false);
+    let fresh = login_probe_rounds(&[("ALRUNNER_LOGIN_REPLAY", "1")], 1, &[], false);
     assert_eq!(verdicts(&kept[1]), verdicts(&fresh[0]));
     assert_eq!(kept[1].last().unwrap()["passed"], json!(3), "{:?}", kept[1]);
     assert!(
@@ -3148,11 +3159,11 @@ fn login_app_requests(src: &str, requests: &[Value], env: &[(&str, &str)]) -> Ve
     out
 }
 
-/// Runs `requests` with the replay on (the default) and off (`ALRUNNER_LOGIN_REPLAY=0`) and asserts every request gives
+/// Runs `requests` with the replay on (`ALRUNNER_LOGIN_REPLAY=1`) and off (the default) and asserts every request gives
 /// the same verdicts (entry, test, status, message); returns the replay-on lines.
 fn same_with_and_without_the_replay(src: &str, requests: &[Value]) -> Vec<Vec<Value>> {
-    let on = login_app_requests(src, requests, &[]);
-    let off = login_app_requests(src, requests, &[("ALRUNNER_LOGIN_REPLAY", "0")]);
+    let on = login_app_requests(src, requests, &[("ALRUNNER_LOGIN_REPLAY", "1")]);
+    let off = login_app_requests(src, requests, &[]);
     for (n, (a, b)) in on.iter().zip(&off).enumerate() {
         assert_eq!(verdicts(a), verdicts(b), "request {n}: the replay changed a verdict");
     }

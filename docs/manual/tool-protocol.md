@@ -242,7 +242,7 @@ Differences a client must adapt to:
    starting them ahead), `affectedMs` (`affectedOnly`: the stored result and the hashes of the inputs), `entriesMs`
    (building the runs of the entries) and `prepareMs` (the rest before the compile: the dependency notes, the hooks and
    the run's options). `--timings` prints the same parts as its `setup:` line.
-   `loginReplays` and `loginStarts` (always present, 0 when off) count, over every request the engine ran, the test sessions that took a kept login start in place of running the login and the login starts kept (al-runner issue 8211). The first test session of a login runs it and keeps a start; later sessions of the same login, company, user and inputs thaw it. `ALRUNNER_LOGIN_REPLAY=0` turns this off (both 0).
+   `loginReplays` and `loginStarts` (always present, 0 when the replay is off, its default; `ALRUNNER_LOGIN_REPLAY=1` turns it on) count, over every request the engine ran, the test sessions that took a kept login start in place of running the login and the login starts kept (al-runner issue 8211). The first test session of a login runs it and keeps a start; later sessions of the same login, company, user and inputs thaw it. `ALRUNNER_LOGIN_REPLAY=0` turns this off (both 0).
    `engineKept: true` when the request ran on the engines an earlier request over the same compile kept. Without
    `entries`, `resetMs` is the time the test threads took to set up their own copy of the install baseline (the
    longest of them; 0 with one thread). With `entries`, each `entrySummary` has `timings` with that entry's `resetMs`

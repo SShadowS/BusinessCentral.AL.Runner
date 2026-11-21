@@ -1,6 +1,6 @@
 //! The run options that each test session takes as they are (`RunOptions::ignore_permission_mock`,
 //! `RunOptions::permissions_off`, `RunOptions::dev_endpoint_ui`, `RunOptions::no_client`, `RunOptions::login_replay_check`,
-//! `RunOptions::login_replay_off`),
+//! `RunOptions::login_replay`),
 //! carried as one value from the options to the session. The test session's login code runs under them, so the whole value
 //! is a field of the login replay check's key (`login_replay.rs` `Key::flags`): a flag added here is in the key too.
 use super::RunOptions;
@@ -14,7 +14,7 @@ pub(crate) struct SessionFlags {
     no_client: bool,
     cell_tap: bool,
     login_replay_check: bool,
-    login_replay_off: bool,
+    login_replay: bool,
 }
 
 impl SessionFlags {
@@ -26,7 +26,7 @@ impl SessionFlags {
             no_client: o.no_client,
             cell_tap: o.cell_tap,
             login_replay_check: o.login_replay_check,
-            login_replay_off: o.login_replay_off,
+            login_replay: o.login_replay,
         }
     }
 
@@ -35,10 +35,10 @@ impl SessionFlags {
         self.login_replay_check
     }
 
-    /// Whether a test session may take a login start in place of its login (`login_start.rs`): not under
-    /// `RunOptions::login_replay_off`, and not under the check, which runs every login and compares.
+    /// Whether a test session may take a login start in place of its login (`login_start.rs`): under
+    /// `RunOptions::login_replay`, and not under the check, which runs every login and compares.
     pub(super) fn login_replay(self) -> bool {
-        !self.login_replay_off && !self.login_replay_check
+        self.login_replay && !self.login_replay_check
     }
 
     pub(super) fn apply(self, s: &mut Session) {
