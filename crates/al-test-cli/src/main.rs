@@ -881,6 +881,44 @@ fn check_companies(companies: &al_host::Companies) -> Result<(), String> {
         .map_err(|e| format!("--companies: {e}"))
 }
 
+/// What the run reads from the artifacts of its BC build: the license (ADR-060) and the emit version of the
+/// missing-object error (al-vm `emit_version`, read on its first use).
+fn build_facts(
+    build: &al_deps::build::BuildId,
+    provision: &deps::Provision,
+    cache_dir: Option<&Path>,
+) -> Result<(al_testrun::license::LicenseUse, al_vm::emit_version::EmitVersion), String> {
+    let fetch = al_deps::artifact::Fetch {
+        cache_root: al_deps::cache::cache_root_from_env(cache_dir),
+        download: provision.download,
+        query: provision.query.clone(),
+        local_artifacts: provision.local_artifacts.clone(),
+        country: provision.country.clone(),
+    };
+    let license =
+        al_testrun::license::LicenseUse::from_artifact(&al_deps::artifact::HttpCdn::from_env(), &fetch, build)?;
+    let emit_version = al_testrun::emit_version::of_build(
+        build,
+        &fetch.cache_root,
+        fetch.download,
+        fetch.local_artifacts.as_deref(),
+    );
+    Ok((license, emit_version))
+}
+
+/// The run options the environment sets for internal comparisons and checks; every other option is its default.
+fn env_options() -> runtime::RunOptions {
+    runtime::RunOptions {
+        private_baseline: std::env::var_os("AL_PRIVATE_BASELINE").is_some(), // ADR-069 decision 11
+        login_replay_check: std::env::var_os("ALRUNNER_LOGIN_REPLAY_CHECK").is_some(), // issue 8211, internal
+        // Internal, for the ADR-070 step 2 comparison: the whole corpus in BC's order (`AL_STRICT_ORDER_ALL`), and the
+        // sequential strict run (`AL_STRICT_SEQUENTIAL`).
+        strict_order: std::env::var_os("AL_STRICT_ORDER_ALL").is_some(),
+        strict_sequential: std::env::var_os("AL_STRICT_SEQUENTIAL").is_some(), // ADR-070 step 2 (internal)
+        ..Default::default()
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn run_version_inner(
     args: &Args,
@@ -1092,6 +1130,7 @@ fn run_version_inner(
     let mut bc_build = None;
     // ADR-060: the license of the BC artifacts the run uses; none without them (`--no-deps`, or every dependency on disk).
     let mut license = al_testrun::license::LicenseUse::none("no BC artifact is used by this run");
+    let mut emit_version = al_vm::emit_version::EmitVersion::default();
     if !args.no_deps {
         // Dependencies go after the corpus apps, so the corpus objects keep their positions.
         // ADR-013 Layer A: the oracle leg is the explicit `--bc-version`, so the Microsoft build
@@ -1117,18 +1156,7 @@ fn run_version_inner(
                 println!("bc build: {} ({})", u.build, origin_word(u.origin));
                 chosen.target.bc.resolved_to(&u.build.to_string())?;
                 bc_build = Some(u.build.to_string());
-                let fetch = al_deps::artifact::Fetch {
-                    cache_root: al_deps::cache::cache_root_from_env(args.cache_dir.as_deref()),
-                    download: provision.download,
-                    query: provision.query.clone(),
-                    local_artifacts: provision.local_artifacts.clone(),
-                    country: provision.country.clone(),
-                };
-                license = al_testrun::license::LicenseUse::from_artifact(
-                    &al_deps::artifact::HttpCdn::from_env(),
-                    &fetch,
-                    &u.build,
-                )?;
+                (license, emit_version) = build_facts(&u.build, &provision, args.cache_dir.as_deref())?;
             }
             None => println!("bc build: none needed (every dependency came from --deps)"),
         }
@@ -1254,6 +1282,7 @@ fn run_version_inner(
         // The corpus has no test data: its oracle is a database the cases fill themselves.
         test_data: None,
         license: license.license.clone(),
+        emit_version,
         company_data: None,
         compile_cache,
         test_time_limit: None,
@@ -1296,13 +1325,7 @@ fn run_version_inner(
         // The suite's CI job sets DisableWriteInsideTryFunctions=false (oracle.toml `server_settings`, job "BC TryWrites").
         allow_write_in_try_functions: pass.settings.allow_write_in_try_functions,
         // `dev_endpoint_ui` stays off: the corpus runs as Microsoft's Test Runner app does, so unhandled UI is an error.
-        private_baseline: std::env::var_os("AL_PRIVATE_BASELINE").is_some(), // ADR-069 decision 11
-        login_replay_check: std::env::var_os("ALRUNNER_LOGIN_REPLAY_CHECK").is_some(), // issue 8211, internal
-        // Internal, for the ADR-070 step 2 comparison: the whole corpus in BC's order (`AL_STRICT_ORDER_ALL`), and the
-        // sequential strict run (`AL_STRICT_SEQUENTIAL`).
-        strict_order: std::env::var_os("AL_STRICT_ORDER_ALL").is_some(),
-        strict_sequential: std::env::var_os("AL_STRICT_SEQUENTIAL").is_some(), // ADR-070 step 2 (internal)
-        ..Default::default()
+        ..env_options()
     };
     let load_time = started.elapsed();
     // The suite apps of this pass alone: the other passes have every other app of this one.
