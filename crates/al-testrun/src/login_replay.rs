@@ -111,9 +111,10 @@ impl Key {
         flags: crate::runtime::session_flags::SessionFlags,
         skipped: &[al_vm::SkippedInstall],
     ) -> Key {
+        let engine = session.engine.clone();
         let store = session.store_mut();
-        let tables = store.export_committed().unwrap_or_default();
-        let database = digest(&rows(&tables));
+        let tables = key_parts::store_table_digests(&engine, store);
+        let database = key_parts::database_digest(&tables);
         let uncommitted = store.has_uncommitted().then(|| digest(&current_rows(store)));
         let backing = store.backing_identity();
         let resources = {
@@ -149,7 +150,7 @@ impl Key {
             ),
             flags,
             license: session.engine.license.clone(),
-            parts: key_parts::KeyParts::of(&tables, &state),
+            parts: key_parts::KeyParts::of(tables, &state),
             skipped: skipped.to_vec(),
             isolation,
             run: RunSettings::now(),
@@ -999,10 +1000,11 @@ mod tests {
             lines: lines.iter().map(|s| s.to_string()).collect(),
             opaque: Vec::new(),
         };
+        let digests = key_parts::table_digests(&tables);
         Key {
-            database: digest(&rows(&tables)),
+            database: key_parts::database_digest(&digests),
             session: digest(&state.lines),
-            parts: key_parts::KeyParts::of(&tables, &state),
+            parts: key_parts::KeyParts::of(digests, &state),
             ..key(1)
         }
     }

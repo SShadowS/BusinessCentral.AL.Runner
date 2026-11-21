@@ -211,8 +211,13 @@ fn open_company(
     let engine = session.engine.clone();
     al_builtins::assumptions::clear_hits();
     let (flags, check) = (scratch.flags, scratch.flags.login_replay_check());
-    // Al-runner issue 8211: what the login can read, before it runs (the key of a login start, or of the check).
-    let key = (check || flags.login_replay())
+    // Al-runner issue 8211: what the login can read, before it runs (the key of a login start, or of the check). Only a
+    // raised login can be replayed: a session whose login is not raised takes no key (step 3 review H3).
+    let raises = || {
+        (session.test_object)
+            .is_some_and(|t| crate::login::raises(&engine, lowered, t, crate::login::watched(session, disabled)))
+    };
+    let key = (check || (flags.login_replay() && raises()))
         .then(|| crate::login_replay::Key::of(session, (isolation, scratch.hub), flags, skipped_installs));
     let notes_code = observed || session.notes_code_run() || crate::profiling::active();
     let perturbed = *perturb != crate::stability::Perturb::default() || scratch.clock_start.is_some();
