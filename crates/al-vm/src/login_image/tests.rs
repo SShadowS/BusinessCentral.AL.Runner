@@ -258,6 +258,8 @@ fn a_new_session_round_trips_with_no_difference() {
     round_trip(&mut f.session);
 }
 
+// The difference-only counters (`caught_errors`, `calls_made`) are no longer plain: the thaw keeps the target's own
+// (`a_difference_only_counter_is_kept_from_the_target_and_not_rendered`).
 #[test]
 fn every_plain_field_the_login_may_change_comes_back() {
     let mut f = fx();
@@ -271,12 +273,10 @@ fn every_plain_field_the_login_may_change_comes_back() {
     s.isolated_committed
         .insert(("a".into(), "k".into()), ("v".into(), true, false));
     s.autoinc.insert(("t".into(), 3), 17);
-    s.caught_errors = 3;
     s.next_guid = 5;
     s.commits += 7;
     s.application_areas = "#All".into();
     s.next_row_version += 3;
-    s.calls_made = 9;
     s.waited_ms = 1234;
     s.encrypted.insert("plain".into(), "cipher".into());
     s.tdd_reached.insert("stub".into());
@@ -287,12 +287,10 @@ fn every_plain_field_the_login_may_change_comes_back() {
     assert_eq!(twin.isolated_storage, s.isolated_storage);
     assert_eq!(twin.isolated_committed, s.isolated_committed);
     assert_eq!(twin.autoinc, s.autoinc);
-    assert_eq!(twin.caught_errors, 3);
     assert_eq!(twin.next_guid, 5);
     assert_eq!(twin.commits, s.commits);
     assert_eq!(twin.application_areas, "#All");
     assert_eq!(twin.next_row_version, s.next_row_version);
-    assert_eq!(twin.calls_made, 9);
     assert_eq!(twin.waited_ms, 1234);
     assert_eq!(twin.encrypted, s.encrypted);
     assert_eq!(twin.tdd_reached, s.tdd_reached);
@@ -1071,4 +1069,26 @@ fn the_size_counts_nodes_per_kind() {
     assert_eq!(of("temporary table"), size.temp_tables);
     assert!(of("record") >= 2, "T1 and T2 are record nodes: {size:?}");
     assert_eq!(size.kinds.iter().map(|k| k.count).sum::<usize>(), size.nodes);
+}
+
+// Step 3 review round 2, R2-M1: a count read only as a difference around one call (`counter` class: `calls_made`,
+// `caught_errors`, `deletes`, `rollbacks`) is not imaged: the thaw keeps the target's own, and no state line renders it.
+#[test]
+fn a_difference_only_counter_is_kept_from_the_target_and_not_rendered() {
+    let mut f = fx();
+    f.session.calls_made = 9;
+    f.session.deletes = 7;
+    let image = image(&mut f.session);
+    let mut target = new_session(&f.session);
+    target.calls_made = 5;
+    target.deletes = 2;
+    target.thaw_login_image(&image);
+    assert_eq!((target.calls_made, target.deletes), (5, 2));
+    let lines = target.state_lines().lines;
+    for name in ["calls_made", "caught_errors", "deletes", "rollbacks"] {
+        assert!(
+            !lines.iter().any(|l| l.starts_with(&format!("field.{name} "))),
+            "{name}"
+        );
+    }
 }

@@ -774,3 +774,42 @@ fn a_tables_digest_is_kept_per_state_and_a_write_makes_another() {
     session.commit_transaction();
     assert_ne!(key(&mut session), first, "a write is another state of the table");
 }
+
+/// Base Application's login code that sets WorkDate (`install::login_work_date`): its first run is recorded per engine
+/// (`install::LoginMemo`) and a later session takes the recorded answer without calling it, so real logins of one key make
+/// other numbers of calls (`Session::calls_made`).
+const LOGIN_MANAGEMENT: &str = r#"
+codeunit 40 LogInManagement
+{
+    SingleInstance = true;
+    procedure GetDefaultWorkDate(): Date begin exit(Last()); end;
+    local procedure Last(): Date begin exit(20260115D); end;
+}
+"#;
+
+// Step 3 review round 2, R2-M1: a counter read only as a difference around one call (`calls_made` and its kind) is no
+// input or output of the login: real logins of one key differ in it (the WorkDate memo), and the check must not report
+// that as a difference, real against real or replay against run.
+#[test]
+fn a_call_count_that_differs_between_real_logins_of_one_key_is_no_difference() {
+    let (engine, l) = compiled_with(&format!("{MAIN}{LOGIN_MANAGEMENT}"));
+    let baseline = al_vm::Session::new(engine.clone()).capture_baseline();
+    let check = RunOptions {
+        login_replay_check: true,
+        ..Default::default()
+    };
+    let setup = Setup {
+        baseline: Some(&baseline),
+        ..Default::default()
+    };
+    sessions_with(&engine, &l, "RPL Tests A", 3, &check, &setup);
+    let report = crate::login_replay::report(&engine).expect("a report");
+    let memo = engine.derived(crate::install::LoginMemo::default);
+    assert_eq!(
+        memo.replays.load(std::sync::atomic::Ordering::Relaxed),
+        2,
+        "GUARD: sessions 2 and 3 take the memo"
+    );
+    assert!(report.contains("2 compared, 0 differ"), "{report}");
+    assert!(report.contains("replay vs run: 2 checked, 0 differ"), "{report}");
+}
