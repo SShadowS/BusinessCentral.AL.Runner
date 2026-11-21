@@ -230,11 +230,14 @@ fn thaw(s: &Session, image: &LoginImage) -> Session {
     twin
 }
 
-/// Freezes `s`, thaws into a twin and asserts the twin's state lines equal `s`'s.
+/// Freezes `s`, thaws into a twin and asserts the twin's state lines equal `s`'s, as `s` held them at the freeze: the
+/// thaw puts the login's rows with a Commit on this thread, which moves the thread's store operation count that `s`'s SQL
+/// counters compare with (`SqlCounters::left_inactive`); al-testrun thaws on a thread of its own.
 fn round_trip(s: &mut Session) -> Session {
     let image = image(s);
+    let ours = s.state_lines();
     let mut twin = thaw(s, &image);
-    assert_eq!(s.state_lines(), twin.state_lines());
+    assert_eq!(ours, twin.state_lines());
     twin
 }
 
@@ -535,6 +538,7 @@ fn media_and_event_counts_are_written_into_the_sessions_own_cells() {
     let image = image(&mut f.session);
     let mut twin = new_session(&f.session);
     let (objects, stats) = (Rc::as_ptr(&twin.media.objects), Rc::as_ptr(&twin.events.event_stats));
+    let ours = f.session.state_lines();
     twin.thaw_login_image(&image);
     assert_eq!(Rc::as_ptr(&twin.media.objects), objects, "the session's own cell");
     assert_eq!(Rc::as_ptr(&twin.events.event_stats), stats, "the session's own cell");
@@ -544,7 +548,7 @@ fn media_and_event_counts_are_written_into_the_sessions_own_cells() {
     );
     assert_eq!(twin.events.event_stats.calls.borrow().get(&(0, 0)), Some(&3));
     assert_eq!(twin.events.event_stats.active.borrow().get(&1), Some(&2));
-    assert_eq!(f.session.state_lines(), twin.state_lines());
+    assert_eq!(ours, twin.state_lines());
 }
 
 #[test]
@@ -758,7 +762,7 @@ fn the_size_counts_what_the_image_holds() {
     // T1 and T2 share one table; TB, the temporary record of a table with a Blob field, is a second one (no rows).
     assert_eq!(size.temp_tables, 2);
     assert_eq!(size.temp_rows, 3);
-    assert!(size.rows_own_bytes <= size.rows_bytes);
+    assert!(size.rows_bytes + size.state_bytes <= size.kept_bytes);
     assert!(size.nodes >= size.instances + size.temp_tables);
 }
 
