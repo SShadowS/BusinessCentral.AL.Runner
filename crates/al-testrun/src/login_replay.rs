@@ -16,7 +16,9 @@ pub(crate) use difference::differences;
 use difference::{KINDS, StoredRow, stored_rows};
 use std::sync::{Mutex, PoisonError};
 
-/// Everything the login and its subscribers can read when the test session opens the company. Two sessions with the same
+/// The inputs the login and its subscribers read when the test session opens the company, as far as the code shows them:
+/// a session state the key does not hold is held in place by the thaw's rule (`al-vm login_image/fields.rs`), and a
+/// static a request sets is a field here (`login_start/outside.rs`). Two sessions with the same
 /// key may share one run of the login only when they also hold the same after it ([`Check`]); a field left out of the
 /// key would let a replay hand a session the store of another input. The engine (the compiled program, its apps and
 /// their code) is not a field: the check lives on the engine (`Engine::derived`).

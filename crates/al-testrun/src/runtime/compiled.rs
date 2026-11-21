@@ -271,8 +271,9 @@ pub struct RunOptions {
     /// read by the front ends). Outcomes do not depend on it.
     pub login_replay_check: bool,
     /// No test session takes a login start in place of running its login (`login_start.rs`, al-runner issue 8211;
-    /// `ALRUNNER_LOGIN_REPLAY=0`, read by the front ends). Default `false`: the replay is on. Only time and memory depend
-    /// on it.
+    /// `ALRUNNER_LOGIN_REPLAY=0`, read by the front ends). Default `false`: the replay is on. Outcomes must not depend
+    /// on it: every input the login reads is a key field (`login_replay::Key`), and the login replay check is its
+    /// differential test.
     pub login_replay_off: bool,
 }
 
