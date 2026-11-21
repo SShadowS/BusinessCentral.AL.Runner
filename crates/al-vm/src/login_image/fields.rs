@@ -76,6 +76,7 @@
 //!   platform, the same for every session).
 
 use crate::Session;
+use crate::state_render::content;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// The table, handed whole to `$with!`.
@@ -381,14 +382,14 @@ macro_rules! image_fields {
 }
 
 /// A field's value as one text that is the same for equal values: a map or a set in sorted order, everything else in its
-/// debug form ([`Session::field_lines`]).
+/// debug form, through the one place the state lines use it (`state_render::content`) ([`Session::field_lines`]).
 pub(crate) trait Canon {
     fn canon(&self) -> String;
 }
 
 impl<K: std::fmt::Debug, V: std::fmt::Debug, S> Canon for HashMap<K, V, S> {
     fn canon(&self) -> String {
-        let mut v: Vec<String> = self.iter().map(|(k, v)| format!("{k:?}: {v:?}")).collect();
+        let mut v: Vec<String> = self.iter().map(|kv| content(&kv)).collect();
         v.sort();
         format!("{{{}}}", v.join(", "))
     }
@@ -396,7 +397,7 @@ impl<K: std::fmt::Debug, V: std::fmt::Debug, S> Canon for HashMap<K, V, S> {
 
 impl<T: std::fmt::Debug, S> Canon for HashSet<T, S> {
     fn canon(&self) -> String {
-        let mut v: Vec<String> = self.iter().map(|x| format!("{x:?}")).collect();
+        let mut v: Vec<String> = self.iter().map(|x| content(x)).collect();
         v.sort();
         format!("{{{}}}", v.join(", "))
     }
@@ -404,7 +405,7 @@ impl<T: std::fmt::Debug, S> Canon for HashSet<T, S> {
 
 /// [`Canon`] in the debug form, for types whose debug form has one order.
 macro_rules! canon_by_debug {
-    ($($t:ty),* $(,)?) => { $(impl Canon for $t { fn canon(&self) -> String { format!("{self:?}") } })* };
+    ($($t:ty),* $(,)?) => { $(impl Canon for $t { fn canon(&self) -> String { content(self) } })* };
 }
 
 canon_by_debug!(
@@ -421,19 +422,19 @@ canon_by_debug!(
 
 impl<T: std::fmt::Debug> Canon for Option<T> {
     fn canon(&self) -> String {
-        format!("{self:?}")
+        content(self)
     }
 }
 
 impl<T: std::fmt::Debug> Canon for Vec<T> {
     fn canon(&self) -> String {
-        format!("{self:?}")
+        content(self)
     }
 }
 
 impl<T: std::fmt::Debug> Canon for BTreeSet<T> {
     fn canon(&self) -> String {
-        format!("{self:?}")
+        content(self)
     }
 }
 

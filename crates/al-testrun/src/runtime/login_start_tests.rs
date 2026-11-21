@@ -758,7 +758,11 @@ fn a_tables_digest_is_kept_per_state_and_a_write_makes_another() {
     session.commit_transaction();
     let key = |s: &mut al_vm::Session| Key::of(s, Default::default(), SessionFlags::default(), &[]);
     let first = key(&mut session);
-    assert_eq!(key(&mut session), first, "the kept digest is the digest of the same rows");
+    assert_eq!(
+        key(&mut session),
+        first,
+        "the kept digest is the digest of the same rows"
+    );
     // Another session over the same rows from another history (another stamp) has the same key.
     let mut other = target(&engine);
     assert!(other.store_mut().insert(&cx, &table, row(1)).is_ok());
