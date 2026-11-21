@@ -37,7 +37,6 @@ impl SessionFlags {
 
     /// Whether a test session may take a login start in place of its login (`login_start.rs`): not under
     /// `RunOptions::login_replay_off`, and not under the check, which runs every login and compares.
-    #[allow(dead_code)] // PERF-01 step 3 A1: `open_company` reads it from A3 on.
     pub(super) fn login_replay(self) -> bool {
         !self.login_replay_off && !self.login_replay_check
     }
