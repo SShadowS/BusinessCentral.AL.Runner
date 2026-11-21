@@ -730,3 +730,41 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
     assert_eq!(kept(&marked.state_lines()), kept(&before));
     assert!(kept(&before).is_some_and(|l| l.contains("marked")));
 }
+
+// Step 3 review H3: the key's digest of each committed table is kept per state of the table (its stamp), so a later
+// session whose tables a write did not reach digests nothing again; a write is a new state, so another digest.
+#[test]
+fn a_tables_digest_is_kept_per_state_and_a_write_makes_another() {
+    use al_data::Store;
+    let (engine, _) = compiled();
+    let at = engine
+        .program
+        .objects
+        .iter()
+        .position(|o| o.name == "Guided Experience Item")
+        .unwrap();
+    let table = engine.tables[at].clone().unwrap();
+    let mut session = target(&engine);
+    let cx = al_data::AccessContext {
+        company: session.access_company().into(),
+        user: session.user_id().into(),
+    };
+    let row = |id: i32| {
+        let mut r: Vec<Value> = table.fields.iter().map(|f| Value::default_for(&f.ty)).collect();
+        r[0] = Value::Integer(id);
+        r
+    };
+    assert!(session.store_mut().insert(&cx, &table, row(1)).is_ok());
+    session.commit_transaction();
+    let key = |s: &mut al_vm::Session| Key::of(s, Default::default(), SessionFlags::default(), &[]);
+    let first = key(&mut session);
+    assert_eq!(key(&mut session), first, "the kept digest is the digest of the same rows");
+    // Another session over the same rows from another history (another stamp) has the same key.
+    let mut other = target(&engine);
+    assert!(other.store_mut().insert(&cx, &table, row(1)).is_ok());
+    other.commit_transaction();
+    assert_eq!(key(&mut other), first, "the digest is of the rows, not of the stamp");
+    assert!(session.store_mut().insert(&cx, &table, row(2)).is_ok());
+    session.commit_transaction();
+    assert_ne!(key(&mut session), first, "a write is another state of the table");
+}
