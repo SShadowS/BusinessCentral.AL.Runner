@@ -699,3 +699,34 @@ fn a_start_from_a_large_install_base_keeps_only_the_logins_rows() {
         "5,000 rows of base keep {large} bytes, 50 keep {small}: the base is in the start"
     );
 }
+
+// Step 3 review H2: the number sequences' refusal mark the runner sets before the login (`Scratch::numbers_unmeasured`,
+// al-runner issue 8152) is an input of the key, and the thaw keeps the target's own: two sessions that differ only in it
+// never share a start.
+#[test]
+fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_targets() {
+    let (engine, _) = compiled();
+    let key_of = |mark: Option<&str>| {
+        let mut session = al_vm::Session::new(engine.clone());
+        if let Some(why) = mark {
+            session.mark_numbers_unmeasured(std::rc::Rc::from(why));
+        }
+        Key::of(&mut session, Default::default(), SessionFlags::default(), &[])
+    };
+    assert_eq!(key_of(None), key_of(None), "GUARD");
+    assert_ne!(key_of(None), key_of(Some("an earlier codeunit took numbers")));
+    // A start taken without the mark, thawn into a target with it: the target keeps its mark.
+    let start = plain_start(&engine);
+    let mut marked = target(&engine);
+    marked.mark_numbers_unmeasured(std::rc::Rc::from("marked"));
+    let before = marked.state_lines();
+    marked.thaw_login_image(&start.image);
+    let kept = |s: &al_vm::StateLines| {
+        s.lines
+            .iter()
+            .find(|l| l.starts_with("field.numbers_unmeasured"))
+            .cloned()
+    };
+    assert_eq!(kept(&marked.state_lines()), kept(&before));
+    assert!(kept(&before).is_some_and(|l| l.contains("marked")));
+}
