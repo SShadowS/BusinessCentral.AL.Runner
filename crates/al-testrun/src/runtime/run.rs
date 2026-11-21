@@ -211,8 +211,8 @@ fn open_company(
     let replay_key = scratch
         .flags
         .login_replay_check()
-        .then(|| crate::login_replay::Key::of(session, disabled, scratch.flags));
-    let before_login = session.store_mut().change_counter();
+        .then(|| crate::login_replay::Key::of(session, disabled, scratch.flags, skipped_installs));
+    let base = session.login_base();
     // Base Application's login code sets WorkDate when the session opens the company (`install::login_work_date`).
     // It runs before the workspace's own Company Triggers subscribers: the order of the two is not pinned
     // (docs/probes-needed.md, WorkDate row).
@@ -220,12 +220,14 @@ fn open_company(
     let wrote = crate::install::test_session_company_open(lowered, session, disabled, skipped_installs)?;
     session.commit_transaction();
     let hits = al_builtins::assumptions::take_hit_bits();
+    #[cfg(test)]
+    crate::login_start::opened(session, &wrote, hits);
     if let Some(key) = replay_key.filter(|_| wrote.raised) {
         let state = crate::login_replay::LoginState::of(session, &wrote, hits);
         let check = crate::login_replay::check(&engine);
         if check.note(key, state.clone()) {
             // The twin is made as `run_codeunit_inner` makes the session: the host of the same scratch, the run's flags.
-            check.round_trip(session, before_login, &state, || {
+            check.round_trip(session, &base, &state, || {
                 let mut host = crate::host::host_perturbed(scratch.clock_start, perturb);
                 host.run_seed = scratch.run_seed.seed;
                 let mut twin = Session::with_host(engine.clone(), host);

@@ -202,7 +202,7 @@ fn new_session(s: &Session) -> Session {
 /// last store operation being a Commit, `SqlCounters::left_inactive`).
 fn image(s: &mut Session) -> LoginImage {
     s.commit_transaction();
-    s.login_image(0)
+    s.login_image(&crate::LoginBase::before_everything())
         .unwrap_or_else(|why| panic!("no image: {}", why.reason()))
 }
 
@@ -631,7 +631,7 @@ fn refused(f: &mut Fx) -> NotImaged {
 
 /// [`refused`] without the Commit: what an uncommitted change does to the freeze.
 fn refused_as_it_is(f: &mut Fx) -> NotImaged {
-    match f.session.login_image(0) {
+    match f.session.login_image(&crate::LoginBase::before_everything()) {
         Ok(_) => panic!("an image was made"),
         Err(why) => why,
     }
@@ -673,7 +673,7 @@ fn a_handle_held_outside_the_globals_refuses() {
     assert!(matches!(refused(&mut f), NotImaged::HeldOutside { .. }));
     drop(held);
     f.session
-        .login_image(0)
+        .login_image(&crate::LoginBase::before_everything())
         .unwrap_or_else(|why| panic!("{}", why.reason()));
 }
 
