@@ -813,3 +813,61 @@ fn a_call_count_that_differs_between_real_logins_of_one_key_is_no_difference() {
     assert!(report.contains("2 compared, 0 differ"), "{report}");
     assert!(report.contains("replay vs run: 2 checked, 0 differ"), "{report}");
 }
+
+// ---- PERF-34: the key hashes each row's bytes; a row with no byte form gives no key ----
+
+/// A session of `engine` holding a committed row of "Guided Experience Item" whose second field (when it has one) or first is
+/// `v`, and the install baseline captured from it.
+fn baseline_with_value(engine: &Arc<Engine>, id: i32, v: Value) -> al_vm::Baseline {
+    use al_data::Store;
+    let mut session = al_vm::Session::new(engine.clone());
+    let at = (engine.program.objects.iter())
+        .position(|o| o.name == "Guided Experience Item")
+        .unwrap();
+    let t = engine.tables[at].clone().unwrap();
+    let mut row: Vec<Value> = t.fields.iter().map(|f| Value::default_for(&f.ty)).collect();
+    row[0] = Value::Integer(id);
+    *row.last_mut().unwrap() = v;
+    let cx = al_data::AccessContext {
+        company: session.access_company().into(),
+        user: session.user_id().into(),
+    };
+    assert!(session.store_mut().insert(&cx, &t, row).is_ok());
+    session.commit_transaction();
+    session.capture_baseline()
+}
+
+// A3 (RED): a committed row that holds a value with no byte form (a SQL counter, a placeholder's size) gives no key: the
+// sessions run their logins (nothing replays), pass as before, and the starts line counts `no key: <kind>`. The stub
+// hashes the Debug text, so it gives a key, the second session takes the start and the line has no `no key`.
+#[test]
+fn a_row_with_no_byte_form_gives_no_key_and_the_session_runs_its_login() {
+    use al_builtins::value::{SqlCount, SqlForm, SqlType};
+    let count = Value::SqlCount(SqlCount {
+        n: 3,
+        form: SqlForm::Delta,
+        ty: SqlType::BigInteger,
+    });
+    let size = Value::PlaceholderSize("mark".into(), SqlType::Integer);
+    for (what, v) in [("SqlCount", count), ("PlaceholderSize", size)] {
+        let (engine, l) = compiled();
+        let baseline = baseline_with_value(&engine, 99, v);
+        let ran = sessions_with(
+            &engine,
+            &l,
+            "RPL Tests A",
+            2,
+            &on(),
+            &Setup {
+                baseline: Some(&baseline),
+                ..Default::default()
+            },
+        );
+        for (i, o) in ran.outcomes.iter().enumerate() {
+            assert_eq!(*o, passes(), "{what}: session {i}");
+        }
+        assert_eq!(starts(&engine).replayed(), 0, "{what}: no key, so no start is taken");
+        let line = starts(&engine).line().unwrap_or_default();
+        assert!(line.contains("no key: "), "{what}: the starts line counts it: {line}");
+    }
+}

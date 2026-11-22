@@ -90,4 +90,120 @@ mod tests {
         let (debug, encoded) = counts::rows();
         assert_eq!(debug + encoded, 8);
     }
+
+    fn rows(n: i32) -> Vec<al_data::Row> {
+        (0..n)
+            .map(|i| vec![Value::Integer(i), Value::Text("a".into())])
+            .collect()
+    }
+
+    /// Step 3's digest of the same rows: the Debug lines.
+    fn step3_digest(company: &str, object: u32, rows: &[al_data::Row]) -> LinesDigest {
+        let lines: Vec<String> = rows.iter().map(|r| format!("{company}|{object}|{r:?}")).collect();
+        digest(&lines)
+    }
+
+    fn blob_row(tweak: impl Fn(&mut al_builtins::stream::BlobBuf)) -> al_data::Row {
+        let b = al_builtins::stream::new_blob();
+        al_builtins::stream::write_bytes(&b, b"xy");
+        tweak(&mut b.borrow_mut());
+        vec![Value::Integer(1), Value::Blob(b)]
+    }
+
+    // A3 (RED): a value with no byte form gives no key, never a lossy digest. The stub gives Ok.
+    #[test]
+    fn a_value_with_no_byte_form_gives_no_key() {
+        use al_builtins::value::{SqlCount, SqlForm, SqlType};
+        let count = Value::SqlCount(SqlCount {
+            n: 3,
+            form: SqlForm::Delta,
+            ty: SqlType::BigInteger,
+        });
+        let size = Value::PlaceholderSize("mark".into(), SqlType::Integer);
+        for (what, v) in [("SqlCount", count), ("PlaceholderSize", size)] {
+            let table = vec![vec![Value::Integer(1)], vec![Value::Integer(2), v.clone()]];
+            let got = table_digest("C", 7, table.iter());
+            assert!(
+                matches!(got, Err(NoKey(kind)) if !kind.is_empty()),
+                "{what}: table {got:?}"
+            );
+            let store = al_data::memory::MemStore::from_exported(vec![exported(table)]);
+            let got = current_digest(&store);
+            assert!(
+                matches!(got, Err(NoKey(kind)) if !kind.is_empty()),
+                "{what}: current {got:?}"
+            );
+        }
+    }
+
+    fn exported(rows: Vec<al_data::Row>) -> al_data::memory::ExportedTable {
+        al_data::memory::ExportedTable {
+            company: "C".into(),
+            object: 7,
+            pk_storage: Default::default(),
+            rows: (rows.into_iter().enumerate())
+                .map(|(i, r)| (vec![Value::Integer(i as i32)], r))
+                .collect(),
+        }
+    }
+
+    // A4 (GUARD, probably green today: Debug renders every BlobBuf field): a field of a Blob that differs is another digest.
+    #[test]
+    fn a_blob_field_difference_gives_another_digest() {
+        let digest_of = |r: al_data::Row| table_digest("C", 7, [r].iter()).expect("a digest");
+        let base = digest_of(blob_row(|_| {}));
+        assert_eq!(base, digest_of(blob_row(|_| {})), "GUARD equal blobs");
+        assert_ne!(
+            base,
+            digest_of(blob_row(|b| b.utf16_binary = true)),
+            "GUARD utf16_binary"
+        );
+        assert_ne!(
+            base,
+            digest_of(blob_row(|b| b.render_pending = Some("m".into()))),
+            "GUARD render_pending"
+        );
+        assert_ne!(base, digest_of(blob_row(|b| b.bytes = b"xz".to_vec())), "GUARD bytes");
+    }
+
+    // A5 (GUARD): one content built twice, from two stores (other stamps, other pointers), gives one digest.
+    #[test]
+    fn one_content_built_twice_from_two_stores_gives_one_digest() {
+        let a = al_data::memory::MemStore::from_exported(vec![exported(rows(4))]);
+        let b = al_data::memory::MemStore::from_exported(vec![exported(rows(4))]);
+        assert_eq!(current_digest(&a), current_digest(&b), "GUARD");
+        assert!(current_digest(&a).is_ok(), "GUARD");
+    }
+
+    // A6 (RED): every row is written as bytes and none as Debug text. The stub gives (n, 0).
+    #[test]
+    fn every_row_of_a_table_digest_is_encoded_and_none_is_debug_rendered() {
+        counts::reset();
+        let r = rows(5);
+        assert!(table_digest("C", 7, r.iter()).is_ok());
+        assert_eq!(counts::rows(), (0, 5), "table_digest");
+    }
+
+    // A6 (RED), the key's uncommitted part: the same for `current_digest`.
+    #[test]
+    fn every_row_of_the_current_digest_is_encoded_and_none_is_debug_rendered() {
+        counts::reset();
+        let store = al_data::memory::MemStore::from_exported(vec![exported(rows(6))]);
+        assert!(current_digest(&store).is_ok());
+        assert_eq!(counts::rows(), (0, 6), "current_digest");
+    }
+
+    // A8 (RED): the digest of the byte form is never step 3's digest of the same rows (a version tag), so a start
+    // recorded by another binary can never meet a new key. The stub gives step 3's digest.
+    #[test]
+    fn the_new_digest_is_never_step_threes() {
+        for n in [1, 3] {
+            let r = rows(n);
+            assert_ne!(
+                table_digest("C", 7, r.iter()).unwrap(),
+                step3_digest("C", 7, &r),
+                "{n} rows"
+            );
+        }
+    }
 }
