@@ -22,3 +22,9 @@ Follow al-runner's own `CLAUDE.md` and `docs/agents/workflow.md` first. On top o
    `kraken coord ask --to owner --kind other`. The maintainer lands it through the merge trains. The first
    PR will ask for a contributor-agreement signature: tell the owner, who signs it.
 6. **Never** start a workflow run, push to upstream, or comment as the owner beyond the PR and its issue.
+
+**How answers to your kraken requests are marked** (owner, 2026-11-23). kraken, the owner's coordinator, answers some requests itself on the owner's behalf:
+- `[kraken, from the mantra; owner may overrule] ...` is kraken's design call from `/coord/owner/design-mantra.md`. Act on it as settled. If the owner later overrules it, follow the owner.
+- `kraken: ...` or `Noted` is kraken's own work, such as a restart, an install or a relay. It is not an owner decision.
+- `Owner: ...` is the owner's own words.
+Secrets, money, pushes not covered by a standing yes, and new capability always go to the owner.
