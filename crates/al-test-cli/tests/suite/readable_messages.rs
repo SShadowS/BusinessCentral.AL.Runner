@@ -60,11 +60,6 @@ const KEPT: &[(&str, &str, &str)] = &[
         "the resource texts in the login replay check's key, hashed, never shown",
     ),
     (
-        "al-testrun/src/login_replay/rows_digest.rs",
-        r#"format!("{company}|{object}|{row:?}")"#,
-        "a committed row in the login key, hashed, never shown (PERF-34 A0 stub; stage 1 hashes the row's bytes and deletes this line)",
-    ),
-    (
         "al-testrun/src/login_replay.rs",
         r#"open: format!("{wrote:?}"),"#,
         "what the company open noted for the tests, compared across sessions by the login replay check (ALRUNNER_LOGIN_REPLAY_CHECK), never shown",

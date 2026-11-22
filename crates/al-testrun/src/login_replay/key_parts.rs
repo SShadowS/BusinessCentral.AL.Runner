@@ -24,6 +24,7 @@ pub(crate) struct KeyParts {
 }
 
 /// The digest of the committed rows of table `t` (`rows_digest.rs`).
+#[cfg(test)]
 fn table_digest(t: &al_data::memory::ExportedTable) -> Result<LinesDigest, NoKey> {
     rows_table_digest(&t.company, t.object, t.rows.iter().map(|(_, row)| row))
 }
@@ -67,10 +68,11 @@ pub(crate) fn store_table_digests(
         let d = match known {
             Some(d) => d,
             None => {
-                let Some((table, _)) = store.committed_table(&company, object) else {
+                // By reference: no copy of the table's rows (PERF-34).
+                let Some(rows) = store.committed_rows(&company, object) else {
                     continue;
                 };
-                let d = table_digest(&table)?;
+                let d = rows_table_digest(&company, object, rows)?;
                 if stamp != 0 {
                     let mut m = memo.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     if m.len() >= KEPT {

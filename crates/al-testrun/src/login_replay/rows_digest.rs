@@ -1,52 +1,120 @@
 //! The digest of committed rows: the one place the login key hashes rows (al-runner issue 8211; PERF-34, design
 //! `/coord/handoff/PERF-01/step4-key-design.md` section 1).
 //!
-//! Stage 1 hashes each row's `value_codec::encode_row` bytes (al-builtins, the one owner of "a row as bytes") straight
-//! into SHA-256 through one reused buffer: no String and no Debug text per row. A value that has no byte form
-//! (`value_codec::encode` answers false: a SqlCount, a placeholder's size, a handle) gives [`NoKey`], never a lossy
-//! digest, and the session runs its login.
+//! Each row's `value_codec::encode_row` bytes (al-builtins, the one owner of "a row as bytes": the install baseline, its
+//! row deltas and the frozen store use the same form) go straight into SHA-256 through one reused buffer: no String and
+//! no Debug text per row (step 3 review H3: on a 50,000-row store rendering and hashing the rows' Debug text was most of
+//! the key's cost). The form is exact: each value is self-delimiting and `value_codec::decode` reads it back
+//! (value_codec.rs, a Blob with every field of its buffer, `blob_form.rs`), so equal digests mean equal rows. A value
+//! that has no byte form (`value_codec::encode` answers false: a SqlCount, a placeholder's size, a handle) gives
+//! [`NoKey`], never a lossy digest, and the session runs its login.
 //!
-//! **A0, inert:** the functions still hash each row's Debug text, one line per row as step 3 did (`{company}|{object}|{row:?}`,
-//! [`digest`] over the lines), so every digest and every key is the one step 3 gave, and no value refuses a key. The
-//! counters under `cfg(test)` say which form a digest took.
+//! One gap the form shares with step 3's Debug text: a Text with half of a surrogate pair is written with U+FFFD at the
+//! lone position (value_codec.rs, `Txt::as_str`). No stored row can hold one (every write refuses it,
+//! al-data `memory/held_cols.rs` `note_held_in`; /coord/handoff/bugs/lone-half-key/repro.md), so it does not reach this
+//! digest; the exact form of such a text in the codec is a follow-up.
 
-use super::{LinesDigest, digest};
+use super::LinesDigest;
+#[cfg(test)]
+use super::digest;
+use sha2::{Digest, Sha256};
 
-/// Why a session has no login key: a row holds a value with no byte form, named by its kind (as `Describe` names it).
-/// The session then runs its login, counted in the starts line (`login_start::NotTaken::NoKey`).
+/// Why a session has no login key: a row holds a value with no byte form, named by its kind (al-data
+/// `memory::not_shareable`). The session then runs its login, counted in the starts line (`login_start::NotTaken::NoKey`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct NoKey(pub(crate) &'static str);
 
+/// The first bytes of every digest: a digest of this form never equals one of another form (step 3 hashed Debug lines).
+const FORM: &[u8] = b"al-runner login key rows: value_codec v1\0";
+
+/// How many bytes the buffer gathers before it goes into the hasher.
+const FLUSH: usize = 64 << 10;
+
+/// The rows of one or more tables going into one SHA-256: the form tag first, then per table its company, object and rows.
+struct RowsHasher {
+    hash: Sha256,
+    buf: Vec<u8>,
+}
+
+impl RowsHasher {
+    fn new() -> RowsHasher {
+        let mut hash = Sha256::new();
+        hash.update(FORM);
+        RowsHasher {
+            hash,
+            buf: Vec::with_capacity(FLUSH + 4096),
+        }
+    }
+
+    /// Table `object` of `company` and its rows in key order, then their count.
+    fn table<'a>(
+        &mut self,
+        company: &str,
+        object: u32,
+        rows: impl Iterator<Item = &'a al_data::Row>,
+    ) -> Result<(), NoKey> {
+        use al_builtins::value_codec::{encode_row, put_str, put_u32, put_u64};
+        put_str(&mut self.buf, company);
+        put_u32(&mut self.buf, object);
+        let mut n: u64 = 0;
+        for row in rows {
+            if !encode_row(row, &mut self.buf) {
+                return Err(no_key(row));
+            }
+            #[cfg(test)]
+            counts::ENCODED_ROWS.with(|c| c.set(c.get() + 1));
+            n += 1;
+            if self.buf.len() >= FLUSH {
+                self.hash.update(&self.buf);
+                self.buf.clear();
+            }
+        }
+        put_u64(&mut self.buf, n);
+        Ok(())
+    }
+
+    fn finish(mut self) -> LinesDigest {
+        self.hash.update(&self.buf);
+        LinesDigest(self.hash.finalize().into())
+    }
+}
+
+/// The kind of the first value of `row` that has no byte form.
+fn no_key(row: &al_data::Row) -> NoKey {
+    let first = row
+        .iter()
+        .find(|v| !al_builtins::value_codec::encode(v, &mut Vec::new()));
+    NoKey(
+        first
+            .and_then(al_data::memory::not_shareable)
+            .unwrap_or("a value with no byte form"),
+    )
+}
+
 /// The digest of the committed rows `rows` of table `object` in `company`, in key order (the per-table digest of the key's
-/// `database` part, `key_parts.rs`).
+/// `database` part, `key_parts.rs`). The form tag is hashed for an empty table too.
 pub(crate) fn table_digest<'a>(
     company: &str,
     object: u32,
     rows: impl Iterator<Item = &'a al_data::Row>,
 ) -> Result<LinesDigest, NoKey> {
-    // A0: the Debug lines of step 3.
-    let lines: Vec<String> = rows.map(|row| debug_line(company, object, row)).collect();
-    Ok(digest(&lines))
+    let mut h = RowsHasher::new();
+    h.table(company, object, rows)?;
+    Ok(h.finish())
 }
 
-/// The digest of every row `store` holds now, the uncommitted changes included (the key's `uncommitted` part).
+/// The digest of every row `store` holds now, the uncommitted changes included (the key's `uncommitted` part), table after
+/// table in the store's order.
 pub(crate) fn current_digest(store: &al_data::memory::MemStore) -> Result<LinesDigest, NoKey> {
-    // A0: the Debug lines of step 3, table after table in the store's order.
-    let mut lines = Vec::new();
+    let mut h = RowsHasher::new();
     for t in store.export_current() {
-        lines.extend(t.rows.iter().map(|(_, row)| debug_line(&t.company, t.object, row)));
+        h.table(&t.company, t.object, t.rows.iter().map(|(_, row)| row))?;
     }
-    Ok(digest(&lines))
+    Ok(h.finish())
 }
 
-/// One row as step 3 wrote it into a digest: company, table object and the row with its system fields.
-fn debug_line(company: &str, object: u32, row: &al_data::Row) -> String {
-    #[cfg(test)]
-    counts::DEBUG_ROWS.with(|c| c.set(c.get() + 1));
-    format!("{company}|{object}|{row:?}")
-}
-
-/// How many rows the digests of this thread wrote as Debug text and as bytes, for tests: stage 1 writes none as Debug text.
+/// How many rows the digests of this thread wrote as Debug text and as bytes, for tests: none is written as Debug text
+/// (step 3 wrote every row so).
 #[cfg(test)]
 pub(crate) mod counts {
     use std::cell::Cell;
