@@ -335,7 +335,7 @@ fn the_image_line_reports_the_kept_bytes_and_the_nodes_per_kind() {
 /// The key of a new session of `engine` whose login skipped `skipped`.
 fn key_skipping(engine: &Arc<Engine>, skipped: &[al_vm::SkippedInstall]) -> Key {
     let mut session = al_vm::Session::new(engine.clone());
-    Key::of(&mut session, Default::default(), SessionFlags::default(), skipped)
+    Key::of(&mut session, Default::default(), SessionFlags::default(), skipped).expect("a key")
 }
 
 // The open runs under the watch of the skipped installs, whose hit marks or refuses: another list is another key (design
@@ -506,7 +506,7 @@ fn a_session_the_gate_refuses_runs_its_login_and_is_counted() {
 fn numbered_key(engine: &Arc<Engine>, n: i32) -> Key {
     let mut session = al_vm::Session::new(engine.clone());
     session.set_work_date(1000 + n);
-    Key::of(&mut session, Default::default(), SessionFlags::default(), &[])
+    Key::of(&mut session, Default::default(), SessionFlags::default(), &[]).expect("a key")
 }
 
 /// A start whose image holds `bytes` of text in a SingleInstance codeunit's global: `kept_bytes` is a little more.
@@ -713,7 +713,7 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
         if let Some(why) = mark {
             session.mark_numbers_unmeasured(std::rc::Rc::from(why));
         }
-        Key::of(&mut session, Default::default(), SessionFlags::default(), &[])
+        Key::of(&mut session, Default::default(), SessionFlags::default(), &[]).expect("a key")
     };
     assert_eq!(key_of(None), key_of(None), "GUARD");
     assert_ne!(key_of(None), key_of(Some("an earlier codeunit took numbers")));
@@ -758,7 +758,7 @@ fn a_tables_digest_is_kept_per_state_and_a_write_makes_another() {
     };
     assert!(session.store_mut().insert(&cx, &table, row(1)).is_ok());
     session.commit_transaction();
-    let key = |s: &mut al_vm::Session| Key::of(s, Default::default(), SessionFlags::default(), &[]);
+    let key = |s: &mut al_vm::Session| Key::of(s, Default::default(), SessionFlags::default(), &[]).expect("a key");
     let first = key(&mut session);
     assert_eq!(
         key(&mut session),
