@@ -1,6 +1,5 @@
 //! The session image: every test freezes a session, thaws the image into a new session of the same engine and compares
-//! what the login replay check compares (`Session::state_lines`), plus direct asserts where the render cannot see
-//! (design `/coord/handoff/PERF-01/step2-design.md` section 4.2).
+//! what the login replay check compares (`Session::state_lines`), plus direct asserts where the render cannot see.
 //!
 //! Conditions of the maintainer (al-runner issue 8211), kept in al-testrun `login_replay.rs`, not here: the key holds
 //! content or SHA-256, never a 64-bit digest; the test codeunit stays in the key. The image holds `Session::test_object`
@@ -22,7 +21,7 @@ table 50100 Row
     var Gv: Integer;
 }
 // A temporary table without a Blob field: an insert into one with a Blob field leaves an empty-Blob note on the temporary
-// table's token, which is not an image of ids only (reported to (a) in s2-b-to-a.md).
+// table's token, which is not an image of ids only.
 table 50103 TRow
 {
     fields { field(1; Id; Integer) { } field(2; Name; Text[50]) { } }
@@ -193,7 +192,7 @@ fn try_call(s: &mut Session, object: usize, routine: &str) -> Result<Value, al_b
     s.call(object, ri, inst, vec![]).map(|(v, _)| v)
 }
 
-/// A new session of the engine: what a thaw is made into (design 0.2).
+/// A new session of the engine: what a thaw is made into.
 fn new_session(s: &Session) -> Session {
     Session::new(s.engine.clone())
 }
@@ -792,7 +791,7 @@ fn committed_blob(s: &mut Session, row_table: usize, id: i32) -> al_builtins::st
         .expect("the committed row")
 }
 
-// PERF-01 step 2c (lethal): a committed row's Blob that `write_bytes` filled on a new buffer (a test-data row, al-vm
+// A committed row's Blob that `write_bytes` filled on a new buffer (a test-data row, al-vm
 // `testdata.rs`) holds `written_base = Some([])` and `content_edits = 1`, and the twin's row held `None` and 0. The image
 // carries every field of the buffer exactly, so the round trip stays a proof; here each field the bytes form left out is
 // set apart from its default.

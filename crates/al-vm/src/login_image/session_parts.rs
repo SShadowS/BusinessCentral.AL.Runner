@@ -1,5 +1,5 @@
-//! The `linked` fields of the field table (`fields.rs`) that are not the object graph or the rows: the session's
-//! sub-states field by field (design section 1.3), the SQL counters, WorkDate and the language, the number sequences'
+//! The `linked` fields of the session field table (`session_fields.rs`) that are not the object graph or the rows: the session's
+//! sub-states field by field, the SQL counters, WorkDate and the language, the number sequences'
 //! refusal mark and the baseline origin. Each is taken by value and written back through the session's own setter where
 //! one exists, so what it keeps in step follows.
 

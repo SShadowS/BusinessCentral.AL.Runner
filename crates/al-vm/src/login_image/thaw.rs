@@ -1,4 +1,4 @@
-//! The thaw of an [`Arena`] into a session (design section 2.3), on the session's own thread. Every node gets a new handle
+//! The thaw of an [`Arena`] into a session, on the session's own thread. Every node gets a new handle
 //! first (an instance through `instance_cycles::shared`, so the thread's registry notes it; a temporary table a new id of
 //! the session and its store), then each is filled with handles of the same thaw: so cycles need no special case, and
 //! no thawn value is shared with the image or another thaw (except `Txt` and `Arc<[String]>`, which are immutable).

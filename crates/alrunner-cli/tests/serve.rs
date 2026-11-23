@@ -3089,7 +3089,7 @@ fn the_login_replay_check_finds_no_difference_across_entries_and_requests() {
     );
 }
 
-/// Al-runner issue 8211, step 2: under the same check each new key's session is frozen into a session image, thawn into a
+/// Al-runner issue 8211: under the same check each new key's session is frozen into a session image, thawn into a
 /// twin and compared (`login image:` line, after the check line). Over the same entries and requests as the check's test
 /// above: every key is imaged, every round trip equals, and an image is made once per key, so a key seen before adds none.
 #[test]

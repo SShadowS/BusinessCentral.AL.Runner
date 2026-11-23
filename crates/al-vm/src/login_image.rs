@@ -1,4 +1,4 @@
-//! The session image (al-runner issue 8211, PERF-01 step 2): what a test session holds after the raised login, as owned
+//! The session image (al-runner issue 8211): what a test session holds after the raised login, as owned
 //! data any thread may keep ([`LoginImage`], [`Session::login_image`]), and a new session made to hold it
 //! ([`Session::thaw_login_image`]). Nothing replays from it yet: al-testrun `login_replay.rs` freezes each new key's
 //! session, thaws it into a twin and compares the two with the login replay check, its differential test.
@@ -67,7 +67,7 @@ const _: fn() = || {
 pub enum NotImaged {
     /// A `Session` field (or `tx.x`, `events.x`) does not hold a new session's value.
     Field(&'static str),
-    /// Code runs or a call left something behind: the first field of `Session::at_rest`'s rule that does not hold
+    /// Code runs or a call left something behind: the first field of the `rest` class that does not hold
     /// (`Session::at_rest_why`).
     NotAtRest(&'static str),
     /// A value with no exact form: where (ids and indexes only, never a value) and what.

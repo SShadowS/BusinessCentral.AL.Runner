@@ -85,7 +85,7 @@ fn shared_instances_temporary_tables_the_clock_and_random_round_trip() {
 fn every_kind_of_value_round_trips_or_is_named_as_deferred() {
     let line = image_line_of(&[MAIN, KINDS_INSIDE]);
     assert!(line.contains(", 0 differ"), "{line}");
-    // The kinds with no form in step 2 (Json, Xml, Http) refuse; every reason names them as deferred.
+    // The kinds the image defers (Json, Xml, Http) refuse; every reason names them as deferred.
     assert!(line.contains("(deferred)"), "{line}");
     for reason in line.split("; ").filter(|p| p.contains("not imaged (")) {
         assert!(reason.contains("(deferred)"), "a reason that is not deferred: {reason}");
@@ -122,7 +122,7 @@ fn the_check_line_keeps_its_shape_and_the_image_line_follows() {
         run(&engine, &l, "RPL Tests A");
     }
     let (check, image) = report_lines(&engine);
-    // Step 1's text, exactly (`login_replay_tests.rs`, `sessions_of_one_key_hold_the_same_after_the_raised_login`).
+    // The check line's text, exactly (`login_replay_tests.rs`, `sessions_of_one_key_hold_the_same_after_the_raised_login`).
     assert_eq!(
         check,
         "login replay check: 3 sessions over 1 keys (a key seen before: 2 sessions, 66%), 2 compared, 0 differ; across test codeunits: 0 compared, 0 differ"
@@ -260,7 +260,11 @@ fn a_codeunit_on_a_thawn_twin_gives_the_results_and_marks_of_a_fresh_login() {
     // The tests read what the login left: the outcomes hold the values, not a refusal.
     let fresh = ran_on(&reads, "RPL Twin Tests", false);
     let text = format!("{:?}", fresh.outcomes);
-    for want in ["kept: 7 kept 5 one 2 11", "pinged: 8 kept 5 one 2 11", "work date: 01/05/30"] {
+    for want in [
+        "kept: 7 kept 5 one 2 11",
+        "pinged: 8 kept 5 one 2 11",
+        "work date: 01/05/30",
+    ] {
         assert!(text.contains(want), "{want}: {text}");
     }
 }

@@ -1,4 +1,4 @@
-//! How much a [`LoginImage`] holds (design section 5): the rows it keeps, and an estimate of its state and graph.
+//! How much a [`LoginImage`] holds: the rows it keeps, and an estimate of its state and graph.
 //!
 //! The row numbers are the shared baseline's own (`SharedBaseline::bytes`, `bytes_of`). The state number is an estimate
 //! of memory: `size_of` of each node and of each value, plus the heap behind its strings, vectors and Blob buffers.

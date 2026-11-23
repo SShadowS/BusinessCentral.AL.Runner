@@ -1,4 +1,4 @@
-//! A record buffer (al-builtins `RecordState`) in the arena, field by field (design section 1.3). The state is read
+//! A record buffer (al-builtins `RecordState`) in the arena, field by field. The state is read
 //! field by field, never cloned: `Clone` blanks `own_read`, `probed_source`, `globals` and the dirty base.
 
 use super::NotImaged;

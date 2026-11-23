@@ -1,4 +1,4 @@
-//! A temporary table in the arena (design section 3.2): the rows its store holds now (such a store never commits), per
+//! A temporary table in the arena: the rows its store holds now (such a store never commits), per
 //! table, as plain values and Blob nodes, so a row and a record that share a Blob buffer still share it after the thaw.
 //! Only a table a record node names is imaged: no AL value reaches another one. The thaw makes a new table of the
 //! thawn session, with an id from its own counter: a temporary table's id is never observable.

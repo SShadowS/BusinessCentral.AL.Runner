@@ -429,7 +429,10 @@ impl Check {
         twin: impl FnOnce() -> Session + Send,
     ) {
         #[cfg(test)]
-        let (target, plant) = (TWIN_TARGET.with(std::cell::Cell::get), TWIN_PLANT.with(std::cell::Cell::get));
+        let (target, plant) = (
+            TWIN_TARGET.with(std::cell::Cell::get),
+            TWIN_PLANT.with(std::cell::Cell::get),
+        );
         let image = session.login_image(before_login);
         let thawn = image.as_ref().ok().map(|image| {
             std::thread::scope(|scope| {
