@@ -102,6 +102,9 @@ pub enum NotThawed {
     /// The session is not a thaw target: the first field of `Session::at_rest_why` or of
     /// `Session::image_refused_field` that does not hold, or a store watch (`Session::thaw_target_why`).
     Target(&'static str),
+    /// The session's store does not take the rows the login wrote: it lacks a table the login changed row by row (a
+    /// base of another shape than the image's).
+    Rows,
 }
 
 impl NotThawed {
@@ -110,6 +113,7 @@ impl NotThawed {
         match self {
             NotThawed::Engine => "an image of another engine".to_string(),
             NotThawed::Target(field) => format!("the target is not a new session: {field}"),
+            NotThawed::Rows => "the target's store does not take the rows the login wrote".to_string(),
         }
     }
 }
@@ -303,8 +307,8 @@ impl Session {
     /// engine with the run's session flags applied, that [`Session::thaw_target_why`] accepts and whose store holds what
     /// the login started from (equal rows by the login key, an equal [`Session::base_shape`]): the rows the login wrote go
     /// on top of its own store, and every row it did not write stays as the target has it. `Err`: the image is of another
-    /// engine, or `self` is not a thaw target; nothing of `self` is changed then, so its caller runs the login in it
-    /// instead.
+    /// engine, `self` is not a thaw target, or its store lacks a table the login changed row by row; nothing of `self` is
+    /// changed then, so its caller runs the login in it instead.
     pub fn thaw_login_image(&mut self, image: &LoginImage) -> Result<(), NotThawed> {
         if self.engine.uid != image.engine {
             return Err(NotThawed::Engine);
@@ -312,9 +316,9 @@ impl Session {
         if let Some(field) = self.thaw_target_why() {
             return Err(NotThawed::Target(field));
         }
-        // Every table the delta changes row by row is one the start's base held, and the target's base has its shape.
-        let rows = (self.data_now().with_row_delta(&image.rows))
-            .expect("the target holds every table the login changed row by row (the gate compares the base shapes)");
+        // Every table the delta changes row by row is one the start's base held; a target whose base has its shape (the
+        // replay's gate compares them) holds each, and another target is refused here, before anything changes.
+        let rows = (self.data_now().with_row_delta(&image.rows)).ok_or(NotThawed::Rows)?;
         self.restore_baseline(&rows);
         // After the baseline: the plain fields hold what the session held, not what the restore set from the baseline.
         image.plain.give(self);

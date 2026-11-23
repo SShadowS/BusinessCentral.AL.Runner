@@ -1120,3 +1120,19 @@ fn a_thaw_into_a_session_that_is_not_new_refuses_and_leaves_it_as_it_was() {
     assert_eq!(other.thaw_login_image(&image), Err(NotThawed::Engine));
     assert_eq!(other.state_lines().lines, before);
 }
+
+// A target whose store does not hold a table the login changed row by row (another base than the start's; the replay's
+// gate compares the base shapes first) does not take the image: the thaw refuses before it changes anything, and the
+// target runs its login instead (issue 8211).
+#[test]
+fn a_thaw_onto_a_store_without_the_tables_the_login_changed_refuses() {
+    let mut f = fx();
+    put_rows(&mut f.session, f.row, 1..6);
+    let base = f.session.login_base();
+    f.run("LoginWrites");
+    let image = image_after(&mut f.session, &base);
+    let mut target = new_session(&f.session);
+    let before = (lines_without_sql(&mut target), table_rows(&mut target, f.row));
+    assert_eq!(target.thaw_login_image(&image), Err(NotThawed::Rows));
+    assert_eq!((lines_without_sql(&mut target), table_rows(&mut target, f.row)), before);
+}
