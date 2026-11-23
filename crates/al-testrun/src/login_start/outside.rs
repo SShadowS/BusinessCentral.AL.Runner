@@ -33,13 +33,15 @@
 //!   `static NEXT`, `static THREAD_ID`, `static LEGACY`: gated (the profiler: `profiling::active()` is in the gate).
 //! - `crates/al-testrun/src/host.rs` `static SERVER_URL`, `static COMPANIES`, `static COMPANY_NAME`,
 //!   `static PUBLISH_ORDER_KNOWN`: key (a serve request sets them: `Key::run`, `RunSettings`, by content; the company name
-//!   also reaches `Key::company`). `static RUN_START`, `static FILES_DIR`, `static ENVIRONMENT`, `static ON`: run (`OnceLock`s,
-//!   set once per process whatever a later request asks: the run clock's start, `--files-dir`, `--environment`,
-//!   `ALRUNNER_REAL_CLOCK`; a run with a files directory or the real clock takes no start, `NotTaken::RealFiles`,
-//!   `NotTaken::RealClock`).
+//!   also reaches `Key::company`). `static FILES_DIR`, `static ENVIRONMENT`, `static ON`: run (`OnceLock`s, set once per
+//!   process whatever a later request asks: `--files-dir`, `--environment`, `ALRUNNER_REAL_CLOCK`; a run with a files
+//!   directory or the real clock takes no start, `NotTaken::RealFiles`, `NotTaken::RealClock`). The run clock is begun per
+//!   run (`RunClock`), not kept here: `Key::clock` holds it.
 //! - `crates/al-testrun/src/dotnet.rs` `static BUILD`, `static PROCESSES`, `static START_ON_THIS_THREAD`: run (the sidecar
 //!   build lock, a process counter, the start-up time read after each test codeunit; an image needs the DotNet state of a
 //!   new session, so a login that started a sidecar has no start).
+//! - `crates/al-testrun/src/workspace_cache.rs` `static DEFERRED`, `static WRITERS`: run (the workspace layer's entry
+//!   writes deferred to the end of the run and their writer threads; no session reads them).
 //! - `crates/al-testrun/src/compile_cache.rs` `static COUNTER`, `static HASH`, `static PINNED_EXECUTABLE`: run (the compile
 //!   cache's file counter, the hash of the runner's own build and the executable it is read from).
 //! - `crates/al-testrun/src/crash.rs` `static RUNNING`, `static PREVIOUS`, `static INSTALL`, `static TOLD`: run (the crash

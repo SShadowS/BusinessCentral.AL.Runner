@@ -1412,28 +1412,7 @@ impl Session {
                     Value::Boolean(n == 0)
                 })
             }
-            RecordOp::SetRange => {
-                let pos = arg_pos(args, 0)?;
-                let ty = t.fields[pos].ty.clone();
-                let or_flowfield = self.is_flowfield(&t, pos);
-                self.blob_setrange_check(&ty, &args[1..])?;
-                let mut r = rec.borrow_mut();
-                r.position = None;
-                let group = r.filter_group;
-                r.filters.retain(|f| !(f.field == pos && f.group == group));
-                r.decimal_cut_filters.retain(|f| !(f.field == pos && f.group == group));
-                // A FlowField filter in the OR group is dropped: GetFilters does not show it and no row is filtered by it
-                // (record/PWFilterGroupOr.al:OrGroup_FlowFieldFilter_BQ, `getFilters`, `flowFieldOnly`, `nameOrFlowField`).
-                if group == al_builtins::filter::OR_GROUP && or_flowfield {
-                    return Ok(Value::Null);
-                }
-                if let Some(range) = super::setrange_filter::setrange_filter(&ty, &args[1..])? {
-                    let filter = FieldFilter::new(pos, range, group);
-                    self.mark_decimal_cut_filter(rec, &mut r, &t, (RecordOp::SetRange, &filter), None, args);
-                    r.filters.push(filter);
-                }
-                Ok(Value::Null)
-            }
+            RecordOp::SetRange => self.set_range(rec, &t, args),
             RecordOp::SetFilter => {
                 let from_al = std::mem::take(&mut self.setfilter_from_al);
                 let pos = arg_pos(args, 0)?;

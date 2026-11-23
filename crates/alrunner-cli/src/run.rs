@@ -250,6 +250,20 @@ fn secs_w(d: Duration) -> String {
     format!("{:>6.2} s", d.as_secs_f64())
 }
 
+/// The `--timings` lines of a run the compile stopped: the setup parts, the phases before the compile stopped ran
+/// (al-runner issue 8103), the compile cache and the total time.
+fn print_stopped_timings(
+    setup: &crate::setup_timings::SetupParts,
+    p: &al_testrun::runtime::Phases,
+    warm: Option<&WarmCtx>,
+    total: Duration,
+) {
+    eprintln!("{}", setup.line());
+    print_compile_phases(p);
+    print_compile_cache(p, crate::workspace_layer::own_report(p, warm));
+    eprintln!("time: total {}", secs(total));
+}
+
 /// The `--timings` lines of the compile: its phases, the install baseline, the memory budget and the compile summary.
 fn print_compile_phases(p: &al_testrun::runtime::Phases) {
     let c = &p.compile_parts;
@@ -1775,10 +1789,7 @@ fn test_inner(
         }
         // The phases before the compile stopped ran (al-runner issue 8103).
         if a.timings {
-            eprintln!("{}", setup.line());
-            print_compile_phases(p);
-            print_compile_cache(p, crate::workspace_layer::own_report(p, warm.as_deref()));
-            eprintln!("time: total {}", secs(total_time));
+            print_stopped_timings(&setup, p, warm.as_deref(), total_time);
         }
         say!("{why}");
         let result = format!("Result: COMPILE ERRORS (exit {code})");
