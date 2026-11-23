@@ -36,7 +36,7 @@
 //!   also reaches `Key::company`). `static FILES_DIR`, `static ENVIRONMENT`, `static ON`: run (`OnceLock`s, set once per
 //!   process whatever a later request asks: `--files-dir`, `--environment`, `ALRUNNER_REAL_CLOCK`; a run with a files
 //!   directory or the real clock takes no start, `NotTaken::RealFiles`, `NotTaken::RealClock`). The run clock is begun per
-//!   run (`RunClock`), not kept here.
+//!   run (`RunClock`), not kept here: `Key::clock` holds it.
 //! - `crates/al-testrun/src/dotnet.rs` `static BUILD`, `static PROCESSES`, `static START_ON_THIS_THREAD`: run (the sidecar
 //!   build lock, a process counter, the start-up time read after each test codeunit; an image needs the DotNet state of a
 //!   new session, so a login that started a sidecar has no start).
