@@ -113,25 +113,22 @@ pub(crate) fn current_digest(store: &al_data::memory::MemStore) -> Result<LinesD
     Ok(h.finish())
 }
 
-/// How many rows the digests of this thread wrote as Debug text and as bytes, for tests: none is written as Debug text
-/// (step 3 wrote every row so).
+/// How many rows the digests of this thread wrote as bytes, for tests: every row a digest reads.
 #[cfg(test)]
 pub(crate) mod counts {
     use std::cell::Cell;
 
     thread_local! {
-        pub(super) static DEBUG_ROWS: Cell<u64> = const { Cell::new(0) };
         pub(super) static ENCODED_ROWS: Cell<u64> = const { Cell::new(0) };
     }
 
-    /// (rows written as Debug text, rows written as bytes) on this thread since the last [`reset`].
-    pub(crate) fn rows() -> (u64, u64) {
-        (DEBUG_ROWS.with(Cell::get), ENCODED_ROWS.with(Cell::get))
+    /// The rows written as bytes on this thread since the last [`reset`].
+    pub(crate) fn rows() -> u64 {
+        ENCODED_ROWS.with(Cell::get)
     }
 
-    /// Both counts back to 0.
+    /// The count back to 0.
     pub(crate) fn reset() {
-        DEBUG_ROWS.with(|c| c.set(0));
         ENCODED_ROWS.with(|c| c.set(0));
     }
 }
@@ -155,8 +152,7 @@ mod tests {
         let b = table_digest("C", 7, rows(3).iter());
         assert_eq!(a, b);
         assert_ne!(a, table_digest("C", 7, rows(2).iter()));
-        let (debug, encoded) = counts::rows();
-        assert_eq!(debug + encoded, 8);
+        assert_eq!(counts::rows(), 8);
     }
 
     fn rows(n: i32) -> Vec<al_data::Row> {
@@ -243,22 +239,22 @@ mod tests {
         assert!(current_digest(&a).is_ok(), "GUARD");
     }
 
-    // A6 (RED): every row is written as bytes and none as Debug text. The stub gives (n, 0).
+    // Every row of a table digest is written as bytes.
     #[test]
-    fn every_row_of_a_table_digest_is_encoded_and_none_is_debug_rendered() {
+    fn every_row_of_a_table_digest_is_encoded() {
         counts::reset();
         let r = rows(5);
         assert!(table_digest("C", 7, r.iter()).is_ok());
-        assert_eq!(counts::rows(), (0, 5), "table_digest");
+        assert_eq!(counts::rows(), 5, "table_digest");
     }
 
-    // A6 (RED), the key's uncommitted part: the same for `current_digest`.
+    // The key's uncommitted part: the same for `current_digest`.
     #[test]
-    fn every_row_of_the_current_digest_is_encoded_and_none_is_debug_rendered() {
+    fn every_row_of_the_current_digest_is_encoded() {
         counts::reset();
         let store = al_data::memory::MemStore::from_exported(vec![exported(rows(6))]);
         assert!(current_digest(&store).is_ok());
-        assert_eq!(counts::rows(), (0, 6), "current_digest");
+        assert_eq!(counts::rows(), 6, "current_digest");
     }
 
     // A8 (RED): the digest of the byte form is never step 3's digest of the same rows (a version tag), so a start
