@@ -414,6 +414,7 @@ impl<'a> Walker<'a> {
             Value::TestControl(_) => Err(never(path, "TestControl")),
             Value::SqlCount(_) => Err(never(path, "SQL counter value")),
             Value::PlaceholderSize(..) => Err(never(path, "byte size of a placeholder report output")),
+            Value::UnbuiltRecord(_) => Err(no_form(path, "Record variable not built yet")),
             Value::Null
             | Value::Boolean(_)
             | Value::Integer(_)

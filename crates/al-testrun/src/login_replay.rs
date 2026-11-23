@@ -51,6 +51,10 @@ pub(crate) struct Key {
     /// moves the clock by another amount under another seed (measured: two requests of one serve daemon, seeds 1 and 2;
     /// alrunner-cli tests/serve.rs `the_login_replay_check_finds_no_difference_across_entries_and_requests`).
     seed: i32,
+    /// The session's clock now (`Session::clock_now_millis`): where the run's clock started (`host::RunClock`, begun per run,
+    /// so per request of a daemon, at the time of day of the day the run began) plus what the session moved it. A login
+    /// that stamps the time it reads hands a later session of another start instant another time.
+    clock: i64,
     /// `UserId()`.
     user: String,
     /// The test codeunit the session opens for: `login::decide` reads it, and a replay may not cross codeunits until a
@@ -150,6 +154,7 @@ impl Key {
             session: digest(&[digest(&state.lines).hex(), digest(&state.opaque).hex()]),
             company: session.access_company().to_string(),
             seed: session.run_seed(),
+            clock: session.clock_now_millis(),
             user: session.user_id(),
             test_codeunit: session.test_object,
             resources,
@@ -199,6 +204,7 @@ impl Key {
             session,
             company,
             seed,
+            clock,
             user,
             test_codeunit,
             resources,
@@ -218,6 +224,7 @@ impl Key {
             (*session != other.session, "session"),
             (*company != other.company, "company"),
             (*seed != other.seed, "seed"),
+            (*clock != other.clock, "clock"),
             (*user != other.user, "user"),
             (*test_codeunit != other.test_codeunit, "test_codeunit"),
             (*resources != other.resources, "resources"),
@@ -849,6 +856,7 @@ mod tests {
             session: digest(&["2".into()]),
             company: "C".into(),
             seed: 0,
+            clock: 0,
             user: "U".into(),
             test_codeunit: Some(test_codeunit),
             resources: digest(&["3".into()]),
@@ -882,6 +890,7 @@ mod tests {
             session,
             company,
             seed,
+            clock,
             user,
             test_codeunit,
             resources,
@@ -896,7 +905,7 @@ mod tests {
         let digests: [&LinesDigest; 3] = [database, session, resources];
         let _: &Option<LinesDigest> = uncommitted;
         let _: &BackingKey = backing;
-        let _: (&String, &i32, &String, &Option<usize>) = (company, seed, user, test_codeunit);
+        let _: (&String, &i32, &i64, &String, &Option<usize>) = (company, seed, clock, user, test_codeunit);
         let _: &(bool, bool, bool) = client;
         let _: &crate::runtime::session_flags::SessionFlags = flags;
         let _: &Option<std::sync::Arc<al_host::license::License>> = license;

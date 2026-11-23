@@ -73,6 +73,9 @@ impl<'a> Render<'a> {
             Value::PlaceholderSize(..) => {
                 Err("byte size of a placeholder report output (it answers only in the session that wrote it)".into())
             }
+            Value::UnbuiltRecord(_) => {
+                Err("Record variable not built yet (its stamp is a commit count of its own session)".into())
+            }
             // Numbered when shared: an object the runtime serves itself holds a state that can change.
             Value::DotNet(d) => {
                 self.shared(

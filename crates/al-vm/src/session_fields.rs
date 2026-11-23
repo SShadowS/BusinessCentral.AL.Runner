@@ -196,6 +196,8 @@ macro_rules! session_fields {
                 // keeps none of them either): a test's differences of the counts are the same from any start, and the
                 // insert stamps are asked only for sequences inserted since the test's start, so none from the login.
                 access_notes,
+                // Counts of deferred and built Record locals, read only by tests (`lazy_record.rs`), never by AL code.
+                lazy_records,
             }
             refuse {
                 // `--explain`: the fault sites of the login code are that session's. Set from the caller before install
