@@ -23,6 +23,7 @@ mod clientless;
 mod consistent_marks;
 mod decimal_column;
 mod get_key_value;
+mod lazy_record;
 mod package_data;
 mod partial_gone;
 mod placeholder_files;
@@ -50,6 +51,7 @@ pub use debug::{DebugFrame, DebugHook, DebugView, Resume};
 pub use exec::{disassemble as exec_disassemble, report as exec_report};
 pub use faultsite::FaultFrame;
 pub(crate) use interp::constant;
+pub use lazy_record::LazyRecordStats;
 #[doc(hidden)]
 pub use platform::{FieldGetByKey, field_get_by_key_pairs};
 pub use profile::frame_name as profile_frame_name;
@@ -1040,6 +1042,8 @@ pub struct Session {
     /// the caller writes its `var` arguments back before it handles the error. Each call site clears it before its call
     /// (interp.rs), so it takes only what its own routine left; see caught_errors.rs.
     pub(crate) error_finals: Option<Vec<Value>>,
+    /// Record locals left unbuilt and built later (`lazy_record.rs`).
+    pub(crate) lazy_records: lazy_record::LazyRecordStats,
     /// The scalar globals passed by `var` to a procedure call that is still running. BC passes the argument by reference,
     /// the runtime copies it in and back; the two differ only when code reaches the global by its own name while the call
     /// runs. To a procedure of the same instance the callee's parameter aliases the global (`interp::alias_access`,
@@ -1474,6 +1478,7 @@ impl Session {
             exited_with_value: false,
             field_error_form: None,
             error_finals: None,
+            lazy_records: Default::default(),
             var_alias_watch: Vec::new(),
             frames: Vec::new(),
             next_interface_call: false,
@@ -2495,22 +2500,7 @@ impl Session {
         let chunk = engine.exec.chunk(&engine.program, object, routine);
         let mut locals = self.spare_vec(r.locals.len() + chunk.map_or(0, |c| usize::from(c.temps)));
         let passed = args.len().min(r.params);
-        for (i, s) in r.locals.iter().enumerate() {
-            // The default of a parameter that is passed in is never seen: the argument replaces it. One with state of
-            // its own (a record takes the number of a temporary table) is still made, as the values are made in order.
-            if i < passed && (plain_default(&s.ty) || matches!(&s.ty, RtType::Array(_, el) if plain_default(el))) {
-                locals.push(Value::Null);
-            } else if i < passed && self.record_without_state(&s.ty) {
-                // A record of a stored table takes no temporary table: its fresh buffer would only be dropped (issue 6133).
-                locals.push(Value::Null);
-            } else {
-                let v = self.slot_default(s);
-                if blob_transfer::measured_local(engine.program.objects[object].kind, r, i) {
-                    blob_transfer::new_variable(&v, self.commits, &mut self.blob_sources);
-                }
-                locals.push(v);
-            }
-        }
+        self.frame_locals(object, r, passed, &mut locals);
         let mut args = args;
         // The call whose by-value arguments `blob_transfer::Argument` measures.
         let measured_call =
