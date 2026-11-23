@@ -855,7 +855,7 @@ fn a_call_count_that_differs_between_real_logins_of_one_key_is_no_difference() {
     assert!(report.contains("replay vs run: 2 checked, 0 differ"), "{report}");
 }
 
-// ---- PERF-34: the key hashes each row's bytes; a row with no byte form gives no key ----
+// ---- The key hashes each row's bytes; a row with no byte form gives no key ----
 
 /// A session of `engine` holding a committed row of "Guided Experience Item" whose second field (when it has one) or first is
 /// `v`, and the install baseline captured from it.
@@ -878,7 +878,7 @@ fn baseline_with_value(engine: &Arc<Engine>, id: i32, v: Value) -> al_vm::Baseli
     session.capture_baseline()
 }
 
-// A3 (RED): a committed row that holds a value with no byte form (a SQL counter, a placeholder's size) gives no key: the
+// A committed row that holds a value with no byte form (a SQL counter, a placeholder's size) gives no key: the
 // sessions run their logins (nothing replays), pass as before, and the starts line counts `no key: <kind>`. The stub
 // hashes the Debug text, so it gives a key, the second session takes the start and the line has no `no key`.
 #[test]

@@ -1,17 +1,16 @@
-//! The digest of committed rows: the one place the login key hashes rows (al-runner issue 8211; PERF-34, design
-//! `/coord/handoff/PERF-01/step4-key-design.md` section 1).
+//! The digest of committed rows: the one place the login key hashes rows (al-runner issue 8211).
 //!
 //! Each row's `value_codec::encode_row` bytes (al-builtins, the one owner of "a row as bytes": the install baseline, its
 //! row deltas and the frozen store use the same form) go straight into SHA-256 through one reused buffer: no String and
-//! no Debug text per row (step 3 review H3: on a 50,000-row store rendering and hashing the rows' Debug text was most of
+//! no Debug text per row (on a 50,000-row store rendering and hashing the rows' Debug text was most of
 //! the key's cost). The form is exact: each value is self-delimiting and `value_codec::decode` reads it back
 //! (value_codec.rs, a Blob with every field of its buffer, `blob_form.rs`), so equal digests mean equal rows. A value
 //! that has no byte form (`value_codec::encode` answers false: a SqlCount, a placeholder's size, a handle) gives
 //! [`NoKey`], never a lossy digest, and the session runs its login.
 //!
-//! One gap the form shares with step 3's Debug text: a Text with half of a surrogate pair is written with U+FFFD at the
+//! One gap the form shares with the earlier Debug text: a Text with half of a surrogate pair is written with U+FFFD at the
 //! lone position (value_codec.rs, `Txt::as_str`). No stored row can hold one (every write refuses it,
-//! al-data `memory/held_cols.rs` `note_held_in`; /coord/handoff/bugs/lone-half-key/repro.md), so it does not reach this
+//! al-data `memory/held_cols.rs` `note_held_in`), so it does not reach this
 //! digest; the exact form of such a text in the codec is a follow-up.
 
 use super::LinesDigest;
@@ -24,7 +23,8 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct NoKey(pub(crate) &'static str);
 
-/// The first bytes of every digest: a digest of this form never equals one of another form (step 3 hashed Debug lines).
+/// The first bytes of every digest: a digest of this form never equals one of another form (the earlier key hashed
+/// Debug lines).
 const FORM: &[u8] = b"al-runner login key rows: value_codec v1\0";
 
 /// How many bytes the buffer gathers before it goes into the hasher.
@@ -161,8 +161,8 @@ mod tests {
             .collect()
     }
 
-    /// Step 3's digest of the same rows: the Debug lines.
-    fn step3_digest(company: &str, object: u32, rows: &[al_data::Row]) -> LinesDigest {
+    /// The earlier digest of the same rows: their Debug lines.
+    fn debug_lines_digest(company: &str, object: u32, rows: &[al_data::Row]) -> LinesDigest {
         let lines: Vec<String> = rows.iter().map(|r| format!("{company}|{object}|{r:?}")).collect();
         digest(&lines)
     }
@@ -174,7 +174,7 @@ mod tests {
         vec![Value::Integer(1), Value::Blob(b)]
     }
 
-    // A3 (RED): a value with no byte form gives no key, never a lossy digest. The stub gives Ok.
+    // A value with no byte form gives no key, never a lossy digest.
     #[test]
     fn a_value_with_no_byte_form_gives_no_key() {
         use al_builtins::value::{SqlCount, SqlForm, SqlType};
@@ -211,7 +211,7 @@ mod tests {
         }
     }
 
-    // A4 (GUARD, probably green today: Debug renders every BlobBuf field): a field of a Blob that differs is another digest.
+    // A guard (the Debug text rendered every BlobBuf field too): a field of a Blob that differs is another digest.
     #[test]
     fn a_blob_field_difference_gives_another_digest() {
         let digest_of = |r: al_data::Row| table_digest("C", 7, [r].iter()).expect("a digest");
@@ -230,7 +230,7 @@ mod tests {
         assert_ne!(base, digest_of(blob_row(|b| b.bytes = b"xz".to_vec())), "GUARD bytes");
     }
 
-    // A5 (GUARD): one content built twice, from two stores (other stamps, other pointers), gives one digest.
+    // A guard: one content built twice, from two stores (other stamps, other pointers), gives one digest.
     #[test]
     fn one_content_built_twice_from_two_stores_gives_one_digest() {
         let a = al_data::memory::MemStore::from_exported(vec![exported(rows(4))]);
@@ -257,15 +257,15 @@ mod tests {
         assert_eq!(counts::rows(), 6, "current_digest");
     }
 
-    // A8 (RED): the digest of the byte form is never step 3's digest of the same rows (a version tag), so a start
-    // recorded by another binary can never meet a new key. The stub gives step 3's digest.
+    // The digest of the byte form is never the Debug lines' digest of the same rows (a version tag), so a start
+    // recorded by another binary can never meet a new key.
     #[test]
     fn the_new_digest_is_never_step_threes() {
         for n in [1, 3] {
             let r = rows(n);
             assert_ne!(
                 table_digest("C", 7, r.iter()).unwrap(),
-                step3_digest("C", 7, &r),
+                debug_lines_digest("C", 7, &r),
                 "{n} rows"
             );
         }

@@ -28,9 +28,8 @@ impl MemStore {
     }
 
     /// The committed rows of table `object` in `company`, in key order, by reference: what al-testrun's login key hashes
-    /// without a copy of the table (`MemStore::committed_table` clones every row; PERF-34, design
-    /// `/coord/handoff/PERF-01/step4-key-design.md` section 1.3). `None` when the store holds no entry for it. Marks nothing
-    /// as read.
+    /// without a copy of the table (`MemStore::committed_table` clones every row). `None` when the store holds no entry
+    /// for it. Marks nothing as read.
     pub fn committed_rows(&self, company: &str, object: u32) -> Option<impl Iterator<Item = &crate::Row> + '_> {
         let slot: super::Slot = (std::sync::Arc::from(company), object);
         Some(self.committed.get(&slot)?.iter().map(|(_, row)| row))

@@ -948,7 +948,7 @@ fn a_deleted_out_backed_table_stays_empty_after_the_way_back() {
     assert_eq!(back.count(&cx, &t, &[]).unwrap(), 0, "not restored again");
 }
 
-// PERF-34 A7 (GUARD, green before and after the key switches to it): `committed_rows` gives the rows `committed_table`
+// A guard: `committed_rows` gives the rows `committed_table`
 // clones, by reference, in key order; `None` for a table the store holds no entry for. Rows written but not committed are
 // not in it.
 #[test]

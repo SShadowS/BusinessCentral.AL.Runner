@@ -68,7 +68,7 @@ pub(crate) fn store_table_digests(
         let d = match known {
             Some(d) => d,
             None => {
-                // By reference: no copy of the table's rows (PERF-34).
+                // By reference: no copy of the table's rows.
                 let Some(rows) = store.committed_rows(&company, object) else {
                     continue;
                 };

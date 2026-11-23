@@ -3399,8 +3399,8 @@ fn a_start_recorded_with_the_numbers_mark_does_not_refuse_a_later_test() {
     );
 }
 
-/// PERF-34 (GUARD, green before and after the login key hashes each row's bytes): the reviewer's `py` and `pw` probes of step
-/// 3 (`/coord/handoff/PERF-01/s3-review-probes/`), scaled down from 50,000 install rows to 200. Both have an install codeunit
+/// A guard (green before and after the login key hashes each row's bytes): two probe shapes of a large install base,
+/// scaled down from 50,000 install rows to 200. Both have an install codeunit
 /// that leaves a wide table; `py` also has a subscriber to the login's setup event that adds a row of its own, so its
 /// sessions' logins write and the key's rows matter; `pw` has none. Six test codeunits, one failing, in three requests of one
 /// seed (one key per codeunit).
@@ -3497,7 +3497,7 @@ fn check_lines(src: &str, requests: &[Value]) -> (Vec<Vec<Value>>, Vec<String>) 
     (out, checks)
 }
 
-/// PERF-34 GUARD: the same verdicts with the replay on, off (`ALRUNNER_LOGIN_REPLAY=0`) and under the check, and the check
+/// A guard: the same verdicts with the replay on, off (`ALRUNNER_LOGIN_REPLAY=0`) and under the check, and the check
 /// finds 0 that differ, for both shapes.
 #[test]
 fn the_py_and_pw_shapes_give_one_verdict_with_the_replay_on_off_and_under_the_check() {
