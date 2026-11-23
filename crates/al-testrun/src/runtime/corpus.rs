@@ -2205,7 +2205,7 @@ fn kept_engine_key(
 /// engine shares the tests engine's cache (decision 4), which is then counted once.
 /// The starts count as what they grew since the meter was made: a kept engine's starts of earlier requests are in the
 /// fixed part already, and when this run evicts them the sum does not fall below that reading, so their eviction never
-/// hides the test rows' growth (step 3 review L4; it can count up to the evicted bytes, at most `login_start::MAX_BYTES`,
+/// Hides the test rows' growth (it can count up to the evicted bytes, at most `login_start::MAX_BYTES`,
 /// too much).
 pub(super) fn shared_bytes_meter(
     engine: &Arc<Engine>,

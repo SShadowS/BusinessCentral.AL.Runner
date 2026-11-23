@@ -937,7 +937,7 @@ mod tests {
     // Condition 2 of the maintainer's acceptance on al-runner issue 8211: the test codeunit stays in the key. Two sessions
     // that differ only in their test codeunit have other keys, so neither is compared with (nor, later, replayed from) the
     // other's first state; only the evidence tally across test codeunits sees them together.
-    // Step 3 review H1 and M2: the server base address a request sets, and the codeunit's isolation and hub, are inputs of
+    // The server base address a request sets, and the codeunit's isolation and hub, are inputs of
     // the login (`GetUrl`, the isolation fields `enter_test_codeunit` sets): another value is another key.
     #[test]
     fn another_server_url_or_isolation_is_another_key() {
@@ -1003,7 +1003,7 @@ mod tests {
         );
         let session = state_of(&[(1990, vec![Value::Integer(7)])], &["session y"]);
         assert_eq!(first_difference(&a, &session).as_deref(), Some("session state 1"));
-        // Step 3 review round 2, R2-L3: a `field.` line is named by its field (a name, never its value), and when more lines
+        // A `field.` line is named by its field (a name, never its value), and when more lines
         // differ the text says how many.
         let row = [(1990, vec![Value::Integer(7)])];
         let fields = state_of(&row, &["session x", "field.a 1", "field.b 2", "field.c 3"]);

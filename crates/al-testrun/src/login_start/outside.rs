@@ -1,6 +1,6 @@
-//! Session state outside al-vm's `Session` that al-testrun keeps (PERF-01 step 3, al-runner issue 8211, design section
-//! 3.3): every `static` of al-testrun (a thread-local or a process table, test code left out), each listed with what a login
-//! start does with it, as `crates/al-vm/src/login_image/fields.rs` lists those of al-vm, al-builtins and al-data.
+//! Session state outside al-vm's `Session` that al-testrun keeps (al-runner issue 8211): every `static` of al-testrun (a
+//! Thread-local or a process table, test code left out), each listed with what a login start does with it, as
+//! `crates/al-vm/src/session_fields.rs` lists those of al-vm, al-builtins and al-data.
 //! al-test-cli `tests/outside_session_state.rs` fails for a `static` of al-testrun that is not listed here, and for a listed
 //! one that is no longer there.
 //!

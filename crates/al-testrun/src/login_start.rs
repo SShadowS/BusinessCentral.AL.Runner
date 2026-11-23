@@ -1,4 +1,4 @@
-//! Login starts (al-runner issue 8211, PERF-01 step 3): a test session whose login inputs ([`crate::login_replay::Key`])
+//! Login starts (al-runner issue 8211): a test session whose login inputs ([`crate::login_replay::Key`])
 //! were seen before takes what that login left (a [`Start`]) in place of running it again. The first session of a key runs
 //! the login and keeps its al-vm `LoginImage` with the open's writes and assumption marks ([`record`]); a later session of
 //! the key thaws the image into itself in `runtime/run.rs` `open_company` ([`replay`]), when [`why_not`] finds nothing
@@ -44,7 +44,7 @@ const _: fn() = || {
     both::<Start>();
 };
 
-/// Why a session does not take a start (design section 3.4), each counted in the report.
+/// Why a session does not take a start, each counted in the report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NotTaken {
     /// The run notes the code it runs: `--explain` or an observer, coverage, the impact trace, the profiler.

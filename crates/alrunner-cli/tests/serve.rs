@@ -3199,7 +3199,7 @@ fn login_probe_rounds(
     out
 }
 
-/// Al-runner issue 8211, step 3: a session whose login inputs another session of the daemon had takes what that login left
+/// Al-runner issue 8211: a session whose login inputs another session of the daemon had takes what that login left
 /// in place of running it. The second request (the same seed, so the same keys) takes a start for each of its three
 /// entries (`timings.loginReplays`), and every test line equals those of the same requests with the replay off.
 #[test]
@@ -3217,7 +3217,7 @@ fn a_second_request_takes_the_login_starts_of_the_first() {
     );
 }
 
-/// Al-runner issue 8211, step 3: `ALRUNNER_LOGIN_REPLAY=0` turns the replay off: no session takes a start, and the field
+/// Al-runner issue 8211: `ALRUNNER_LOGIN_REPLAY=0` turns the replay off: no session takes a start, and the field
 /// says so (0, not absent).
 #[test]
 fn with_the_replay_off_no_session_takes_a_start() {
@@ -3228,9 +3228,9 @@ fn with_the_replay_off_no_session_takes_a_start() {
     }
 }
 
-/// Step 3 review H3: the replay is off unless `ALRUNNER_LOGIN_REPLAY=1` turns it on. On a store a session does not start
+/// The replay is off unless `ALRUNNER_LOGIN_REPLAY=1` turns it on. On a store a session does not start
 /// from a shared snapshot of (install code that runs in every session), the key's digest of every row costs more than the
-/// login it saves (review probe `py`), so it is opt-in until that cost is gone.
+/// Login it saves, so it is opt-in until that cost is gone.
 #[test]
 fn the_replay_is_off_unless_turned_on() {
     let default = login_probe_rounds(&[], 2, &[], false);
@@ -3239,7 +3239,7 @@ fn the_replay_is_off_unless_turned_on() {
     }
 }
 
-/// Al-runner issue 8211, step 3: a kept daemon whose first request had a test the time limit stopped answers the next
+/// Al-runner issue 8211: a kept daemon whose first request had a test the time limit stopped answers the next
 /// request as a new daemon does (the same verdicts), and takes the starts of the first request (the stopped test's session
 /// recorded none that could change the answer).
 #[test]
@@ -3297,7 +3297,7 @@ fn same_with_and_without_the_replay(src: &str, requests: &[Value]) -> Vec<Vec<Va
     on
 }
 
-/// Al-runner issue 8211, step 3 review H1: the login reads the request's `serverUrl` (`GetUrl`), so a session of another
+/// Al-runner issue 8211: the login reads the request's `serverUrl` (`GetUrl`), so a session of another
 /// URL never takes the start of a login that read another one. Same seed, so every other key field is equal.
 #[test]
 fn a_request_with_another_server_url_takes_no_start_of_the_first() {
@@ -3337,7 +3337,7 @@ codeunit 50821 "Probe Login Tests"
     );
 }
 
-/// The app of the review's `pg` and `ph` probes (step 3 review H2): a login subscriber adds a row both test codeunits read,
+/// The app of two probes: a login subscriber adds a row both test codeunits read,
 /// and both take NumberSequence numbers, so under TestIsolation = Function in BC's order the second is refused when the
 /// numbers an earlier codeunit took are not known (al-runner issue 8152, `Scratch::numbers_unmeasured`).
 const NUMBERS_APP: &str = r#"table 50830 "RG Login Row" { fields { field(1; Code; Code[20]) { } field(2; Note; Text[50]) { } } keys { key(PK; Code) { Clustered = true; } } }
@@ -3372,7 +3372,7 @@ codeunit 50822 "RG Tests K"
 }
 "#;
 
-/// Step 3 review H2, `pg`: a plain request, then one in BC's order under TestIsolation = Function, where the numbers mark
+/// A plain request, then one in BC's order under TestIsolation = Function, where the numbers mark
 /// refuses `ReadsNumbers`. A start the plain request recorded without the mark must not run it.
 #[test]
 fn a_start_recorded_without_the_numbers_mark_does_not_run_a_refused_test() {
@@ -3383,7 +3383,7 @@ fn a_start_recorded_without_the_numbers_mark_does_not_run_a_refused_test() {
     );
 }
 
-/// Step 3 review H2, `ph`: the strict request first, so a start is recorded with the mark; a later request without it must
+/// The strict request first, so a start is recorded with the mark; a later request without it must
 /// not refuse the test.
 #[test]
 fn a_start_recorded_with_the_numbers_mark_does_not_refuse_a_later_test() {

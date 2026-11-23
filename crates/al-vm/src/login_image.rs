@@ -1,7 +1,7 @@
 //! The session image (al-runner issue 8211): what a test session holds after the raised login, as owned
 //! data any thread may keep ([`LoginImage`], [`Session::login_image`]), and a new session made to hold it
 //! ([`Session::thaw_login_image`]). al-testrun `login_start.rs` keeps an image per login key and thaws it into a later
-//! session of the key in place of its login (PERF-01 step 3); `login_replay.rs` compares thaws with real logins, the
+//! Session of the key in place of its login; `login_replay.rs` compares thaws with real logins, the
 //! differential test.
 //!
 //! Every field of `Session` is in one class of the session field table (`session_fields.rs`). The image holds the `plain`
@@ -158,7 +158,7 @@ pub struct KindSize {
 }
 
 /// What a login's row delta assumes of the store it is put on, beyond the rows the key's digest sees: which tables have
-/// an entry (with their row counts), the tables a DeleteAll emptied, and the company copies (design section 3.2). A replay
+/// An entry (with their row counts), the tables a DeleteAll emptied, and the company copies. A replay
 /// takes a start only onto a store of the same shape.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BaseShape {
@@ -243,7 +243,7 @@ impl Session {
     }
 
     /// The shape of this session's committed store ([`BaseShape`]): what a row delta assumes of the store it is put on
-    /// beyond the rows (design section 3.2).
+    /// Beyond the rows.
     pub fn base_shape(&self) -> BaseShape {
         let (emptied, copies) = self.store.committed_marks();
         BaseShape {

@@ -37,7 +37,7 @@ pub(crate) fn table_digests(tables: &[al_data::memory::ExportedTable]) -> BTreeM
 
 /// [`table_digests`] of the committed tables of `store`, each digest made once per state of its table: a table's stamp
 /// names one state of it in every store of the process (al-data `MemStore::committed_stamps`), so a digest kept for a
-/// stamp is the digest of the rows the table holds at that stamp (step 3 review H3: the rows were rendered and digested
+/// Stamp is the digest of the rows the table holds at that stamp (the rows were rendered and digested
 /// whole for every test session). A table with no stamp is digested each time. Kept per engine (`Engine::derived`).
 pub(crate) fn store_table_digests(
     engine: &al_vm::Engine,

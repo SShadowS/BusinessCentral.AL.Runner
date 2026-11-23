@@ -272,7 +272,7 @@ pub struct RunOptions {
     pub login_replay_check: bool,
     /// A test session takes a login start in place of running its login when it can (`login_start.rs`, al-runner issue
     /// 8211; `ALRUNNER_LOGIN_REPLAY=1`, read by the front ends). Default `false`: off, until the key costs less than the
-    /// login on every shape (step 3 review H3: install code that runs in every session gives every table a new stamp, so
+    /// Login on every shape (install code that runs in every session gives every table a new stamp, so
     /// the key digests every row). Outcomes must not depend on it: every input the login reads is a key field
     /// (`login_replay::Key`), and the login replay check is its differential test.
     pub login_replay: bool,

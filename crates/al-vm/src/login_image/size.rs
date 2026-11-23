@@ -44,7 +44,7 @@ impl LoginImage {
         }
     }
 
-    /// What keeping this image costs in memory, the number the starts' caps count (design section 4): its rows, its state
+    /// What keeping this image costs in memory, the number the starts' caps count: its rows, its state
     /// and its base shape.
     pub fn kept_bytes(&self) -> u64 {
         (self.rows.size() + self.state_bytes() + self.base_shape.bytes()) as u64
