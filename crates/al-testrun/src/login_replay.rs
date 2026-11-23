@@ -547,6 +547,24 @@ thread_local! {
     pub(crate) static TWIN_PLANT: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
     /// Run on the twin before the thaw ([`Check::round_trip`]): a test makes it a session the thaw must refuse.
     pub(crate) static TWIN_TARGET: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
+    /// [`serve_twin`] is on, and how many sessions it replaced.
+    pub(crate) static SERVE_TWIN: std::cell::Cell<(bool, u32)> = const { std::cell::Cell::new((false, 0)) };
+}
+
+/// Under [`SERVE_TWIN`] (tests only), each session after its raised login is replaced by a twin made by `twin` and thawn
+/// from the session's image on this thread, so the codeunit's tests run on the twin: the evidence, at the level of test
+/// results, that a thawn session serves the tests as the session that ran its login does (issue 8211).
+#[cfg(test)]
+pub(crate) fn serve_twin(session: &mut Session, before_login: u64, twin: impl FnOnce() -> Session) {
+    let (on, served) = SERVE_TWIN.with(std::cell::Cell::get);
+    if !on {
+        return;
+    }
+    let image = (session.login_image(before_login)).unwrap_or_else(|why| panic!("no image: {}", why.reason()));
+    let mut twin = twin();
+    twin.thaw_login_image(&image).expect("a new session takes the image");
+    *session = twin;
+    SERVE_TWIN.with(|s| s.set((true, served + 1)));
 }
 
 /// The check of `engine`.

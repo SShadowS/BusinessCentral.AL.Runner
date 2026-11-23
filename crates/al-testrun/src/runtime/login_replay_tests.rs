@@ -114,14 +114,14 @@ pub(super) fn run_with(engine: &Arc<Engine>, l: &al_sema::lower::Lowered, name: 
 
 /// What a run of a test codeunit gives: each test's outcome, its error stack and its assumption marks.
 #[derive(Debug, PartialEq)]
-struct Ran {
-    outcomes: Vec<(String, Outcome)>,
+pub(super) struct Ran {
+    pub(super) outcomes: Vec<(String, Outcome)>,
     stacks: Vec<(String, String)>,
     marks: Vec<(String, Vec<Assumption>)>,
 }
 
 /// Runs test codeunit `name` once on `engine` under the session flags of `opts`, the check on or off as `opts` says.
-fn run_as(engine: &Arc<Engine>, l: &al_sema::lower::Lowered, name: &str, opts: RunOptions) -> Ran {
+pub(super) fn run_as(engine: &Arc<Engine>, l: &al_sema::lower::Lowered, name: &str, opts: RunOptions) -> Ran {
     let mut scratch = Scratch {
         flags: super::session_flags::SessionFlags::of(&opts),
         ..Default::default()

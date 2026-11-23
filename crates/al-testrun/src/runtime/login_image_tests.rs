@@ -9,7 +9,7 @@
 //! there still holds with the image on, and the last test here shows the first report line is unchanged by it.
 
 use super::login_replay_tests::{
-    GAP, GAP_INSTANCES, GAP_MEDIA, GAP_RANDOM, KINDS_INSIDE, MAIN, OPAQUE_INSIDE, compiled_with, run,
+    GAP, GAP_INSTANCES, GAP_MEDIA, GAP_RANDOM, KINDS_INSIDE, MAIN, OPAQUE_INSIDE, Ran, compiled_with, run, run_as,
 };
 use super::*;
 
@@ -153,4 +153,114 @@ fn a_twin_the_thaw_refuses_is_counted_and_changes_no_outcome() {
     );
     let (engine, l) = compiled_with(MAIN);
     assert_eq!(with, outcomes(&engine, &l, "RPL Tests A", false));
+}
+
+/// A raised login that leaves state its tests read: a row, a SingleInstance codeunit's globals (an Integer, a Text, a
+/// List, a Dictionary, a temporary record with two rows, an instance of another codeunit), a seeded Random sequence, a
+/// work date and a manual binding. Each test but one fails on purpose with what it read, so its outcome holds the values.
+const TWIN_READS: &str = r#"
+codeunit 77470 "RPL Twin Registration"
+{
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Guided Experience", 'OnRegisterManualSetup', '', false, false)]
+    local procedure RegisterManualSetup()
+    var G: Codeunit "Guided Experience"; Keep: Codeunit "RPL Twin Keep";
+    begin
+        G.InsertAssistedSetup(77470);
+        Keep.Fill();
+    end;
+}
+codeunit 77471 "RPL Twin Keep"
+{
+    SingleInstance = true;
+    var N: Integer; T: Text; Items: List of [Integer]; Names: Dictionary of [Integer, Text];
+        Temp: Record "Guided Experience Item" temporary; Peer: Codeunit "RPL Twin Peer"; Sub: Codeunit "RPL Twin Sub";
+    procedure Fill()
+    begin
+        N := 7; T := 'kept'; Items.Add(3); Items.Add(5); Names.Add(1, 'one');
+        Temp."Object ID" := 1; Temp.Insert(); Temp."Object ID" := 2; Temp.Insert();
+        Peer.SetX(11); Randomize(42); BindSubscription(Sub); WorkDate(20300105D);
+    end;
+    procedure Describe(): Text
+    begin
+        exit(StrSubstNo('%1 %2 %3 %4 %5 %6', N, T, Items.Get(2), Names.Get(1), Temp.Count(), Peer.GetX()));
+    end;
+    procedure Bump() begin N += 1; end;
+    procedure Ping() begin OnPing(); end;
+    [IntegrationEvent(false, false)]
+    local procedure OnPing() begin end;
+}
+codeunit 77472 "RPL Twin Peer"
+{
+    var X: Integer;
+    procedure SetX(V: Integer) begin X := V; end;
+    procedure GetX(): Integer begin exit(X); end;
+}
+codeunit 77473 "RPL Twin Sub"
+{
+    EventSubscriberInstance = Manual;
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"RPL Twin Keep", 'OnPing', '', false, false)]
+    local procedure HandlePing() var Keep: Codeunit "RPL Twin Keep"; begin Keep.Bump(); end;
+}
+codeunit 77474 "RPL Twin Tests"
+{
+    Subtype = Test;
+    [Test]
+    procedure SeesTheRow() var I: Record "Guided Experience Item"; begin if I.IsEmpty() then Error('no row'); end;
+    [Test]
+    procedure ReadsTheKeptState() var Keep: Codeunit "RPL Twin Keep"; begin Error('kept: %1', Keep.Describe()); end;
+    [Test]
+    procedure DrawsFromTheSeededSequence() begin Error('draws: %1 %2 %3', Random(1000), Random(1000), CreateGuid()); end;
+    [Test]
+    procedure ReadsTheWorkDate() begin Error('work date: %1', WorkDate()); end;
+    [Test]
+    procedure TheBindingStillHolds() var Keep: Codeunit "RPL Twin Keep"; begin Keep.Ping(); Error('pinged: %1', Keep.Describe()); end;
+}
+"#;
+
+/// Runs `name` with the check on, on the session that ran its login or (`twin`) on a twin thawn from its image.
+fn ran_on(source: &str, name: &str, twin: bool) -> Ran {
+    let (engine, l) = compiled_with(source);
+    crate::login_replay::SERVE_TWIN.with(|s| s.set((twin, 0)));
+    let ran = run_as(
+        &engine,
+        &l,
+        name,
+        RunOptions {
+            login_replay_check: true,
+            ..RunOptions::default()
+        },
+    );
+    let (_, served) = crate::login_replay::SERVE_TWIN.with(std::cell::Cell::get);
+    crate::login_replay::SERVE_TWIN.with(|s| s.set((false, 0)));
+    assert_eq!(served, u32::from(twin), "{name}: the sessions a twin replaced");
+    ran
+}
+
+// The evidence at the level of test results the maintainer asked for before a replay serves tests (issue 8211): each
+// codeunit, run on a twin thawn from its session's image in place of that session, gives the outcomes (the values its
+// failing tests read included), the error stacks and the assumption marks of the session that ran its own login.
+#[test]
+fn a_codeunit_on_a_thawn_twin_gives_the_results_and_marks_of_a_fresh_login() {
+    let gap_instances = format!("{GAP}{GAP_INSTANCES}");
+    let gap_random = format!("{GAP}{GAP_RANDOM}");
+    let gap_media = format!("{GAP}{GAP_MEDIA}");
+    let reads = format!("{MAIN}{TWIN_READS}");
+    let runs = [
+        (MAIN, "RPL Tests A"),
+        (gap_instances.as_str(), "RPL Gap Tests"),
+        (gap_random.as_str(), "RPL Gap Tests"),
+        (gap_media.as_str(), "RPL Gap Tests"),
+        (reads.as_str(), "RPL Twin Tests"),
+    ];
+    for (source, name) in runs {
+        let fresh = ran_on(source, name, false);
+        assert!(!fresh.outcomes.is_empty(), "{name}: no test ran");
+        assert_eq!(ran_on(source, name, true), fresh, "{name}");
+    }
+    // The tests read what the login left: the outcomes hold the values, not a refusal.
+    let fresh = ran_on(&reads, "RPL Twin Tests", false);
+    let text = format!("{:?}", fresh.outcomes);
+    for want in ["kept: 7 kept 5 one 2 11", "pinged: 8 kept 5 one 2 11", "work date: 01/05/30"] {
+        assert!(text.contains(want), "{want}: {text}");
+    }
 }
