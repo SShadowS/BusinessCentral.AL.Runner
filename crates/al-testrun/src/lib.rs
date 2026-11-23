@@ -37,6 +37,7 @@ pub mod license;
 mod login;
 mod login_memo;
 mod login_replay;
+mod login_start;
 pub mod observe;
 mod partner_login;
 pub mod profiling;

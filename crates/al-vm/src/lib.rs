@@ -103,6 +103,10 @@ mod hostvalues;
 mod http;
 pub mod impact;
 mod install_left;
+mod login_image;
+pub use login_image::{
+    BaseShape, ImageSize, KindSize, LoginBase, LoginImage, NODE_KINDS, NotImaged, NotThawed, PortableBase,
+};
 mod interfaces;
 mod isdirty;
 mod license_ceiling;

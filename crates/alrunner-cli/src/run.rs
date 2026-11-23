@@ -568,6 +568,10 @@ pub struct RequestTimings {
     pub engine: std::time::Duration,
     /// The request ran on the engines an earlier request over the same compile kept.
     pub engine_kept: bool,
+    /// Test sessions that took a login start in place of running the login, and the starts kept (al-runner issue 8211),
+    /// over every request the engine ran.
+    pub login_replays: u64,
+    pub login_starts: usize,
     /// Setting up the install baseline: running the install code, or reading it.
     pub baseline: std::time::Duration,
     /// `ran`, `cache` or `kept` (`Phases::baseline_source`); `None`: no baseline.
@@ -588,6 +592,8 @@ impl RequestTimings {
             compile: p.warm_compile.unwrap_or(p.compile),
             engine: p.engine,
             engine_kept: p.engine_kept,
+            login_replays: p.login_replay.replays,
+            login_starts: p.login_replay.starts,
             baseline: p.baseline,
             baseline_source: p.baseline_source,
             tests: p.tests,
@@ -1685,6 +1691,7 @@ fn test_inner(
         memory: crate::memory_budget::budget(a.max_memory, warm.is_none() && debug.is_none()), // `--max-memory`
         private_baseline: std::env::var_os("AL_PRIVATE_BASELINE").is_some(), // ADR-069 decision 11
         login_replay_check: std::env::var_os("ALRUNNER_LOGIN_REPLAY_CHECK").is_some(), // issue 8211, internal
+        login_replay: std::env::var_os("ALRUNNER_LOGIN_REPLAY").is_some_and(|v| v == "1"), // issue 8211, internal
         // ADR-070 step 2 (internal); ADR-074: the discovery pass under strict order needs each BC session in one walk.
         strict_sequential: std::env::var_os("AL_STRICT_SEQUENTIAL").is_some() || driver.one_session(),
         test_driver: driver,
@@ -1809,7 +1816,7 @@ fn test_inner(
         }
     };
     let p = &rt.phases;
-    p.login_replay.iter().for_each(|l| eprintln!("{l}")); // ALRUNNER_LOGIN_REPLAY_CHECK (issue 8211)
+    p.login_replay.report.iter().for_each(|l| eprintln!("{l}")); // ALRUNNER_LOGIN_REPLAY_CHECK (issue 8211)
     let d = sidecar_host.stats();
     sidecar_host.shutdown();
 
