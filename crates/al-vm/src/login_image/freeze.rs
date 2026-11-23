@@ -1,4 +1,4 @@
-//! The walk that freezes the object graph into an [`Arena`] (design section 2.2). It starts from the SingleInstance
+//! The walk that freezes the object graph into an [`Arena`]. It starts from the SingleInstance
 //! globals in ascending object index, then the live manual bindings in order (the order `Session::state_lines` uses), then
 //! the live records of `Session::temp_blob_impl_fields`, and
 //! keeps its own stack: no depth limit. Each handle is looked up by its address; a new one gets the next number.
@@ -347,7 +347,7 @@ impl<'a> Walker<'a> {
         })
     }
 
-    /// A .NET object the check renders exactly. v1 images the ones measured on a real login only ([`MEASURED_DOTNET`],
+    /// A .NET object the check renders exactly. The image takes the ones measured on a real login only ([`MEASURED_DOTNET`],
     /// with an empty state); every other kind and state is deferred, each with its type in the reason.
     fn dotnet(&mut self, d: &al_builtins::value::DotNetObject, path: &str) -> Result<DotNetNode, NotImaged> {
         use al_builtins::value::DotNetKind;
@@ -457,7 +457,7 @@ pub(crate) fn borrowed<T>(r: Result<T, std::cell::BorrowError>, path: &str, what
     })
 }
 
-/// A shape v1 of the image defers: its own reason, counted in the report.
+/// A shape the image defers: its own reason, counted in the report.
 pub(crate) fn deferred(path: &str, what: &str) -> NotImaged {
     NotImaged::Value {
         path: path.to_string(),
@@ -529,7 +529,7 @@ codeunit 50110 Holder
             .login_image(&crate::LoginBase::before_everything())
             .unwrap_or_else(|why| panic!("{}", why.reason()));
         let mut twin = Session::new(session.engine.clone());
-        twin.thaw_login_image(&image);
+        twin.thaw_login_image(&image).expect("a new session takes the image");
         let noted = twin.temp_blob_impl_fields.live();
         assert_eq!(noted.len(), 1);
         let at = twin
@@ -591,8 +591,7 @@ codeunit 50112 Kinds2 { var M: Integer; procedure Touch() begin M := 1; end; }
 query 50113 KQ { elements { dataitem(K; KRow) { column(Id; Id) { } } } }
 "#;
 
-    /// The shapes v1 of the image defers although the check renders them exactly (design decision 10): each its own
-    /// counted reason in the `login image:` line, each a follow-up.
+    /// The shapes the image defers although the check renders them exactly: each its own counted reason in the `login image:` line, each a follow-up.
     const DEFERRED: &[&str] = &[
         "JsonObject (deferred)",
         "JsonArray (deferred)",
@@ -610,7 +609,7 @@ query 50113 KQ { elements { dataitem(K; KRow) { column(Id; Id) { } } } }
 
     // The image refuses only what the login replay check has no exact form for: for each kind of value a SingleInstance
     // global holds, when `Session::state_lines` names nothing as opaque (state_render.rs, the one owner of which values
-    // have an exact form), the image is taken, or refused with a v1 deferral named in `DEFERRED`. And when the check names
+    // have an exact form), the image is taken, or refused with a deferral named in `DEFERRED`. And when the check names
     // a value as opaque, the image refuses too.
     #[test]
     fn the_image_refuses_only_what_the_check_has_no_exact_form_for() {
@@ -772,7 +771,7 @@ query 50113 KQ { elements { dataitem(K; KRow) { column(Id; Id) { } } } }
                 .login_image(&crate::LoginBase::before_everything())
                 .unwrap_or_else(|why| panic!("{}", why.reason()));
             let mut twin = Session::new(engine.clone());
-            twin.thaw_login_image(&image);
+            twin.thaw_login_image(&image).expect("a new session takes the image");
             let Value::DotNet(d) = twin.codeunit_instance(at).borrow().globals[slot].clone() else {
                 panic!("a DotNet value")
             };
@@ -843,7 +842,7 @@ codeunit 50200 PKeep
             .login_image(&crate::LoginBase::before_everything())
             .unwrap_or_else(|why| panic!("{}", why.reason()));
         let mut twin = Session::new(engine);
-        twin.thaw_login_image(&image);
+        twin.thaw_login_image(&image).expect("a new session takes the image");
         (s, twin, keep)
     }
 
@@ -858,7 +857,7 @@ codeunit 50200 PKeep
 
     // State kept outside `Session`'s fields, owner 1: the committed store's `emptied` marks. A login that emptied a table
     // whose rows BC holds but the runner does not know (records.rs `is_unseeded`) and then inserted a row reads the row;
-    // the twin reads it too, and the check (`emptied` line) sees the mark. Review of step 2, H1.
+    // the twin reads it too, and the check (`emptied` line) sees the mark.
     #[test]
     fn a_table_the_login_emptied_stays_emptied_in_the_twin() {
         // Emptied and written again; emptied and left empty (the thaw finds the empty table's entry).
@@ -872,7 +871,7 @@ codeunit 50200 PKeep
     }
 
     // State kept outside `Session`'s fields, owner 2: an ErrorInfo's `Callstack`, in al-builtins errorinfo.rs `CALLSTACKS`
-    // by the value's cell. The twin's ErrorInfo answers the same `Callstack`. Review of step 2, H2.
+    // by the value's cell. The twin's ErrorInfo answers the same `Callstack`.
     #[test]
     fn an_error_infos_call_stack_follows_it_into_the_twin() {
         let (mut s, mut twin, keep) = original_and_twin(&["Collect"]);
@@ -882,8 +881,8 @@ codeunit 50200 PKeep
         assert_eq!(a, b);
     }
 
-    // v1 images the DotNet objects measured on a real login only (`MEASURED_DOTNET`, empty state); another type, a state
-    // and an enum value are deferred, each naming its type. Review of PERF-01 step 2, M2.
+    // The image takes the DotNet objects measured on a real login only (`MEASURED_DOTNET`, empty state); another type, a state
+    // and an enum value are deferred, each naming its type.
     #[test]
     fn a_dotnet_object_v1_does_not_measure_is_deferred_by_its_type() {
         use al_builtins::value::{DotNetKind, DotNetObject};
@@ -946,7 +945,7 @@ codeunit 50210 RKeep
 "#;
 
     // A record of a table with a RecordId field holds a RecordId cell in that field, which the check renders exactly: the
-    // image takes it, in the record and in a temporary table's rows. Review of PERF-01 step 2, M3.
+    // image takes it, in the record and in a temporary table's rows.
     #[test]
     fn a_record_with_a_record_id_field_round_trips() {
         let l = al_testkit::compile(RID);
@@ -961,7 +960,7 @@ codeunit 50210 RKeep
                 .login_image(&crate::LoginBase::before_everything())
                 .unwrap_or_else(|why| panic!("{routine}: {}", why.reason()));
             let mut twin = Session::new(engine.clone());
-            twin.thaw_login_image(&image);
+            twin.thaw_login_image(&image).expect("a new session takes the image");
             assert_eq!(lines(&mut s), lines(&mut twin), "{routine}");
             assert_eq!(
                 outcome(&mut s, keep, "Read"),

@@ -535,7 +535,7 @@ pub struct RecordState {
     /// (session-system/TestCrmTableNoConnectionContracts.al).
     pub crm: bool,
     /// Field values in the table's field order.
-    pub fields: Vec<Value>,
+    pub fields: crate::record_fields::Fields,
     pub filters: Vec<crate::filter::FieldFilter>,
     /// The filter group `SetRange` and `SetFilter` write to and `GetFilter` reads.
     pub filter_group: i32,
@@ -619,9 +619,13 @@ pub struct RecordState {
     /// `Page.RunModal(Id, Rec)` called as a statement, see `hand_back_selection`).
     pub unpinned_buffer: Option<&'static str>,
     /// A by-value copy whose filters were dropped on an assumption (`by-value-table-proc-other-table`,
-    /// al-vm `records/by_value_view.rs`): a read of its view marks it. Clones of the state
+    /// `by-value-report-procedure`, al-vm `records/by_value_view.rs`): a read of its view marks it. Clones of the state
     /// keep it; `Reset`, `SetView` and `Clear` end it.
     pub view_assumption: Option<crate::assumptions::Assumption>,
+    /// A by-value copy that did not take its caller's SetAutoCalcFields (al-vm `records/by_value_view.rs`
+    /// `measured_auto_calc`): a row read of it that calculates no field marks `by-value-record-no-auto-calc`
+    /// (al-vm `flowfields.rs` `auto_calculate`). Clones of the state keep it.
+    pub auto_calc_dropped: bool,
     /// The filters an action's `RunPageLink` put on this Rec of the page it opened: a copy of Rec passed by value does not
     /// carry them (testpage/TestActionRunPageLinkFilterGroup.al:292-369, `filters=` in OnOpenPage and OnAfterGetCurrRecord).
     pub run_page_link: Option<Rc<Vec<crate::filter::FieldFilter>>>,
@@ -863,14 +867,22 @@ impl RecordState {
     /// IsDirty, RecordRef.IsDirty and Modify compare with (`is_dirty_base`, `dirty_base`, `last_modify`).
     pub fn blob_copies_of(&self, pos: usize, b: &crate::stream::BlobRef) -> usize {
         let holds = |row: &[Value]| matches!(row.get(pos), Some(Value::Blob(o)) if std::sync::Arc::ptr_eq(o, b));
-        let mut rows: Vec<&[Value]> = vec![&self.fields];
-        rows.extend(self.dirty_base.as_deref());
-        rows.extend(self.last_modify.as_deref());
-        if let DirtyBase::Row { base, alt, .. } = &self.is_dirty_base {
-            rows.push(base);
-            rows.extend(alt.as_deref());
-        }
-        rows.into_iter().filter(|r| holds(r)).count()
+        // Without a vector of the rows: every write through an OutStream on a temporary record's Blob counts here.
+        let (base, alt) = match &self.is_dirty_base {
+            DirtyBase::Row { base, alt, .. } => (Some(base.as_slice()), alt.as_deref()),
+            _ => (None, None),
+        };
+        [
+            Some(&self.fields[..]),
+            self.dirty_base.as_deref(),
+            self.last_modify.as_deref(),
+            base,
+            alt,
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|r| holds(r))
+        .count()
     }
 
     /// A copy of the record that is a variable of its own: a by-value parameter (also a temporary one). It reads the
@@ -1528,11 +1540,20 @@ pub struct Instance {
     pub born: Born,
     /// The session watches this single instance's globals (al-vm `single_track.rs`).
     pub single: bool,
-    /// Why what this single instance holds is not the value BC has: every read of one of its globals is refused with this
-    /// reason (al-vm `single_unmeasured.rs`). `None` for every other instance.
-    pub unmeasured: Option<Rc<str>>,
+    /// What a read of one of this single instance's globals does, when the run found its state somewhere no pin covers
+    /// (al-vm `single_unmeasured.rs`). `None` for every other instance.
+    pub unmeasured: Option<SingleMark>,
     /// Counts the instance as live while it exists (`instance_cycles::live`).
     pub live: crate::instance_cycles::LiveCount,
+}
+
+/// The mark of a single instance whose state the run found somewhere no pin covers ([`Instance::unmeasured`]).
+#[derive(Debug, Clone)]
+pub enum SingleMark {
+    /// What it holds is not BC's value: every read of one of its globals is refused with this reason.
+    Refused(Rc<str>),
+    /// What it holds is BC's value by this assumption entry: every read of one of its globals marks it.
+    Assumed(crate::assumptions::Assumption),
 }
 
 thread_local! {

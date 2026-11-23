@@ -41,6 +41,8 @@ pub struct Baseline {
     pub company_unknown: Vec<(String, u32, String)>,
     /// The companies `Database.CopyCompany` made from the session company (`Session::full_copies`). Sorted.
     pub full_copies: Vec<String>,
+    /// The rows whose SystemRowVersion is the Insert's, not BC's (`Session::restamped_rows`).
+    restamped_rows: Vec<crate::state::RestampedRows>,
     /// Names what the baseline holds: baselines with the same origin hold the same data. Each baseline made gets a
     /// number of its own; [`Baseline::with_origin`] gives a copy read from another's bytes that one's.
     origin: u64,
@@ -186,6 +188,12 @@ impl Baseline {
         for company in &self.full_copies {
             put_str(&mut out, company);
         }
+        put_u32(&mut out, self.restamped_rows.len() as u32);
+        for r in &self.restamped_rows {
+            put_u32(&mut out, r.table);
+            put_i64(&mut out, r.from);
+            put_i64(&mut out, r.to);
+        }
         Some(out)
     }
 
@@ -273,6 +281,16 @@ impl Baseline {
         for _ in 0..r.u32()? {
             full_copies.push(r.str()?);
         }
+        let mut restamped_rows = Vec::new();
+        for _ in 0..r.u32()? {
+            let table = r.u32()?;
+            let from = r.i64()?;
+            restamped_rows.push(crate::state::RestampedRows {
+                table,
+                from,
+                to: r.i64()?,
+            });
+        }
         if !r.is_empty() {
             return None;
         }
@@ -289,6 +307,7 @@ impl Baseline {
             company_built,
             company_unknown,
             full_copies,
+            restamped_rows,
             install_rows: None,
             origin: new_origin(),
         })
@@ -380,6 +399,7 @@ impl Session {
                 v
             },
             full_copies: self.full_copies.iter().cloned().collect(),
+            restamped_rows: self.restamped_rows.clone(),
             install_rows: Some(self.baseline_rows.clone()),
             origin: new_origin(),
         }
@@ -444,6 +464,7 @@ impl Session {
             && !start.company_built
             && unknown == start_unknown
             && self.full_copies.iter().eq(start.full_copies.iter())
+            && self.restamped_rows == start.restamped_rows
     }
 
     /// Puts into `b` the numbers the session took since `b` from the sequences `b` holds. Under runner 130450 a test's
@@ -530,6 +551,7 @@ impl Session {
             .map(|(c, t, why)| ((c.clone(), *t), why.clone()))
             .collect();
         self.full_copies = b.full_copies.iter().cloned().collect();
+        self.restamped_rows = b.restamped_rows.clone();
         // A store read back from bytes holds the copies' tables but not which restored rows they read (see
         // `MemStore::note_copy`): a full copy is a copy of the session company.
         let session = self.cx.company.to_string();
@@ -602,6 +624,11 @@ mod tests {
             company_built: true,
             company_unknown: vec![("My Company".into(), 311, "why".into())],
             full_copies: vec!["Copy".into()],
+            restamped_rows: vec![crate::state::RestampedRows {
+                table: 50000,
+                from: 1_000_000_002,
+                to: 1_000_000_004,
+            }],
             install_rows: None,
             origin: new_origin(),
         }
@@ -611,7 +638,7 @@ mod tests {
     fn summary(b: &Baseline) -> String {
         let rows = b.store.export_committed().expect("no backing");
         format!(
-            "{rows:?} {} {} {} {:?} {:?} {:?} {} {:?} {:?} {:?}",
+            "{rows:?} {} {} {} {:?} {:?} {:?} {} {:?} {:?} {:?} {:?}",
             b.next_guid,
             b.next_row_version,
             b.committed_row_version,
@@ -621,7 +648,8 @@ mod tests {
             b.last_stamp,
             b.workspace_installs,
             b.company_unknown,
-            b.full_copies
+            b.full_copies,
+            b.restamped_rows
         )
     }
 
@@ -748,6 +776,53 @@ mod tests {
         );
         let shared = b.freeze().unwrap().thaw(None);
         assert!(ordered_read_refused(&shared.store.as_database()), "the shared baseline");
+    }
+
+    /// The rows `--test-data` backs table `Names` with in company `C`: `Alpha`, `ærø` and `Bravo`.
+    struct NameRows;
+
+    impl al_data::memory::Backing for NameRows {
+        fn company(&self) -> &str {
+            "C"
+        }
+        fn rows(&self, company: &str, object: u32) -> Option<al_data::memory::Rows> {
+            let rows = [("Alpha", "A"), ("ærø", "B"), ("Bravo", "C")].map(|(n, c)| {
+                vec![
+                    al_builtins::value::Value::Text(n.into()),
+                    al_builtins::value::Value::Code(c.into()),
+                ]
+            });
+            (company == "C" && object == 11)
+                .then(|| al_data::memory::Rows::from_rows(&names(), rows.to_vec()).ok())
+                .flatten()
+        }
+    }
+
+    // Review of PR 8517 (issue 8516): install code that writes to a table test data backs copies the backing's rows into
+    // the store (`table_mut`). The captured baseline, the one read back from its bytes and the thawed shared one hold the
+    // same rows, so they give the same answer to an ordered read of a text key holding `æ` (al-data collation_read_tests.rs
+    // `an_ordered_read_of_a_text_key_holding_a_small_ae_refuses`): all three refuse it.
+    #[test]
+    fn a_backed_baseline_refuses_alike_captured_read_back_and_thawed() {
+        use al_data::Store;
+        let backing: std::rc::Rc<dyn al_data::memory::Backing> = std::rc::Rc::new(NameRows);
+        let mut store = al_data::memory::MemStore::default()
+            .as_database()
+            .with_backing(backing.clone());
+        let row = vec![
+            al_builtins::value::Value::Text("Alpha".into()),
+            al_builtins::value::Value::Code("Z".into()),
+        ];
+        store.modify(&al_data::contract::cx("C"), &names(), row).unwrap();
+        store.commit();
+        let mut b = sample();
+        b.store = store;
+        let back = Baseline::from_bytes(&b.to_bytes().unwrap()).unwrap();
+        let read_back = back.store.as_database().with_backing(backing.clone());
+        let thawed = b.freeze().unwrap().thaw(None).store.as_database().with_backing(backing);
+        assert!(ordered_read_refused(&b.store), "the captured baseline");
+        assert!(ordered_read_refused(&read_back), "read back from its bytes");
+        assert!(ordered_read_refused(&thawed), "the shared baseline");
     }
 
     // corpus record/TestSystemFieldStampsContracts.al:Insert_StampsBothFieldsWithTheUtcClock_SystemIdIsSetBeforeOnInsert:

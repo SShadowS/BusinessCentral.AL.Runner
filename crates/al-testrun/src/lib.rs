@@ -35,6 +35,7 @@ pub mod isolation;
 pub mod junit;
 pub mod license;
 mod login;
+mod login_memo;
 mod login_replay;
 mod login_start;
 pub mod observe;

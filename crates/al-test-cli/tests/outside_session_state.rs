@@ -1,8 +1,8 @@
-//! Session state outside `Session`'s fields (al-runner issue 8211, PERF-01 step 2): every `static` of al-vm, al-builtins
-//! and al-data (a thread-local or a process table) is listed, with what the session image does with it, in the module
-//! comment of `crates/al-vm/src/login_image/fields.rs` ("Thread-local and process tables"). A new one fails here until it
-//! is listed: the field table names every `Session` field, and this list names every owner outside them. The `static`s of
-//! al-testrun are listed the same way in `crates/al-testrun/src/login_start/outside.rs` (PERF-01 step 3).
+//! Session state outside `Session`'s fields (al-runner issue 8211): every `static` of al-vm, al-builtins and al-data (a
+//! thread-local or a process table) is listed, with what it is to a session, in the module comment of
+//! `crates/al-vm/src/session_fields.rs` ("Thread-local and process tables"). A new one fails here until it is listed: the
+//! field table names every `Session` field, and this list names every owner outside them. The `static`s of
+//! al-testrun are listed the same way in `crates/al-testrun/src/login_start/outside.rs`.
 //!
 //! A listed name is written `static NAME` in backticks after its file. The scan fails both ways: for a `static` the list
 //! does not name, and for a listed one that is no longer there. Exempt: test code (a `#[cfg(test)]` item; a file whose
@@ -14,7 +14,7 @@ use rust_scan::{blank, is_generated, matching_brace};
 use std::collections::BTreeSet;
 
 const CRATES: &[&str] = &["al-vm", "al-builtins", "al-data"];
-const LIST: &str = "crates/al-vm/src/login_image/fields.rs";
+const LIST: &str = "crates/al-vm/src/session_fields.rs";
 const TESTRUN_CRATES: &[&str] = &["al-testrun"];
 const TESTRUN_LIST: &str = "crates/al-testrun/src/login_start/outside.rs";
 
@@ -175,7 +175,7 @@ fn assert_every_static_is_listed(crates: &[&str], list_file: &str, what: &str) {
         .collect();
     assert!(
         missing.is_empty(),
-        "{what} that {list_file} does not list (say what the image does with it):\n{}",
+        "{what} that {list_file} does not list (say what it is to a session):\n{}",
         missing.join("\n")
     );
     let stale: Vec<String> = (named.difference(&found))
@@ -193,7 +193,7 @@ fn every_owner_of_session_state_outside_session_is_listed() {
     assert_every_static_is_listed(CRATES, LIST, "session state outside `Session`");
 }
 
-// PERF-01 step 3 (design section 3.3): al-testrun keeps session state outside `Session` too (the events hooks, the lane's
+// Al-testrun keeps session state outside `Session` too (the events hooks, the lane's
 // single instances, the carry, the login memo); each is listed with what a login start does with it.
 #[test]
 fn every_owner_of_session_state_in_al_testrun_is_listed() {
@@ -204,7 +204,7 @@ fn every_owner_of_session_state_in_al_testrun_is_listed() {
     );
 }
 
-// The forms the scan must catch (review of PERF-01 step 2, round 2, L2), each a planted source.
+// The forms the scan must catch, each a planted source.
 #[test]
 fn the_scan_catches_every_form_of_a_static() {
     let planted = [
@@ -234,7 +234,7 @@ fn the_scan_catches_every_form_of_a_static() {
 }
 
 // A file named `..._tests.rs` is test code only when its module is declared under `#[cfg(test)]` (or it says
-// `#![cfg(test)]` itself); a module of that name declared without it is scanned. Review round 2, L2.
+// `#![cfg(test)]` itself); a module of that name declared without it is scanned.
 #[test]
 fn a_tests_file_is_exempt_only_when_its_module_is_test_code() {
     let crate_files = [
@@ -263,7 +263,7 @@ fn a_tests_file_is_exempt_only_when_its_module_is_test_code() {
 // A listed name is `static NAME` in backticks; the list's other backticked text (a function, a test) is not a name.
 #[test]
 fn the_list_names_statics_by_the_word_static() {
-    let list = "- `crates/a.rs` `static ONE`, `static two`, `static $n`: imaged (test `a_test`, `Session::f`).";
+    let list = "- `crates/a.rs` `static ONE`, `static two`, `static $n`: session (test `a_test`, `Session::f`).";
     let names: Vec<(String, String)> = listed(list).into_iter().collect();
     assert_eq!(
         names,

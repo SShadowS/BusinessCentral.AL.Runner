@@ -1,6 +1,6 @@
 //! The parts of a key's `database` and `session` digests, each with a SHA-256 digest of its own, so the keys line can say
-//! which parts a new key differs in from its nearest earlier key, by name only (PERF-01 step 3: a DO run's new keys
-//! differed in `session`, and the line did not say which state). The parts:
+//! which parts a new key differs in from its nearest earlier key, by name only (issue 8211: a key field alone, such as
+//! `session`, does not say which state moved). The parts:
 //! - per company and table object, the committed rows of that table: named `company N/table T`, where N is the company's
 //!   place among the companies of the two keys (a company name can be a customer's, so it is never shown);
 //! - per state line name, the session state lines of that name (`Session::state_lines`: every line starts with a name the

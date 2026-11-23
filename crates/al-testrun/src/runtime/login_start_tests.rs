@@ -722,7 +722,7 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
     let mut marked = target(&engine);
     marked.mark_numbers_unmeasured(std::rc::Rc::from("marked"));
     let before = marked.state_lines();
-    marked.thaw_login_image(&start.image);
+    marked.thaw_login_image(&start.image).expect("a thaw target takes the start");
     let kept = |s: &al_vm::StateLines| {
         s.lines
             .iter()

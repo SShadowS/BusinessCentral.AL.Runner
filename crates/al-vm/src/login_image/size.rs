@@ -1,4 +1,4 @@
-//! How much a [`LoginImage`] holds (design section 5): the rows it keeps, and an estimate of its state and graph.
+//! How much a [`LoginImage`] holds: the rows it keeps, and an estimate of its state and graph.
 //!
 //! The row number is the row delta's own (`RowDelta::size`, its encoded rows). The state number is an estimate of
 //! memory: `size_of` of each node and of each value, plus the heap behind its strings, vectors, Blob buffers and a

@@ -1,4 +1,4 @@
-//! The SingleInstance object graph of a session as an arena with no `Rc` (design section 2): every handle a global
+//! The SingleInstance object graph of a session as an arena with no `Rc`: every handle a global
 //! reaches (an instance, an array, a List, a Dictionary, a record, a table globals set, a library cell, a Blob buffer, a
 //! temporary table, a fetched row, a query, a DotNet object the runtime serves) is one node, numbered by first sight; a value is plain or a node number. So
 //! two places that hold one handle hold one node, a cycle ends at a node already numbered, and the arena is `Send + Sync`
@@ -86,8 +86,8 @@ pub(crate) struct InstanceNode {
     pub(crate) single: bool,
 }
 
-/// A .NET object the runtime serves itself (al-builtins `DotNetKind::Internal`). v1 takes the ones measured on a real
-/// login only, with an empty state: `ALConfigSettings.Instance` and a `GraphQuery` (`freeze.rs` `MEASURED_DOTNET`).
+/// A .NET object the runtime serves itself (al-builtins `DotNetKind::Internal`). The image takes the ones measured on a
+/// real login only, with an empty state: `ALConfigSettings.Instance` and a `GraphQuery` (`freeze.rs` `MEASURED_DOTNET`).
 #[derive(Debug)]
 pub(crate) enum DotNetNode {
     Internal { type_name: String, state: Vec<Frozen> },

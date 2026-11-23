@@ -1,4 +1,4 @@
-//! A record buffer (al-builtins `RecordState`) in the arena, field by field (design section 1.3). The state is read
+//! A record buffer (al-builtins `RecordState`) in the arena, field by field. The state is read
 //! field by field, never cloned: `Clone` blanks `own_read`, `probed_source`, `globals` and the dirty base.
 
 use super::NotImaged;
@@ -53,6 +53,7 @@ pub(crate) struct RecordNode {
     globals: Option<NodeId>,
     unpinned_buffer: Option<&'static str>,
     view_assumption: Option<al_builtins::assumptions::Assumption>,
+    auto_calc_dropped: bool,
 }
 
 impl RecordNode {
@@ -187,6 +188,7 @@ impl Walker<'_> {
             view_assumption,
             run_page_link,
             rolled_read,
+            auto_calc_dropped,
         } = r;
         let refuse = |what: &str| NotImaged::Value {
             path: path.to_string(),
@@ -269,6 +271,7 @@ impl Walker<'_> {
             globals,
             unpinned_buffer: *unpinned_buffer,
             view_assumption: *view_assumption,
+            auto_calc_dropped: *auto_calc_dropped,
         })
     }
 
@@ -398,6 +401,7 @@ impl Maker<'_> {
             globals,
             unpinned_buffer,
             view_assumption,
+            auto_calc_dropped,
         } = n;
         let temp_id = temp.map(|t| self.temp_id(t));
         let rows = |v: &Option<Vec<Frozen>>| v.as_ref().map(|v| self.values(v));
@@ -407,7 +411,8 @@ impl Maker<'_> {
             company: company.clone(),
             change_company_called: *change_company_called,
             crm: false,
-            fields: self.values(fields),
+            // A buffer that shared a table's initial values is copied on its first write: an owned one reads the same.
+            fields: self.values(fields).into(),
             filters: filters.iter().map(PlainFilter::filter).collect(),
             filter_group: *filter_group,
             marks: marks.iter().map(|m| self.values(m)).collect(),
@@ -455,6 +460,7 @@ impl Maker<'_> {
             view_assumption: *view_assumption,
             run_page_link: None,
             rolled_read: Default::default(),
+            auto_calc_dropped: *auto_calc_dropped,
             temp_id,
         }
     }

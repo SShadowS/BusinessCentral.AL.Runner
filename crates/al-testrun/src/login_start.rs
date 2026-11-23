@@ -57,6 +57,8 @@ pub(crate) enum NotTaken {
     Target(&'static str),
     /// The store the session starts from has another shape than the start's (`LoginImage::base_shape`).
     BaseShape,
+    /// The thaw refused the session (`Session::thaw_login_image`).
+    NotThawed(al_vm::NotThawed),
 }
 
 impl NotTaken {
@@ -68,6 +70,7 @@ impl NotTaken {
             NotTaken::MovedIn => "single instances moved in".into(),
             NotTaken::Target(field) => format!("target: {field}"),
             NotTaken::BaseShape => "base shape".into(),
+            NotTaken::NotThawed(why) => format!("not thawed: {}", why.reason()),
         }
     }
 }
@@ -272,7 +275,11 @@ pub(crate) fn replay(
         starts.not_taken(why);
         return None;
     }
-    session.thaw_login_image(&start.image);
+    // The gate asked what the thaw asks; a thaw that still refuses leaves the session as it was, and it runs its login.
+    if let Err(why) = session.thaw_login_image(&start.image) {
+        starts.not_taken(NotTaken::NotThawed(why));
+        return None;
+    }
     starts.state().replayed += 1;
     #[cfg(test)]
     if DROP_HITS.with(std::cell::Cell::get) {

@@ -1,14 +1,19 @@
-//! The session image (al-runner issue 8211, PERF-01 step 2): what a test session holds after the raised login, as owned
+//! The session image (al-runner issue 8211): what a test session holds after the raised login, as owned
 //! data any thread may keep ([`LoginImage`], [`Session::login_image`]), and a new session made to hold it
 //! ([`Session::thaw_login_image`]). al-testrun `login_start.rs` keeps an image per login key and thaws it into a later
 //! session of the key in place of its login (PERF-01 step 3); `login_replay.rs` compares thaws with real logins, the
 //! differential test.
 //!
-//! Every field of `Session` is in one class of the table in `fields.rs`. The image holds the `plain` fields by value, the
-//! sub-states and counters of `session_parts.rs`, the committed rows the login wrote as a `RowDelta` over the store it
-//! started from ([`LoginBase`]: rows go through their bytes, so no Blob buffer is shared with the session that goes on to
-//! run its tests), the shape of that store ([`BaseShape`]), and the SingleInstance object graph as an arena (`arena.rs`).
-//! A field of the `refuse` or `rest` class that does not hold a new session's value means no image.
+//! Every field of `Session` is in one class of the session field table (`session_fields.rs`). The image holds the `plain`
+//! fields by value (`fields.rs`, made from the table), the sub-states and counters of `session_parts.rs`, the committed
+//! rows the login wrote as a `RowDelta` over the store it started from ([`LoginBase`]: rows go through their bytes, so no
+//! Blob buffer is shared with the session that goes on to run its tests), the shape of that store ([`BaseShape`]), and
+//! the SingleInstance object graph as an arena (`arena.rs`). A field of the `refuse` or `rest` class that does not hold a
+//! new session's value means no image (`Session::image_refused_field`, `Session::at_rest_why`).
+//!
+//! Of the session state the table lists outside `Session`'s fields, what is the session's own is imaged: the emptied
+//! marks of the store (in the `RowDelta`, test `a_table_the_login_emptied_stays_emptied_in_the_twin`) and an ErrorInfo's
+//! call stack (`ErrorInfoNode::callstack`, test `an_error_infos_call_stack_follows_it_into_the_twin`).
 //!
 //! The thaw's target is a session on the image's engine with the run's session flags applied, that holds the store the
 //! login started from (the login key proves the rows equal; [`Session::base_shape`] what the key's digest does not see)
@@ -64,7 +69,7 @@ const _: fn() = || {
 pub enum NotImaged {
     /// A `Session` field (or `tx.x`, `events.x`) does not hold a new session's value.
     Field(&'static str),
-    /// Code runs or a call left something behind: the first field of `Session::at_rest`'s rule that does not hold
+    /// Code runs or a call left something behind: the first field of the `rest` class that does not hold
     /// (`Session::at_rest_why`).
     NotAtRest(&'static str),
     /// A value with no exact form: where (ids and indexes only, never a value) and what.
@@ -84,6 +89,27 @@ impl NotImaged {
             NotImaged::Value { what, .. } => what.clone(),
             NotImaged::HeldOutside { .. } => "a handle held outside the image".to_string(),
             NotImaged::Rows(why) => format!("rows: {why}"),
+        }
+    }
+}
+
+/// Why an image is not thawn into a session ([`Session::thaw_login_image`]): the session is left as it was, so its caller
+/// runs the login in it instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotThawed {
+    /// The image was taken on another engine (`Engine::uid`).
+    Engine,
+    /// The session is not a thaw target: the first field of `Session::at_rest_why` or of
+    /// `Session::image_refused_field` that does not hold, or a store watch (`Session::thaw_target_why`).
+    Target(&'static str),
+}
+
+impl NotThawed {
+    /// One line for the report, with no value in it: the reason that is counted.
+    pub fn reason(&self) -> String {
+        match self {
+            NotThawed::Engine => "an image of another engine".to_string(),
+            NotThawed::Target(field) => format!("the target is not a new session: {field}"),
         }
     }
 }
@@ -228,7 +254,7 @@ impl Session {
     /// the thaw's writes). `None`: it can. The thaw's own target rule.
     pub fn thaw_target_why(&self) -> Option<&'static str> {
         (self.at_rest_why())
-            .or_else(|| self.refused_field())
+            .or_else(|| self.image_refused_field())
             .or_else(|| self.store.watching().then_some("store watch"))
     }
 
@@ -247,7 +273,7 @@ impl Session {
         if let Some(field) = self.at_rest_why() {
             return Err(NotImaged::NotAtRest(field));
         }
-        if let Some(field) = self.refused_field() {
+        if let Some(field) = self.image_refused_field() {
             return Err(NotImaged::Field(field));
         }
         if self.store.has_uncommitted() {
@@ -276,13 +302,16 @@ impl Session {
     /// Makes this session hold what the image holds, in place of running its login. `self`: a session of the image's
     /// engine with the run's session flags applied, that [`Session::thaw_target_why`] accepts and whose store holds what
     /// the login started from (equal rows by the login key, an equal [`Session::base_shape`]): the rows the login wrote go
-    /// on top of its own store, and every row it did not write stays as the target has it.
-    pub fn thaw_login_image(&mut self, image: &LoginImage) {
-        assert_eq!(
-            self.engine.uid, image.engine,
-            "an image is thawn on the engine it was taken on"
-        );
-        assert_eq!(self.thaw_target_why(), None, "the thaw's target is at rest and as new");
+    /// on top of its own store, and every row it did not write stays as the target has it. `Err`: the image is of another
+    /// engine, or `self` is not a thaw target; nothing of `self` is changed then, so its caller runs the login in it
+    /// instead.
+    pub fn thaw_login_image(&mut self, image: &LoginImage) -> Result<(), NotThawed> {
+        if self.engine.uid != image.engine {
+            return Err(NotThawed::Engine);
+        }
+        if let Some(field) = self.thaw_target_why() {
+            return Err(NotThawed::Target(field));
+        }
         // Every table the delta changes row by row is one the start's base held, and the target's base has its shape.
         let rows = (self.data_now().with_row_delta(&image.rows))
             .expect("the target holds every table the login changed row by row (the gate compares the base shapes)");
@@ -291,6 +320,7 @@ impl Session {
         image.plain.give(self);
         image.parts.give(self);
         thaw::thaw(self, image);
+        Ok(())
     }
 }
 
