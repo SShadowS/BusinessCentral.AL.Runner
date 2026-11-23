@@ -8,7 +8,7 @@ use super::plain::PlainFilter;
 use super::thaw::Maker;
 use al_builtins::value::{
     Buffer, DirtyBase, FetchedRow, FieldSet, LoadState, OwnRead, OwnReadAt, ProbedSource, RecordState, RowOrigin,
-    TableGlobals, Value,
+    TableGlobals, Value, VersionEntry, VersionSource,
 };
 
 /// What a record buffer holds. `crm` (`true` means no image) and `run_page_link` (a page's state: `Some` means no image)
@@ -48,6 +48,7 @@ pub(crate) struct RecordNode {
     last_modify: Option<Vec<Frozen>>,
     failed_insert: Option<i64>,
     row_origin: Option<RowOrigin>,
+    version_entry: Option<VersionNode>,
     own_read: Option<OwnReadNode>,
     probed_source: (u8, u64),
     /// The node of its table globals set (`None`: unset).
@@ -83,6 +84,7 @@ impl RecordNode {
             + opt(&self.position)
             + opt(&self.dirty_base)
             + opt(&self.last_modify)
+            + self.version_entry.as_ref().map_or(0, |e| all(&e.key))
             + self.auto_calc.len() * size_of::<usize>()
             + self.adhoc.as_ref().map_or(0, |(_, v)| v.len() * size_of::<usize>())
             + dirty
@@ -122,6 +124,26 @@ struct BufferNode {
     missing_loaded: bool,
     fetched: Option<NodeId>,
     init: bool,
+}
+
+/// `VersionSource` (al-vm `version_entry.rs`) with its key frozen. Its counts are the session's: `commits` and the
+/// writes (`TxState::write_counts`) travel with the image, the test methods started are a new session's (0), and the
+/// rollbacks are imaged only at 0, a new session's count, which the thaw target keeps.
+#[derive(Debug)]
+struct VersionNode {
+    version: i64,
+    key: Vec<Frozen>,
+    how: al_builtins::value::VersionHow,
+    via: al_builtins::value::VersionVia,
+    table_written: al_builtins::value::TableWritten,
+    company: Option<String>,
+    tests: u32,
+    commits: u64,
+    rollbacks: u64,
+    writes: [u64; 3],
+    log: usize,
+    failed_inserts: u32,
+    deleted: bool,
 }
 
 /// `OwnReadAt`, with the store's change count as the fact the render compares: whether it is the record's store's count
@@ -207,10 +229,9 @@ impl Walker<'_> {
         if rolled_read.0.is_some() {
             return Err(refuse("Record holding its own read of a rolled Time"));
         }
-        // The source of the buffer's row version (al-vm `version_entry.rs`) counts the session's tests, Commits, rollbacks
-        // and writes then: not imaged.
-        if version_entry.0.is_some() {
-            return Err(refuse("Record holding the source of its row version"));
+        // The source of the buffer's row version counts the session's rollbacks then, which the thaw does not carry.
+        if version_entry.0.is_some() && self.session.rollbacks != 0 {
+            return Err(refuse("Record holding the source of its row version after a rollback"));
         }
         let temp = match temp_id {
             Some(t) if t.is_by_value_copy() => return Err(refuse("temporary Record of a by-value copy's table")),
@@ -242,6 +263,10 @@ impl Walker<'_> {
         let load = self.load(load, path)?;
         let own_read = match &own_read.0 {
             Some(m) => Some(self.own_read(m, temp_id.as_ref().map(|t| t.id()), path)?),
+            None => None,
+        };
+        let version_entry = match &version_entry.0 {
+            Some(e) => Some(self.version_source(e, path)?),
             None => None,
         };
         let globals =
@@ -279,6 +304,7 @@ impl Walker<'_> {
             last_modify,
             failed_insert: *failed_insert,
             row_origin: *row_origin,
+            version_entry,
             own_read,
             probed_source: (probed_source.0, probed_source.1),
             globals,
@@ -342,6 +368,40 @@ impl Walker<'_> {
             request: request.clone(),
             buffer,
             partial: *partial,
+        })
+    }
+
+    /// The source of a buffer's row version, its key frozen.
+    fn version_source(&mut self, e: &VersionSource, path: &str) -> Result<VersionNode, NotImaged> {
+        let VersionSource {
+            version,
+            key,
+            how,
+            via,
+            table_written,
+            company,
+            tests,
+            commits,
+            rollbacks,
+            writes,
+            log,
+            failed_inserts,
+            deleted,
+        } = e;
+        Ok(VersionNode {
+            version: *version,
+            key: self.field_values(key, &format!("{path} row version key"))?,
+            how: *how,
+            via: *via,
+            table_written: *table_written,
+            company: company.clone(),
+            tests: *tests,
+            commits: *commits,
+            rollbacks: *rollbacks,
+            writes: *writes,
+            log: *log,
+            failed_inserts: *failed_inserts,
+            deleted: *deleted,
         })
     }
 
@@ -410,6 +470,7 @@ impl Maker<'_> {
             last_modify,
             failed_insert,
             row_origin,
+            version_entry,
             own_read,
             probed_source,
             globals,
@@ -468,7 +529,7 @@ impl Maker<'_> {
             last_modify: rows(last_modify),
             failed_insert: *failed_insert,
             row_origin: *row_origin,
-            version_entry: al_builtins::value::VersionEntry(None),
+            version_entry: VersionEntry(version_entry.as_ref().map(|e| self.version_source(e))),
             own_read: OwnRead(own_read.as_ref().map(|m| self.own_read(m, temp_id.as_ref()))),
             probed_source: ProbedSource(probed_source.0, probed_source.1),
             globals: globals.map_or_else(TableGlobals::default, |g| self.globals(g).share()),
@@ -495,6 +556,24 @@ impl Maker<'_> {
                 init: b.init,
             }),
             partial: l.partial,
+        }
+    }
+
+    fn version_source(&self, e: &VersionNode) -> VersionSource {
+        VersionSource {
+            version: e.version,
+            key: self.values(&e.key),
+            how: e.how,
+            via: e.via,
+            table_written: e.table_written,
+            company: e.company.clone(),
+            tests: e.tests,
+            commits: e.commits,
+            rollbacks: e.rollbacks,
+            writes: e.writes,
+            log: e.log,
+            failed_inserts: e.failed_inserts,
+            deleted: e.deleted,
         }
     }
 
