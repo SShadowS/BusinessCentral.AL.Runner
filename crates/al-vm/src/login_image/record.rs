@@ -183,6 +183,7 @@ impl Walker<'_> {
             last_modify,
             failed_insert,
             row_origin,
+            version_entry,
             own_read,
             probed_source,
             globals,
@@ -205,6 +206,11 @@ impl Walker<'_> {
         // The variable's own read of a row holding a rolled Time (al-vm `records/time_rollover.rs`) is not imaged.
         if rolled_read.0.is_some() {
             return Err(refuse("Record holding its own read of a rolled Time"));
+        }
+        // The source of the buffer's row version (al-vm `version_entry.rs`) counts the session's tests, Commits, rollbacks
+        // and writes then: not imaged.
+        if version_entry.0.is_some() {
+            return Err(refuse("Record holding the source of its row version"));
         }
         let temp = match temp_id {
             Some(t) if t.is_by_value_copy() => return Err(refuse("temporary Record of a by-value copy's table")),
@@ -462,6 +468,7 @@ impl Maker<'_> {
             last_modify: rows(last_modify),
             failed_insert: *failed_insert,
             row_origin: *row_origin,
+            version_entry: al_builtins::value::VersionEntry(None),
             own_read: OwnRead(own_read.as_ref().map(|m| self.own_read(m, temp_id.as_ref()))),
             probed_source: ProbedSource(probed_source.0, probed_source.1),
             globals: globals.map_or_else(TableGlobals::default, |g| self.globals(g).share()),

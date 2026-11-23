@@ -1135,6 +1135,7 @@ impl Session {
                 // (the stale-buffer shapes and the rest that read `lock_tx`) is pinned for Record.LockTable only.
                 let started = !locked && self.tx.open.locks.lock_tx;
                 self.lock_through_recordref(locked, "a RecordRef.LockTable");
+                self.note_recordref_lock(&rec, &t);
                 if started {
                     self.tx.open.locks.recref_lock_tx = true;
                 }
@@ -2206,6 +2207,8 @@ fn record_method(method: &str) -> RecordOp {
 /// n=2;rr.get own O3;rr.get O1 O1`). A by-value copy of that Rec put into a Variant some other way is not pinned.
 fn variant_record_into_ref(lib: &Lib, src: &Rc<RefCell<RecordState>>) -> Result<Value, Signal> {
     let mut copy = gettable_record_copy(src)?;
+    // Through a Variant the row version's entry is not measured (`check_failed_insert_stale`).
+    copy.version_entry = copy.version_entry.carried(al_builtins::value::VersionVia::Cloned);
     match copy.unpinned_buffer {
         Some(crate::records::RUN_PAGE_LINK_VARIANT) => copy.unpinned_buffer = None,
         Some(w @ (crate::records::RUN_PAGE_LINK_COPY | crate::records::RUN_PAGE_LINK_OPEN_COPY)) => {
@@ -2226,7 +2229,14 @@ pub(crate) fn gettable_record_copy(src: &Rc<RefCell<RecordState>>) -> Result<Rec
         return unsupported(format!("RecordRef.GetTable of a record: {why}"));
     }
     crate::Session::by_value_view_handed(src, || "RecordRef.GetTable of a record".into())?;
-    Ok(al_builtins::record_into_recordref::recordref_copy(&src.borrow()))
+    let mut copy = al_builtins::record_into_recordref::recordref_copy(&src.borrow());
+    // The ref takes the version as the record had it (corpus PR 1523, record/crud/TestRecordFailedInsertMovedKey.al:907
+    // R10).
+    copy.version_entry = src
+        .borrow()
+        .version_entry
+        .carried(al_builtins::value::VersionVia::GetTable);
+    Ok(copy)
 }
 
 /// The copy `RecordRef.GetTable` takes holds its own buffer of each Blob the record read from the database without

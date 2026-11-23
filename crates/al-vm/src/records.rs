@@ -1864,6 +1864,7 @@ impl Session {
         let passes = self.row_passes(rec, &t, &row)?;
         let version = t.fields.iter().position(|f| f.id == 2_000_000_005).map(|i| &row[i]);
         let origin = self.load_origin(version, [via_get, via_sysid, via_find]);
+        let entry = self.load_version_entry(&t, rec, version, [via_get, via_sysid, via_find], &pk);
         let own_read = self.own_read_after_load(&t, rec, &row, via_get && !via_sysid && !via_find && passes);
         let temporary = rec.borrow().temporary;
         if via_get && !temporary && self.tx.open.locked_tables.contains(&t.object) {
@@ -1881,6 +1882,7 @@ impl Session {
             r.position = passes.then_some(pk);
             r.fields = row.into();
             r.row_origin = origin;
+            r.version_entry = entry;
             r.own_read = own_read;
         }
         self.note_replayed_load(rec);

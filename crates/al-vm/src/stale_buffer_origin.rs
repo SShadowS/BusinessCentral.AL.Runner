@@ -10,8 +10,28 @@ use al_data::TableDef;
 use crate::records::same_key;
 
 type Pk = [Value];
+type Rec = std::rc::Rc<std::cell::RefCell<al_builtins::value::RecordState>>;
+
+/// The origin of the version the variable's own Modify gave a buffer whose origin `o` was its own Insert or Get in the
+/// same transaction: its own write (record/crud/SbStaleOwnModify.al:132-264, :410-448).
+pub(crate) fn own_modify_origin(o: RowOrigin, now: i64) -> RowOrigin {
+    RowOrigin {
+        own_write: true,
+        version: now,
+        read_in_write_tx: false,
+        own_modified: true,
+        ..o
+    }
+}
 
 impl Session {
+    /// Gives `rec` the origin of the version `v` the variable's own Insert into `t` gave it, and its version entry
+    /// (`version_entry.rs`).
+    pub(crate) fn set_own_insert_origin(&self, t: &TableDef, rec: &Rec, v: i64) {
+        rec.borrow_mut().row_origin = Some(RowOrigin::new(true, v, self.commits));
+        self.stamp_own_write(t, rec, al_builtins::value::VersionHow::OwnInsert, None);
+    }
+
     /// The origin of a row version a load just read. `how` is [Get, GetBySystemId, a Find].
     /// A version written in the open transaction (above the last Commit's) read by Get, GetBySystemId or a Find follows the
     /// rule of the buffer that wrote it (record/crud/SbStaleOwnModify.al:467-640; record/crud/StaleRuleMatrix.al
