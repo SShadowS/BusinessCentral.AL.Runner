@@ -53,6 +53,11 @@ pub(crate) enum NotTaken {
     Perturbed,
     /// Single instances of the codeunit before were moved in (the strict-order lane).
     MovedIn,
+    /// The wall clock (`ALRUNNER_REAL_CLOCK`): a login that stamps the time it reads would hand a later session an
+    /// earlier time, and no key holds the clock.
+    RealClock,
+    /// A real files directory (`--files-dir`): a login that reads a file another session wrote reads what no key holds.
+    RealFiles,
     /// The session is not a thaw target (`Session::thaw_target_why`).
     Target(&'static str),
     /// The store the session starts from has another shape than the start's (`LoginImage::base_shape`).
@@ -68,6 +73,8 @@ impl NotTaken {
             NotTaken::NotesCode => "the run notes the code it runs".into(),
             NotTaken::Perturbed => "a stability perturbation or a set clock start".into(),
             NotTaken::MovedIn => "single instances moved in".into(),
+            NotTaken::RealClock => "the real clock (ALRUNNER_REAL_CLOCK)".into(),
+            NotTaken::RealFiles => "a real files directory (--files-dir)".into(),
             NotTaken::Target(field) => format!("target: {field}"),
             NotTaken::BaseShape => "base shape".into(),
             NotTaken::NotThawed(why) => format!("not thawed: {}", why.reason()),
@@ -218,15 +225,45 @@ pub(crate) fn phases(engine: &Engine) -> crate::runtime::LoginReplay {
     }
 }
 
-/// Why a run keeps every session from taking or recording a start: it notes the code it runs (`notes_code`), it is
-/// perturbed or has a set clock start (`perturbed`), or single instances were moved in (`moved_in`).
-pub(crate) fn run_gate(notes_code: bool, perturbed: bool, moved_in: bool) -> Option<NotTaken> {
-    if notes_code {
+/// What `run_codeunit_inner` knows of a run that keeps every session of it from taking or recording a start
+/// ([`run_gate`]).
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct RunFacts {
+    /// The run notes the code it runs (`--explain` or an observer, coverage, the impact trace, the profiler).
+    pub notes_code: bool,
+    /// A stability perturbation or a set clock start.
+    pub perturbed: bool,
+    /// Single instances of the codeunit before were moved in.
+    pub moved_in: bool,
+    /// The system host reads the wall clock as it goes (`ALRUNNER_REAL_CLOCK`, `host::real_clock`).
+    pub real_clock: bool,
+    /// `File` reads and writes a real directory (`--files-dir`, `host::uses_real_files`).
+    pub real_files: bool,
+}
+
+impl RunFacts {
+    /// The process settings of a run, besides what the caller knows of it.
+    pub(crate) fn with_host(self) -> RunFacts {
+        RunFacts {
+            real_clock: crate::host::real_clock(),
+            real_files: crate::host::uses_real_files(),
+            ..self
+        }
+    }
+}
+
+/// Why a run keeps every session from taking or recording a start ([`RunFacts`]), in this order.
+pub(crate) fn run_gate(run: RunFacts) -> Option<NotTaken> {
+    if run.notes_code {
         Some(NotTaken::NotesCode)
-    } else if perturbed {
+    } else if run.perturbed {
         Some(NotTaken::Perturbed)
-    } else if moved_in {
+    } else if run.moved_in {
         Some(NotTaken::MovedIn)
+    } else if run.real_clock {
+        Some(NotTaken::RealClock)
+    } else if run.real_files {
+        Some(NotTaken::RealFiles)
     } else {
         None
     }
@@ -241,19 +278,12 @@ pub(crate) fn target_gate(target: Option<&'static str>, shape: &BaseShape, start
     }
 }
 
-/// Why `session` does not take the start `start` of its key; `None`: it takes it. `notes_code`, `perturbed`, `moved_in`:
-/// what `run_codeunit_inner` knows of the run ([`run_gate`]). The gate as one answer, for tests: [`replay`] asks the same
-/// two in this order, the run first (it counts a gated session whether its key has a start or not).
+/// Why `session` does not take the start `start` of its key; `None`: it takes it. `run`: what `run_codeunit_inner` knows
+/// of the run ([`run_gate`]). The gate as one answer, for tests: [`replay`] asks the same two in this order, the run first
+/// (it counts a gated session whether its key has a start or not).
 #[cfg(test)]
-pub(crate) fn why_not(
-    session: &Session,
-    start: &Start,
-    notes_code: bool,
-    perturbed: bool,
-    moved_in: bool,
-) -> Option<NotTaken> {
-    run_gate(notes_code, perturbed, moved_in)
-        .or_else(|| target_gate(session.thaw_target_why(), &session.base_shape(), start))
+pub(crate) fn why_not(session: &Session, start: &Start, run: RunFacts) -> Option<NotTaken> {
+    run_gate(run).or_else(|| target_gate(session.thaw_target_why(), &session.base_shape(), start))
 }
 
 /// The login of `session`, whose key is `key`, replayed from the key's start in place of running it: the open's writes and

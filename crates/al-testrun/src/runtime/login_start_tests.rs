@@ -396,10 +396,7 @@ fn target(engine: &Arc<Engine>) -> al_vm::Session {
 fn a_session_with_nothing_against_it_takes_the_start() {
     let (engine, _) = compiled();
     let start = plain_start(&engine);
-    assert_eq!(
-        login_start::why_not(&target(&engine), &start, false, false, false),
-        None
-    );
+    assert_eq!(login_start::why_not(&target(&engine), &start, Default::default()), None);
 }
 
 // One reason per row of design 3.4; each is counted in the report. RED at A1: always `NoStart`.
@@ -407,10 +404,52 @@ fn a_session_with_nothing_against_it_takes_the_start() {
 fn the_gate_names_a_run_that_notes_code_a_perturbation_and_moved_in_singles() {
     let (engine, _) = compiled();
     let start = plain_start(&engine);
-    let why = |notes, perturbed, moved| login_start::why_not(&target(&engine), &start, notes, perturbed, moved);
+    let why = |notes_code, perturbed, moved_in| {
+        let run = login_start::RunFacts {
+            notes_code,
+            perturbed,
+            moved_in,
+            ..Default::default()
+        };
+        login_start::why_not(&target(&engine), &start, run)
+    };
     assert_eq!(why(true, false, false), Some(NotTaken::NotesCode));
     assert_eq!(why(false, true, false), Some(NotTaken::Perturbed));
     assert_eq!(why(false, false, true), Some(NotTaken::MovedIn));
+}
+
+// The wall clock is an input no key holds, as for the install baseline cache (`runtime/baseline_key.rs`): a kept serve
+// daemon under `ALRUNNER_REAL_CLOCK` would otherwise hand a later session the time an earlier login stamped into a row.
+// Such a run neither takes nor records a start, with its own reason (issue 8211).
+#[test]
+fn the_gate_names_the_real_clock() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let run = login_start::RunFacts {
+        real_clock: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        login_start::why_not(&target(&engine), &start, run),
+        Some(NotTaken::RealClock)
+    );
+}
+
+// A real files directory (`--files-dir`) is an input no key holds, as for the install baseline cache: a login that reads a
+// file an earlier test wrote would read what no key holds. Such a run neither takes nor records a start, with its own
+// reason (issue 8211).
+#[test]
+fn the_gate_names_a_real_files_directory() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let run = login_start::RunFacts {
+        real_files: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        login_start::why_not(&target(&engine), &start, run),
+        Some(NotTaken::RealFiles)
+    );
 }
 
 #[test]
@@ -420,13 +459,13 @@ fn the_gate_names_what_keeps_the_session_from_being_a_target() {
     let mut covering = target(&engine);
     covering.enable_coverage();
     assert_eq!(
-        login_start::why_not(&covering, &start, false, false, false),
+        login_start::why_not(&covering, &start, Default::default()),
         Some(NotTaken::Target("coverage"))
     );
     let mut tracing = target(&engine);
     tracing.trace_faults(true);
     assert_eq!(
-        login_start::why_not(&tracing, &start, false, false, false),
+        login_start::why_not(&tracing, &start, Default::default()),
         Some(NotTaken::Target("fault_trace"))
     );
 }
@@ -455,7 +494,7 @@ fn the_gate_refuses_a_target_whose_base_has_another_shape() {
     other.commit_transaction();
     assert_ne!(other.base_shape(), *start.image.base_shape(), "the shapes differ");
     assert_eq!(
-        login_start::why_not(&other, &start, false, false, false),
+        login_start::why_not(&other, &start, Default::default()),
         Some(NotTaken::BaseShape)
     );
 }
