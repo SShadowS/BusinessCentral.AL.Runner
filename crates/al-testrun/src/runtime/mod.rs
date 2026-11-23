@@ -1262,6 +1262,7 @@ mod lane_starts;
 mod login_explain_tests;
 #[cfg(test)]
 mod login_image_tests;
+#[cfg(test)]
 mod login_memo_tests;
 #[cfg(test)]
 mod login_replay_tests;

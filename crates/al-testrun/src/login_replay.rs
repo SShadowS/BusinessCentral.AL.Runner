@@ -122,6 +122,26 @@ impl Key {
     }
 }
 
+/// Who offers the rows of the tables no write reached, as a field of [`Key`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum BackingKey {
+    /// `MemStore::backing_identity`: two backings with the same identity offer the same rows (`Backing::identity`).
+    Known((u64, u64)),
+    /// The backing does not say who it is (`Backing::identity` `None`: not known), so it may offer other rows than
+    /// another such backing: a number no other session gets, so that the key matches no other key.
+    Unknown(u64),
+}
+
+impl BackingKey {
+    fn of(identity: Option<(u64, u64)>) -> BackingKey {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        identity.map_or_else(
+            || BackingKey::Unknown(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
+            BackingKey::Known,
+        )
+    }
+}
+
 impl Key {
     /// The fields in which this key differs from `other`, by name, in the order they are declared.
     /// Every field is named, so a field added to [`Key`] does not compile until it is listed here.
@@ -179,26 +199,6 @@ impl Key {
     }
 }
 
-/// Who offers the rows of the tables no write reached, as a field of [`Key`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BackingKey {
-    /// `MemStore::backing_identity`: two backings with the same identity offer the same rows (`Backing::identity`).
-    Known((u64, u64)),
-    /// The backing does not say who it is (`Backing::identity` `None`: not known), so it may offer other rows than
-    /// another such backing: a number no other session gets, so that the key matches no other key.
-    Unknown(u64),
-}
-
-impl BackingKey {
-    fn of(identity: Option<(u64, u64)>) -> BackingKey {
-        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        identity.map_or_else(
-            || BackingKey::Unknown(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
-            BackingKey::Known,
-        )
-    }
-}
-
 /// What a test session holds after the raised login: every committed row (system fields included), the session state
 /// (`Session::state_lines`), the assumption marks the login made (a replayed flagged pass stays flagged) and what the
 /// company open noted for the tests of the codeunit (`install::CompanyOpenWrites`: a later test is watched or refused by
@@ -212,7 +212,7 @@ pub(crate) struct LoginState {
 }
 
 impl LoginState {
-    /// The committed rows, one line each.
+    /// The committed rows, field by field.
     #[cfg(test)]
     pub(crate) fn rows(&self) -> &[StoredRow] {
         &self.rows
@@ -535,8 +535,8 @@ pub(crate) fn check(engine: &Engine) -> std::sync::Arc<Check> {
     engine.derived(Check::default)
 }
 
-/// The report of `engine`'s check: the check line, and the image line after a `\n` when a round trip was tried; `None`
-/// when no session raised the login under the check.
+/// The report of `engine`'s check: the check line, the image line when a round trip was tried, then the keys line;
+/// `None` when no session raised the login under the check.
 pub(crate) fn report(engine: &Engine) -> Option<String> {
     let check = check(engine);
     let line = check.line()?;
@@ -777,9 +777,9 @@ mod tests {
         );
     }
 
-    // The report never prints a value (PERF-01 step 2c: the image line printed a differing row of the company's data): a
-    // row, a session state line, a value with no comparable form and the open writes that hold a planted value are named
-    // by where they differ only, in the check's line and in each difference the image line takes its first from.
+    // The report never prints a value (the rows are the company's data, issue 8211): a row, a session state line, a value
+    // with no comparable form and the open writes that hold a planted value are named by where they differ only, in the
+    // check's line and in each difference the image line takes its first from.
     #[test]
     fn the_difference_text_names_where_and_never_a_value() {
         let secret = |s: &str| Value::Text(format!("SECRET-VALUE-{s}").as_str().into());
@@ -831,7 +831,7 @@ mod tests {
         }
     }
 
-    // PERF-01 step 3: a new key names the session state lines and the database tables it differs in from its nearest
+    // Issue 8211: a new key names the session state lines and the database tables it differs in from its nearest
     // earlier key, by name only. A planted value in a row, in a company name and in a state line never appears.
     #[test]
     fn a_new_key_names_the_session_lines_and_tables_it_differs_in_and_no_value() {
@@ -893,7 +893,7 @@ mod tests {
         );
     }
 
-    // Why the keys of a run differ (PERF-01 step 3): each new key after the first is named by the key fields in which it
+    // Why the keys of a run differ (issue 8211): each new key after the first is named by the key fields in which it
     // differs from the nearest earlier key (the one it differs from in the fewest fields), counted per set of fields.
     #[test]
     fn a_new_key_names_the_fields_it_differs_in_from_the_nearest_earlier_key() {

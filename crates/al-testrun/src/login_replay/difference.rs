@@ -1,7 +1,7 @@
 //! What differs between the states of two sessions after the login ([`LoginState`]), and the one text both report lines
-//! print for it (`login replay check:` and `login image:`): where it differs, never what a row, a session state line or a
-//! value holds. The rows are the company's data (a serve request runs on a customer's database), so a value never reaches
-//! the report (PERF-01 step 2c, where the image line printed a differing row).
+//! print for it (`login replay check: ... first: ...` and `login image: ...`): where it differs, never what a row, a
+//! session state line or a value holds. The rows are the company's data (a serve request runs on a customer's
+//! database), so a value never reaches the report (issue 8211).
 //!
 //! The text, per kind of [`KINDS`]:
 //! - `not comparable: codeunit 5 global 1, entry 2`: per value with no comparable form, the path the line names before its
@@ -154,7 +154,7 @@ mod tests {
         }
     }
 
-    // The lethal case (PERF-01 step 2c): a Blob whose buffer differs in two fields, its bytes equal.
+    // A Blob whose buffer differs in two fields while its bytes are equal is named by those fields.
     #[test]
     fn a_row_names_its_fields_and_a_blob_the_fields_of_its_buffer() {
         let blob = al_builtins::stream::new_blob().borrow().clone();

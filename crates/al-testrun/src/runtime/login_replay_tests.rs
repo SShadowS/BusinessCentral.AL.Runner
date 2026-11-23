@@ -53,8 +53,8 @@ codeunit 77403 "RPL Tests B"
 }
 "#;
 
-/// The check line of `engine`'s report: the report's first line (a second line, `login image: ...`, follows it; the tests
-/// of `login_image_tests.rs` read that one).
+/// The check line of `engine`'s report: the report's first line (the keys line, `login replay keys: ...`, and the image
+/// line, `login image: ...`, follow it; the tests of `login_image_tests.rs` read the image line).
 fn check_line(engine: &Engine) -> Option<String> {
     crate::login_replay::report(engine).map(|r| r.lines().next().unwrap_or_default().to_string())
 }

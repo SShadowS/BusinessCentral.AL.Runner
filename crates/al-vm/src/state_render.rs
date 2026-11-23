@@ -805,7 +805,7 @@ mod tests {
     }
 
     // A DotNet object the runtime serves itself holds a state that can change (`DotNetKind::Internal`), so one object two
-    // globals share and two equal objects do not hold the same. Review of PERF-01 step 2, M1.
+    // globals share and two equal objects do not hold the same (issue 8211).
     #[test]
     fn one_shared_dotnet_object_and_two_equal_ones_render_apart() {
         let (session, _) = session_and_records();
