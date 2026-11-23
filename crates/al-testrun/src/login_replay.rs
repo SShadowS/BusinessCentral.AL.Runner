@@ -277,6 +277,8 @@ struct ImageTally {
     keys: u64,
     /// Per reason (`NotImaged::reason`), the keys whose session was not imaged.
     not_imaged: std::collections::BTreeMap<String, u64>,
+    /// Per reason (`NotThawed::reason`), the images the twin did not take: no round trip is compared for them.
+    not_thawed: std::collections::BTreeMap<String, u64>,
     sizes: Vec<al_vm::ImageSize>,
     differ: u64,
     /// Per kind of [`KINDS`], the round trips that differ in it.
@@ -292,6 +294,11 @@ impl ImageTally {
             let by: Vec<String> = (self.not_imaged.iter()).map(|(why, n)| format!("{n}: {why}")).collect();
             format!(" ({})", by.join(", "))
         });
+        let refused = (!self.not_thawed.is_empty()).then(|| {
+            let n: u64 = self.not_thawed.values().sum();
+            let by: Vec<String> = (self.not_thawed.iter()).map(|(why, n)| format!("{n}: {why}")).collect();
+            format!(", {n} not thawed ({})", by.join(", "))
+        });
         let differ = self.first_difference.as_ref().map(|first| {
             let by: Vec<String> = (KINDS.iter().zip(&self.differ_by))
                 .filter(|(_, n)| **n > 0)
@@ -300,13 +307,14 @@ impl ImageTally {
             format!(" ({}; first: {first})", by.join(", "))
         });
         format!(
-            "login image: {} keys, {} imaged, {not} not imaged{}; round trips {}, {} differ{}; per key: {}",
+            "login image: {} keys, {} imaged, {not} not imaged{}; round trips {}, {} differ{}{}; per key: {}",
             self.keys,
             self.sizes.len(),
             reasons.unwrap_or_default(),
-            self.sizes.len(),
+            self.sizes.len() as u64 - self.not_thawed.values().sum::<u64>(),
             self.differ,
             differ.unwrap_or_default(),
+            refused.unwrap_or_default(),
             self.per_key()
         )
     }
@@ -411,7 +419,8 @@ impl Check {
     /// A new key's session after the raised login: frozen ([`Session::login_image`]), thawn into `twin` on a thread of
     /// its own (so nothing of the thaw reaches this thread's state: its store operation count, its assumption marks, its
     /// instance registry), and the twin's state compared with `state` ([`differences`]). `before_login`: the store's
-    /// change counter before the login. Outcomes do not change: the twin is dropped and `session` is only read.
+    /// change counter before the login. Outcomes do not change: the twin is dropped and `session` is only read. A twin
+    /// that does not take the image (`NotThawed`) is counted, and no round trip is compared for it.
     pub(crate) fn round_trip(
         &self,
         session: &Session,
@@ -420,23 +429,27 @@ impl Check {
         twin: impl FnOnce() -> Session + Send,
     ) {
         #[cfg(test)]
-        let plant = TWIN_PLANT.with(std::cell::Cell::get);
+        let (target, plant) = (TWIN_TARGET.with(std::cell::Cell::get), TWIN_PLANT.with(std::cell::Cell::get));
         let image = session.login_image(before_login);
         let thawn = image.as_ref().ok().map(|image| {
             std::thread::scope(|scope| {
                 // A test thread's stack: the drop of a deep graph recurses on it.
                 std::thread::Builder::new()
                     .stack_size(crate::runtime::TEST_STACK)
-                    .spawn_scoped(scope, || {
+                    .spawn_scoped(scope, || -> Result<LoginState, al_vm::NotThawed> {
                         // Declared first, so it drops last: the twin's instances that hold each other are freed.
                         let _run_end = al_builtins::instance_cycles::RunEnd::new();
                         let mut twin = twin();
-                        twin.thaw_login_image(image);
+                        #[cfg(test)]
+                        if let Some(target) = target {
+                            target(&mut twin);
+                        }
+                        twin.thaw_login_image(image)?;
                         #[cfg(test)]
                         if let Some(plant) = plant {
                             plant(&mut twin);
                         }
-                        LoginState::of_twin(&mut twin, state)
+                        Ok(LoginState::of_twin(&mut twin, state))
                     })
                     .ok()
                     .and_then(|thread| thread.join().ok())
@@ -455,7 +468,11 @@ impl Check {
         };
         t.sizes.push(image.size());
         let differs = match thawn {
-            Some(twin) => differences(state, &twin),
+            Some(Ok(twin)) => differences(state, &twin),
+            Some(Err(why)) => {
+                *t.not_thawed.entry(why.reason()).or_default() += 1;
+                return;
+            }
             None => vec![(0, "not comparable: the thaw did not end".to_string())],
         };
         if let Some((_, what)) = differs.first() {
@@ -528,6 +545,8 @@ impl Check {
 thread_local! {
     /// Run on the twin after the thaw ([`Check::round_trip`]): a test plants a difference the check must report.
     pub(crate) static TWIN_PLANT: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
+    /// Run on the twin before the thaw ([`Check::round_trip`]): a test makes it a session the thaw must refuse.
+    pub(crate) static TWIN_TARGET: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
 }
 
 /// The check of `engine`.

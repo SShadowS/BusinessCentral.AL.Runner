@@ -133,3 +133,24 @@ fn the_check_line_keeps_its_shape_and_the_image_line_follows() {
         "{image}"
     );
 }
+
+// A twin that is not a new session (here: its runner permission step is on) does not take the image, and the thaw says so instead of
+// panicking on the thread that runs it: the round trip is counted as not thawn, nothing is reported as a difference, and
+// the session ran its own login, so the outcomes are those of a run with the check off (issue 8211).
+#[test]
+fn a_twin_the_thaw_refuses_is_counted_and_changes_no_outcome() {
+    let (engine, l) = compiled_with(MAIN);
+    crate::login_replay::TWIN_TARGET.with(|p| p.set(Some(|twin| twin.runner_permission_step = true)));
+    let with = outcomes(&engine, &l, "RPL Tests A", true);
+    crate::login_replay::TWIN_TARGET.with(|p| p.set(None));
+    let (_, line) = report_lines(&engine);
+    assert!(
+        line.starts_with(
+            "login image: 1 keys, 1 imaged, 0 not imaged; round trips 0, 0 differ, 1 not thawed (1: the target is not a \
+             new session: runner_permission_step); per key: "
+        ),
+        "{line}"
+    );
+    let (engine, l) = compiled_with(MAIN);
+    assert_eq!(with, outcomes(&engine, &l, "RPL Tests A", false));
+}

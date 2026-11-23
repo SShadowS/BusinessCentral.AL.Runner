@@ -527,7 +527,7 @@ codeunit 50110 Holder
         drop(rec);
         let image = session.login_image(0).unwrap_or_else(|why| panic!("{}", why.reason()));
         let mut twin = Session::new(session.engine.clone());
-        twin.thaw_login_image(&image);
+        twin.thaw_login_image(&image).expect("a new session takes the image");
         let noted = twin.temp_blob_impl_fields.live();
         assert_eq!(noted.len(), 1);
         let at = twin
@@ -763,7 +763,7 @@ query 50113 KQ { elements { dataitem(K; KRow) { column(Id; Id) { } } } }
             s.commit_transaction();
             let image = s.login_image(0).unwrap_or_else(|why| panic!("{}", why.reason()));
             let mut twin = Session::new(engine.clone());
-            twin.thaw_login_image(&image);
+            twin.thaw_login_image(&image).expect("a new session takes the image");
             let Value::DotNet(d) = twin.codeunit_instance(at).borrow().globals[slot].clone() else {
                 panic!("a DotNet value")
             };
@@ -832,7 +832,7 @@ codeunit 50200 PKeep
         s.commit_transaction();
         let image = s.login_image(0).unwrap_or_else(|why| panic!("{}", why.reason()));
         let mut twin = Session::new(engine);
-        twin.thaw_login_image(&image);
+        twin.thaw_login_image(&image).expect("a new session takes the image");
         (s, twin, keep)
     }
 
@@ -944,7 +944,7 @@ codeunit 50210 RKeep
                 .login_image(0)
                 .unwrap_or_else(|why| panic!("{routine}: {}", why.reason()));
             let mut twin = Session::new(engine.clone());
-            twin.thaw_login_image(&image);
+            twin.thaw_login_image(&image).expect("a new session takes the image");
             assert_eq!(lines(&mut s), lines(&mut twin), "{routine}");
             assert_eq!(
                 outcome(&mut s, keep, "Read"),

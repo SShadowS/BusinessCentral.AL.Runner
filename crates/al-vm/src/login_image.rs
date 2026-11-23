@@ -91,6 +91,27 @@ impl NotImaged {
     }
 }
 
+/// Why an image is not thawn into a session ([`Session::thaw_login_image`]): the session is left as it was, so its caller
+/// runs the login in it instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotThawed {
+    /// The image was taken on another engine (`Engine::uid`).
+    Engine,
+    /// The session is not a new one at rest: the first field of `Session::at_rest_why` or of
+    /// `Session::image_refused_field` that does not hold.
+    Target(&'static str),
+}
+
+impl NotThawed {
+    /// One line for the report, with no value in it: the reason that is counted.
+    pub fn reason(&self) -> String {
+        match self {
+            NotThawed::Engine => "an image of another engine".to_string(),
+            NotThawed::Target(field) => format!("the target is not a new session: {field}"),
+        }
+    }
+}
+
 /// How much an image holds ([`LoginImage::size`]).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ImageSize {
@@ -139,16 +160,15 @@ impl Session {
     }
 
     /// Makes this session hold what the image holds. `self`: made by `Session::with_host` on the image's engine, with
-    /// the run's session flags applied.
-    pub fn thaw_login_image(&mut self, image: &LoginImage) {
-        assert_eq!(
-            self.engine.uid, image.engine,
-            "an image is thawn on the engine it was taken on"
-        );
-        assert!(
-            self.at_rest_why().is_none() && self.image_refused_field().is_none(),
-            "the thaw's target is a new session"
-        );
+    /// the run's session flags applied. `Err`: the image is of another engine, or `self` is not a new session at rest;
+    /// nothing of `self` is changed then, so its caller runs the login in it instead.
+    pub fn thaw_login_image(&mut self, image: &LoginImage) -> Result<(), NotThawed> {
+        if self.engine.uid != image.engine {
+            return Err(NotThawed::Engine);
+        }
+        if let Some(field) = self.at_rest_why().or_else(|| self.image_refused_field()) {
+            return Err(NotThawed::Target(field));
+        }
         self.restore_baseline(&image.rows.thaw(Some(&self.engine)));
         // The tables a DeleteAll emptied: the rows the baseline gave, marked emptied again (a new stamp, as a write gives).
         // A DeleteAll makes the table's entry before it marks it (al-data memory.rs `delete_all` takes `table_mut`), and the
@@ -167,6 +187,7 @@ impl Session {
         image.plain.give(self);
         image.parts.give(self);
         thaw::thaw(self, image);
+        Ok(())
     }
 }
 
