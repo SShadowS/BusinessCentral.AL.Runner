@@ -115,6 +115,7 @@ pub(crate) enum PlainFilterExpr {
     Like(String, bool),
     NotLike(String, bool),
     AtSignAlone(bool),
+    AtSignAloneCode,
     EmptyViewValue,
     NumCode(Box<PlainFilterExpr>),
     UnpinnedMatch(Box<PlainFilterExpr>, String),
@@ -146,6 +147,7 @@ impl PlainFilterExpr {
             FilterExpr::Like(p, ci) => PlainFilterExpr::Like(p.clone(), *ci),
             FilterExpr::NotLike(p, ci) => PlainFilterExpr::NotLike(p.clone(), *ci),
             FilterExpr::AtSignAlone(b) => PlainFilterExpr::AtSignAlone(*b),
+            FilterExpr::AtSignAloneCode => PlainFilterExpr::AtSignAloneCode,
             FilterExpr::EmptyViewValue => PlainFilterExpr::EmptyViewValue,
             FilterExpr::NumCode(i) => PlainFilterExpr::NumCode(Box::new(PlainFilterExpr::of(i)?)),
             FilterExpr::UnpinnedMatch(i, t) => {
@@ -176,6 +178,7 @@ impl PlainFilterExpr {
             PlainFilterExpr::Like(p, ci) => FilterExpr::Like(p.clone(), *ci),
             PlainFilterExpr::NotLike(p, ci) => FilterExpr::NotLike(p.clone(), *ci),
             PlainFilterExpr::AtSignAlone(b) => FilterExpr::AtSignAlone(*b),
+            PlainFilterExpr::AtSignAloneCode => FilterExpr::AtSignAloneCode,
             PlainFilterExpr::EmptyViewValue => FilterExpr::EmptyViewValue,
             PlainFilterExpr::NumCode(i) => FilterExpr::NumCode(Box::new(i.expr())),
             PlainFilterExpr::UnpinnedMatch(i, t) => FilterExpr::UnpinnedMatch(Box::new(i.expr()), t.clone()),

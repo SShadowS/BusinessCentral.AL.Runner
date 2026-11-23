@@ -1,4 +1,4 @@
-//! How much a [`LoginImage`] holds (design section 5): the rows it keeps, and an estimate of its state and graph.
+//! How much a [`LoginImage`] holds: the rows it keeps, and an estimate of its state and graph.
 //!
 //! The row number is the row delta's own (`RowDelta::size`, its encoded rows). The state number is an estimate of
 //! memory: `size_of` of each node and of each value, plus the heap behind its strings, vectors, Blob buffers and a
@@ -44,7 +44,7 @@ impl LoginImage {
         }
     }
 
-    /// What keeping this image costs in memory, the number the starts' caps count (design section 4): its rows, its state
+    /// What keeping this image costs in memory, the number the starts' caps count: its rows, its state
     /// and its base shape.
     pub fn kept_bytes(&self) -> u64 {
         (self.rows.size() + self.state_bytes() + self.base_shape.bytes()) as u64

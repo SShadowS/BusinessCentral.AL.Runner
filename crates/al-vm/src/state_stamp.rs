@@ -68,8 +68,9 @@ pub struct LeftStamp {
 struct Single {
     /// The fingerprint of each global.
     globals: Vec<crate::single_track::Fp>,
-    /// Every global holds what a fresh instance of the codeunit holds ([`at_declared`]).
-    declared: bool,
+    /// Per global: it holds what a fresh instance of the codeunit holds ([`at_declared`]). Empty when the instance has
+    /// another number of globals than a fresh one.
+    declared: Vec<bool>,
 }
 
 /// What differs between two [`LeftStamp`]s, other than rows and group 1 filters ([`LeftStamp::changed`]).
@@ -81,10 +82,11 @@ pub struct LeftChange {
     pub number_sequences: bool,
     pub isolated_storage: bool,
     pub random: bool,
-    /// The SingleInstance codeunits (object index) whose state changed: an instance that was there before and holds
-    /// another value in a global or went away, or a new instance whose globals do not all hold what a fresh instance
-    /// holds. A global with no comparable form (a .NET object, a stream, a temporary record) counts as changed.
-    pub singles: BTreeSet<usize>,
+    /// The SingleInstance codeunits (object index) whose state changed, each with the globals (index) that changed: of an
+    /// instance that was there before, those that hold another value (all of them when it went away or its number of
+    /// globals differs); of a new instance, those that do not hold what a fresh instance holds. A global with no
+    /// comparable form (a .NET object, a stream, a temporary record) counts as changed.
+    pub singles: BTreeMap<usize, BTreeSet<usize>>,
 }
 
 impl LeftChange {
@@ -107,14 +109,23 @@ impl LeftStamp {
         } else {
             None
         };
-        let objects = self.singles.keys().chain(later.singles.keys());
+        let objects: BTreeSet<usize> = self.singles.keys().chain(later.singles.keys()).copied().collect();
         let singles = objects
-            .filter(|o| match (self.singles.get(o), later.singles.get(o)) {
-                (Some(x), Some(y)) => x.globals != y.globals,
-                (None, Some(y)) => !y.declared,
-                _ => true,
+            .into_iter()
+            .filter_map(|o| {
+                let changed = match (self.singles.get(&o), later.singles.get(&o)) {
+                    (Some(x), Some(y)) if x.globals.len() == y.globals.len() => {
+                        (0..x.globals.len()).filter(|&g| x.globals[g] != y.globals[g]).collect()
+                    }
+                    (None, Some(y)) if y.declared.len() == y.globals.len() => {
+                        (0..y.declared.len()).filter(|&g| !y.declared[g]).collect()
+                    }
+                    (Some(x), _) => (0..x.globals.len()).collect(),
+                    (None, Some(y)) => (0..y.globals.len()).collect(),
+                    (None, None) => BTreeSet::new(),
+                };
+                (!changed.is_empty()).then_some((o, changed))
             })
-            .copied()
             .collect();
         LeftChange {
             session,
@@ -144,8 +155,13 @@ impl Session {
             let engine = self.engine.clone();
             let fresh = self.slot_defaults(&engine.program.objects[o].globals);
             let inst = inst.borrow();
-            let declared = inst.globals.len() == fresh.len()
-                && (inst.globals.iter().zip(&fresh)).all(|(v, f)| at_declared(v, f, &engine, 0));
+            let declared = if inst.globals.len() == fresh.len() {
+                (inst.globals.iter().zip(&fresh))
+                    .map(|(v, f)| at_declared(v, f, &engine, 0))
+                    .collect()
+            } else {
+                Vec::new()
+            };
             let globals = inst
                 .globals
                 .iter()
@@ -247,7 +263,11 @@ impl Session {
     /// sequence and its draws by origin, plus the counters code advances (the clock offset, the clock's draws, key and
     /// last system stamp, the Guid and SystemId draws and their key, the row versions), the last error and the facts of
     /// `state_facts.rs`, as lines that compare across sessions: an instance is named by a number by first sight, not by
-    /// its address (al-testrun `login_replay.rs`, al-runner issue 8211).
+    /// its address (al-testrun `login_replay.rs`, al-runner issue 8211). It is not a pure read: `left_stamp` builds a
+    /// fresh instance's globals to compare with, and each temporary record among them takes a temporary table number
+    /// (`Session::new_temp_id`), so the session's counter moves on. Harmless: the number only names a temporary table's
+    /// store inside the session, AL code never sees it, and al-testrun's watched and partner logins call `left_stamp`
+    /// the same way.
     pub fn state_lines(&mut self) -> StateLines {
         let stamp = self.left_stamp();
         let id = |o: usize| self.engine.program.objects[o].id.unwrap_or(0);

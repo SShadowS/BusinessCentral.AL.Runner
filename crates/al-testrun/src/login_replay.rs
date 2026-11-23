@@ -19,7 +19,7 @@ pub(crate) use rows_digest::NoKey;
 use std::sync::{Mutex, PoisonError};
 
 /// The inputs the login and its subscribers read when the test session opens the company, as far as the code shows them:
-/// a session state the key does not hold is held in place by the thaw's rule (`al-vm login_image/fields.rs`), and a
+/// a session state the key does not hold is held in place by the thaw's rule (al-vm `session_fields.rs`, `login_image/fields.rs`), and a
 /// static a request sets is a field here (`login_start/outside.rs`). Two sessions with the same
 /// key may share one run of the login only when they also hold the same after it ([`Check`]); a field left out of the
 /// key would let a replay hand a session the store of another input. The engine (the compiled program, its apps and
@@ -40,7 +40,7 @@ pub(crate) struct Key {
     /// committed (the rows are then `database`).
     uncommitted: Option<LinesDigest>,
     /// Who offers the rows of the tables no write reached (the test data, `MemStore::backing_identity`).
-    backing: Option<(u64, u64)>,
+    backing: BackingKey,
     /// The session state before the login (`Session::state_lines`): language, WorkDate, number sequences, isolated
     /// storage, SingleInstance globals, manual bindings, `Random`, filter group 1, the clock offset, the Guid key and
     /// draws, row versions, AutoIncrement counters, the last error.
@@ -126,7 +126,7 @@ impl Key {
             true => Some(rows_digest::current_digest(store)?),
             false => None,
         };
-        let backing = store.backing_identity();
+        let backing = BackingKey::of(store.backing_identity());
         let resources = {
             let overrides = session
                 .engine
@@ -165,6 +165,26 @@ impl Key {
             isolation,
             run: RunSettings::now(),
         })
+    }
+}
+
+/// Who offers the rows of the tables no write reached, as a field of [`Key`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum BackingKey {
+    /// `MemStore::backing_identity`: two backings with the same identity offer the same rows (`Backing::identity`).
+    Known((u64, u64)),
+    /// The backing does not say who it is (`Backing::identity` `None`: not known), so it may offer other rows than
+    /// another such backing: a number no other session gets, so that the key matches no other key.
+    Unknown(u64),
+}
+
+impl BackingKey {
+    fn of(identity: Option<(u64, u64)>) -> BackingKey {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        identity.map_or_else(
+            || BackingKey::Unknown(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
+            BackingKey::Known,
+        )
     }
 }
 
@@ -244,7 +264,7 @@ pub(crate) struct LoginState {
 }
 
 impl LoginState {
-    /// The committed rows, one line each.
+    /// The committed rows, field by field.
     #[cfg(test)]
     pub(crate) fn rows(&self) -> &[StoredRow] {
         &self.rows
@@ -350,6 +370,8 @@ struct ImageTally {
     keys: u64,
     /// Per reason (`NotImaged::reason`), the keys whose session was not imaged.
     not_imaged: std::collections::BTreeMap<String, u64>,
+    /// Per reason (`NotThawed::reason`), the images the twin did not take: no round trip is compared for them.
+    not_thawed: std::collections::BTreeMap<String, u64>,
     sizes: Vec<al_vm::ImageSize>,
     /// The round trips.
     differences: Differences,
@@ -363,12 +385,18 @@ impl ImageTally {
             let by: Vec<String> = (self.not_imaged.iter()).map(|(why, n)| format!("{n}: {why}")).collect();
             format!(" ({})", by.join(", "))
         });
+        let refused = (!self.not_thawed.is_empty()).then(|| {
+            let n: u64 = self.not_thawed.values().sum();
+            let by: Vec<String> = (self.not_thawed.iter()).map(|(why, n)| format!("{n}: {why}")).collect();
+            format!(", {n} not thawed ({})", by.join(", "))
+        });
         let trips = self.differences.line().replacen(" checked", "", 1);
         format!(
-            "login image: {} keys, {} imaged, {not} not imaged{}; round trips {trips}; per key: {}",
+            "login image: {} keys, {} imaged, {not} not imaged{}; round trips {trips}{}; per key: {}",
             self.keys,
             self.sizes.len(),
             reasons.unwrap_or_default(),
+            refused.unwrap_or_default(),
             self.per_key()
         )
     }
@@ -476,7 +504,8 @@ impl Check {
     /// A new key's session after the raised login: frozen ([`Session::login_image`]), thawn into a twin that starts from
     /// the store `base` (the session before its login), and the twin's state compared with `state` ([`differences`]).
     /// Returns the image, for the key's start (`login_start.rs`). Outcomes do not change: the twin is dropped and
-    /// `session` is only read.
+    /// `session` is only read. A twin that does not take the image (`NotThawed`) is counted, and no round trip is
+    /// compared for it.
     pub(crate) fn round_trip(
         &self,
         session: &Session,
@@ -496,10 +525,11 @@ impl Check {
             (Err(why), _) => *t.not_imaged.entry(why.reason()).or_default() += 1,
             (Ok(image), Some(thawn)) => {
                 t.sizes.push(image.size());
-                t.differences.note(&match thawn {
-                    Ok(twin) => differences(state, &twin),
-                    Err(why) => vec![(0, format!("not comparable: {why}"))],
-                });
+                match thawn {
+                    Ok(twin) => t.differences.note(&differences(state, &twin)),
+                    Err(Uncompared::NotThawed(why)) => *t.not_thawed.entry(why.reason()).or_default() += 1,
+                    Err(why) => t.differences.note(&[(0, format!("not comparable: {why}"))]),
+                }
             }
             (Ok(_), None) => unreachable!("an image is thawn"),
         }
@@ -592,6 +622,49 @@ impl Check {
 thread_local! {
     /// Run on the twin after the thaw ([`Check::round_trip`]): a test plants a difference the check must report.
     pub(crate) static TWIN_PLANT: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
+    /// Run on the twin before the thaw ([`Check::round_trip`]): a test makes it a session the thaw must refuse.
+    pub(crate) static TWIN_TARGET: std::cell::Cell<Option<fn(&mut Session)>> = const { std::cell::Cell::new(None) };
+    /// [`serve_twin`] is on, and how many sessions it replaced.
+    pub(crate) static SERVE_TWIN: std::cell::Cell<(bool, u32)> = const { std::cell::Cell::new((false, 0)) };
+}
+
+/// Under [`SERVE_TWIN`] (tests only), each session after its raised login is replaced by a twin made by `twin` and thawn
+/// from the session's image on this thread, so the codeunit's tests run on the twin: the evidence, at the level of test
+/// results, that a thawn session serves the tests as the session that ran its login does (issue 8211).
+#[cfg(test)]
+pub(crate) fn serve_twin(session: &mut Session, base: &al_vm::LoginBase, twin: impl FnOnce() -> Session) {
+    let (on, served) = SERVE_TWIN.with(std::cell::Cell::get);
+    if !on {
+        return;
+    }
+    let image = (session.login_image(base)).unwrap_or_else(|why| panic!("no image: {}", why.reason()));
+    let mut twin = twin();
+    twin.start_from(&base.portable().expect("the store before the login has a rows form"));
+    twin.thaw_login_image(&image).expect("a new session takes the image");
+    *session = twin;
+    SERVE_TWIN.with(|s| s.set((true, served + 1)));
+}
+
+/// Why a thawn twin was not compared ([`thaw_twin`]).
+enum Uncompared {
+    /// The store before the login has no rows form.
+    NoBase,
+    /// The twin did not take the image (`Session::thaw_login_image`).
+    NotThawed(al_vm::NotThawed),
+    /// The thaw's thread did not end.
+    NoEnd,
+}
+
+impl std::fmt::Display for Uncompared {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Uncompared::NoBase => {
+                f.write_str("the store before the login has no rows form (a value with no bytes, or company copies)")
+            }
+            Uncompared::NotThawed(why) => write!(f, "not thawed: {}", why.reason()),
+            Uncompared::NoEnd => f.write_str("the thaw did not end"),
+        }
+    }
 }
 
 /// `image` thawn into `twin` (a new session with the run's flags) that starts from the store of `base`, on a thread of its
@@ -602,31 +675,36 @@ fn thaw_twin(
     base: &al_vm::LoginBase,
     with: (al_builtins::assumptions::HitBits, String),
     twin: impl FnOnce() -> Session + Send,
-) -> Result<LoginState, &'static str> {
+) -> Result<LoginState, Uncompared> {
     #[cfg(test)]
-    let plant = TWIN_PLANT.with(std::cell::Cell::get);
-    let base = base
-        .portable()
-        .ok_or("the store before the login has no rows form (a value with no bytes, or company copies)")?;
+    let (target, plant) = (
+        TWIN_TARGET.with(std::cell::Cell::get),
+        TWIN_PLANT.with(std::cell::Cell::get),
+    );
+    let base = base.portable().ok_or(Uncompared::NoBase)?;
     std::thread::scope(|scope| {
         // A test thread's stack: the drop of a deep graph recurses on it.
         std::thread::Builder::new()
             .stack_size(crate::runtime::TEST_STACK)
-            .spawn_scoped(scope, || {
+            .spawn_scoped(scope, || -> Result<LoginState, Uncompared> {
                 // Declared first, so it drops last: the twin's instances that hold each other are freed.
                 let _run_end = al_builtins::instance_cycles::RunEnd::new();
                 let mut twin = twin();
                 twin.start_from(&base);
-                twin.thaw_login_image(image);
+                #[cfg(test)]
+                if let Some(target) = target {
+                    target(&mut twin);
+                }
+                twin.thaw_login_image(image).map_err(Uncompared::NotThawed)?;
                 #[cfg(test)]
                 if let Some(plant) = plant {
                     plant(&mut twin);
                 }
-                LoginState::of_twin(&mut twin, with)
+                Ok(LoginState::of_twin(&mut twin, with))
             })
             .ok()
             .and_then(|thread| thread.join().ok())
-            .ok_or("the thaw did not end")
+            .unwrap_or(Err(Uncompared::NoEnd))
     })
 }
 
@@ -653,8 +731,10 @@ pub(crate) fn checked(
         let image = check.round_trip(session, base, &state, twin);
         match gate {
             Some(why) => starts.not_taken(why),
-            None => starts.record(
+            None => crate::login_start::keep(
+                engine,
                 key,
+                base,
                 image.map(|image| crate::login_start::Start {
                     image,
                     wrote: wrote.clone(),
@@ -680,8 +760,8 @@ pub(crate) fn check(engine: &Engine) -> std::sync::Arc<Check> {
     engine.derived(Check::default)
 }
 
-/// The report of `engine`'s check: the check line, and the image line after a `\n` when a round trip was tried; `None`
-/// when no session raised the login under the check.
+/// The report of `engine`'s check: the check line, the image line when a round trip was tried, then the keys line;
+/// `None` when no session raised the login under the check.
 pub(crate) fn report(engine: &Engine) -> Option<String> {
     let check = check(engine);
     let line = check.line()?;
@@ -765,7 +845,7 @@ mod tests {
         Key {
             database: digest(&["1".into()]),
             uncommitted: None,
-            backing: None,
+            backing: BackingKey::Known((0, 0)),
             session: digest(&["2".into()]),
             company: "C".into(),
             seed: 0,
@@ -790,7 +870,8 @@ mod tests {
     // Condition 1 of the maintainer's acceptance on al-runner issue 8211: the key compares content or a strong hash, never
     // a 64-bit digest. Every field is named with its type, so a field added or changed does not compile until it is
     // classified here: a SHA-256 digest of lines, or the content itself. `backing` is not a digest: two process-unique
-    // numbers (`TestData::id`, `Engine::uid`) that name who offers the rows. The module's own code names no 64-bit hasher.
+    // numbers (`TestData::id`, `Engine::uid`) that name who offers the rows, or, for a backing that does not say who it
+    // is, a number no other session gets (`BackingKey`). The module's own code names no 64-bit hasher.
     #[test]
     fn every_key_field_is_content_or_a_sha256_digest() {
         let k = key(1);
@@ -814,7 +895,7 @@ mod tests {
         } = &k;
         let digests: [&LinesDigest; 3] = [database, session, resources];
         let _: &Option<LinesDigest> = uncommitted;
-        let _: &Option<(u64, u64)> = backing;
+        let _: &BackingKey = backing;
         let _: (&String, &i32, &String, &Option<usize>) = (company, seed, user, test_codeunit);
         let _: &(bool, bool, bool) = client;
         let _: &crate::runtime::session_flags::SessionFlags = flags;
@@ -846,7 +927,7 @@ mod tests {
     // Condition 2 of the maintainer's acceptance on al-runner issue 8211: the test codeunit stays in the key. Two sessions
     // that differ only in their test codeunit have other keys, so neither is compared with (nor, later, replayed from) the
     // other's first state; only the evidence tally across test codeunits sees them together.
-    // Step 3 review H1 and M2: the server base address a request sets, and the codeunit's isolation and hub, are inputs of
+    // The server base address a request sets, and the codeunit's isolation and hub, are inputs of
     // the login (`GetUrl`, the isolation fields `enter_test_codeunit` sets): another value is another key.
     #[test]
     fn another_server_url_or_isolation_is_another_key() {
@@ -912,7 +993,7 @@ mod tests {
         );
         let session = state_of(&[(1990, vec![Value::Integer(7)])], &["session y"]);
         assert_eq!(first_difference(&a, &session).as_deref(), Some("session state 1"));
-        // Step 3 review round 2, R2-L3: a `field.` line is named by its field (a name, never its value), and when more lines
+        // A `field.` line is named by its field (a name, never its value), and when more lines
         // differ the text says how many.
         let row = [(1990, vec![Value::Integer(7)])];
         let fields = state_of(&row, &["session x", "field.a 1", "field.b 2", "field.c 3"]);
@@ -957,9 +1038,9 @@ mod tests {
         );
     }
 
-    // The report never prints a value (PERF-01 step 2c: the image line printed a differing row of the company's data): a
-    // row, a session state line, a value with no comparable form and the open writes that hold a planted value are named
-    // by where they differ only, in the check's line and in each difference the image line takes its first from.
+    // The report never prints a value (the rows are the company's data, issue 8211): a row, a session state line, a value
+    // with no comparable form and the open writes that hold a planted value are named by where they differ only, in the
+    // check's line and in each difference the image line takes its first from.
     #[test]
     fn the_difference_text_names_where_and_never_a_value() {
         let secret = |s: &str| Value::Text(format!("SECRET-VALUE-{s}").as_str().into());
@@ -1012,7 +1093,7 @@ mod tests {
         }
     }
 
-    // PERF-01 step 3: a new key names the session state lines and the database tables it differs in from its nearest
+    // Issue 8211: a new key names the session state lines and the database tables it differs in from its nearest
     // earlier key, by name only. A planted value in a row, in a company name and in a state line never appears.
     #[test]
     fn a_new_key_names_the_session_lines_and_tables_it_differs_in_and_no_value() {
@@ -1074,7 +1155,7 @@ mod tests {
         );
     }
 
-    // Why the keys of a run differ (PERF-01 step 3): each new key after the first is named by the key fields in which it
+    // Why the keys of a run differ (issue 8211): each new key after the first is named by the key fields in which it
     // differs from the nearest earlier key (the one it differs from in the fewest fields), counted per set of fields.
     #[test]
     fn a_new_key_names_the_fields_it_differs_in_from_the_nearest_earlier_key() {

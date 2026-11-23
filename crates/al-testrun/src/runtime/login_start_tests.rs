@@ -1,12 +1,11 @@
 // The scans of production code stop at the first `#[cfg(test)]` of a file; a test module in a file of its own starts with one.
 #![cfg(test)]
-//! Replaying the raised login (`login_start.rs`, al-runner issue 8211, PERF-01 step 3): the first session of a key runs the
+//! Replaying the raised login (`login_start.rs`, al-runner issue 8211): the first session of a key runs the
 //! login and keeps what it left (a start); a later session of the key takes the start in place of running the login. The
 //! tests run over the stand-in of Microsoft's login (`login_tests::DEP`) and the sources of `login_replay_tests.rs`, as
-//! the step-1 and step-2 tests do (design `/coord/handoff/PERF-01/step3-design.md` section 7).
+//! The check's and the image's tests do.
 //!
-//! Part (b)'s B1 tests, written red against the inert A1 stubs (`take` finds nothing, `record` keeps nothing, `why_not`
-//! always says no start): a test marked GUARD passes at A1 on purpose and must stay green.
+//! A test marked GUARD holds whether or not a session replays; it must stay green.
 
 use super::login_replay_tests::{MAIN, OPAQUE_INSIDE, compiled, compiled_with};
 use super::session_flags::SessionFlags;
@@ -111,7 +110,6 @@ fn assert_one_state(ran: &Ran, what: &str) {
 
 // The step-2 compare, now on the replay path: the first session of a key runs the login, the later ones take its start, and
 // each holds after the open what a real login leaves (rows, session state, marks, what the open noted).
-// RED at A1: `take` finds nothing, so nothing replays (`replayed()` is 0).
 #[test]
 fn a_second_session_of_a_key_takes_the_start_and_holds_what_a_real_login_leaves() {
     let (engine, l) = compiled();
@@ -135,7 +133,7 @@ fn a_second_session_of_a_key_takes_the_start_and_holds_what_a_real_login_leaves(
     assert_eq!(first_difference(&ran.states[1], &real.states[0]), None);
 }
 
-// GUARD (green at A1): with the switch off (the default; `ALRUNNER_LOGIN_REPLAY=1`, `RunOptions::login_replay`, turns it on) every session runs
+// A guard: with the switch off (the default; `ALRUNNER_LOGIN_REPLAY=1`, `RunOptions::login_replay`, turns it on) every session runs
 // the login, nothing is kept, and the outcomes and states are those of the replay's.
 #[test]
 fn the_switch_off_runs_every_login() {
@@ -149,7 +147,7 @@ fn the_switch_off_runs_every_login() {
 }
 
 // The check replays nothing: every session runs the login, and each later session of a key is compared with a thaw of the
-// key's start (design decision 5). RED at A1: no start is kept and the report has no `replay vs run` count.
+// Key's start.
 #[test]
 fn the_check_replays_nothing_and_compares_each_later_session_with_a_thaw_of_its_start() {
     let (engine, l) = compiled();
@@ -176,7 +174,7 @@ fn the_check_replays_nothing_and_compares_each_later_session_with_a_thaw_of_its_
     );
     let report = crate::login_replay::report(&engine).expect("a report");
     assert!(report.contains("replay vs run: 2 checked, 0 differ"), "{report}");
-    // GUARD: the first two lines keep the shape of step 1 and step 2.
+    // GUARD: the first two lines keep the shape of the check line and the image line.
     assert!(
         report.starts_with(
             "login replay check: 3 sessions over 1 keys (a key seen before: 2 sessions, 66%), 2 compared, 0 differ; across test codeunits: 0 compared, 0 differ\nlogin image: 1 keys, 1 imaged, 0 not imaged; round trips 1, 0 differ"
@@ -185,7 +183,7 @@ fn the_check_replays_nothing_and_compares_each_later_session_with_a_thaw_of_its_
     );
 }
 
-// A planted difference in the thaw the check compares with is reported (`TWIN_PLANT`, as the round trip's is). RED at A1.
+// A planted difference in the thaw the check compares with is reported (`TWIN_PLANT`, as the round trip's is).
 #[test]
 fn a_planted_difference_in_the_replay_is_reported() {
     let (engine, l) = compiled();
@@ -239,9 +237,9 @@ impl Drop for DropHits {
     }
 }
 
-// The marks the login made are raised again after a replay, so a flagged pass stays flagged (design decision 3). The plant
+// The marks the login made are raised again after a replay, so a flagged pass stays flagged. The plant
 // `DROP_HITS` takes a start without its marks: the replayed session's list then differs, which shows this test bites; without
-// it the lists are equal. RED at A1: nothing replays, so the plant changes nothing.
+// It the lists are equal.
 #[test]
 fn a_replayed_session_flags_the_passes_a_real_login_flags() {
     let flagged = vec![("SeesTheRow".to_string(), vec!["text-digits-to-integer"])];
@@ -266,7 +264,7 @@ fn a_replayed_session_flags_the_passes_a_real_login_flags() {
 }
 
 // A key whose session the image refuses (`NotImaged`) runs the real login every time and is not frozen again: it is counted
-// once in the report, however many sessions it has. RED at A1: no report line.
+// Once in the report, however many sessions it has.
 #[test]
 fn a_key_that_is_not_imaged_runs_the_login_every_time_and_is_frozen_once() {
     let (engine, l) = compiled_with(&format!("{MAIN}{OPAQUE_INSIDE}"));
@@ -285,8 +283,8 @@ fn a_key_that_is_not_imaged_runs_the_login_every_time_and_is_frozen_once() {
 }
 
 // An uncaught error of the install code leaves `error_finals` on the session (`install_once`'s fallback makes the install
-// session the test session): the freeze refuses it (`NotAtRest`) and the gate would refuse it (`thaw_target_why`), so no start
-// is made or taken (design 3.5). RED at A1: no report line names it.
+// session the test session), and the login's calls clear it: the session that records is not a thaw target before its
+// login (`LoginBase::target_why`), so it keeps no start, as a later such session takes none (`thaw_target_why`).
 #[test]
 fn an_uncaught_install_error_keeps_error_finals_and_no_start_is_made_or_taken() {
     let failing = r#"
@@ -299,11 +297,14 @@ codeunit 77495 "RPL Failing Install" { Subtype = Install; trigger OnInstallAppPe
     assert_eq!(ran.outcomes[0], ran.outcomes[1]);
     assert_eq!(ran.outcomes[0], ran.outcomes[2]);
     let line = starts(&engine).line().expect("the refused key is reported");
-    assert!(line.contains("not at rest: error_finals"), "{line}");
+    assert!(
+        line.contains("3 refused by the gate (3: target: error_finals)"),
+        "{line}"
+    );
 }
 
-// What the starts' report line says, names only (design 2, 4): replays, starts kept with their size, why keys were not
-// imaged, why sessions were refused. RED at A1: no line.
+// What the starts' report line says, names only: replays, starts kept with their size, why keys were not
+// Imaged, why sessions were refused.
 #[test]
 fn the_report_names_the_starts() {
     let (engine, l) = compiled();
@@ -313,7 +314,7 @@ fn the_report_names_the_starts() {
     assert!(line.contains(" MB)"), "{line}");
 }
 
-// The image line under the check gains the kept bytes and the count per node kind, names only (design 4). RED at A1: neither.
+// The image line under the check gains the kept bytes and the count per node kind, names only.
 #[test]
 fn the_image_line_reports_the_kept_bytes_and_the_nodes_per_kind() {
     let (engine, l) = compiled();
@@ -338,8 +339,7 @@ fn key_skipping(engine: &Arc<Engine>, skipped: &[al_vm::SkippedInstall]) -> Key 
     Key::of(&mut session, Default::default(), SessionFlags::default(), skipped).expect("a key")
 }
 
-// The open runs under the watch of the skipped installs, whose hit marks or refuses: another list is another key (design
-// 1, "What the key is"). RED at A1: the list is taken and not a field.
+// The open runs under the watch of the skipped installs, whose hit marks or refuses: another list is another key.
 #[test]
 fn another_skipped_install_list_is_another_key() {
     let (engine, _) = compiled();
@@ -365,7 +365,7 @@ fn another_skipped_install_list_is_another_key() {
     );
 }
 
-// ---- the gate (design 3.4): why a session does not take a start ----
+// ---- the gate: why a session does not take a start ----
 
 /// A start taken from a new session of `engine` (nothing logged in: what the gate looks at is the target and the run).
 fn plain_start(engine: &Arc<Engine>) -> Start {
@@ -388,26 +388,65 @@ fn target(engine: &Arc<Engine>) -> al_vm::Session {
     session
 }
 
-// A session that can take the start of its key takes it. RED at A1: `why_not` always answers `NoStart`.
+// A session that can take the start of its key takes it.
 #[test]
 fn a_session_with_nothing_against_it_takes_the_start() {
     let (engine, _) = compiled();
     let start = plain_start(&engine);
-    assert_eq!(
-        login_start::why_not(&target(&engine), &start, false, false, false),
-        None
-    );
+    assert_eq!(login_start::why_not(&target(&engine), &start, Default::default()), None);
 }
 
-// One reason per row of design 3.4; each is counted in the report. RED at A1: always `NoStart`.
+// One reason per gate condition; each is counted in the report.
 #[test]
 fn the_gate_names_a_run_that_notes_code_a_perturbation_and_moved_in_singles() {
     let (engine, _) = compiled();
     let start = plain_start(&engine);
-    let why = |notes, perturbed, moved| login_start::why_not(&target(&engine), &start, notes, perturbed, moved);
+    let why = |notes_code, perturbed, moved_in| {
+        let run = login_start::RunFacts {
+            notes_code,
+            perturbed,
+            moved_in,
+            ..Default::default()
+        };
+        login_start::why_not(&target(&engine), &start, run)
+    };
     assert_eq!(why(true, false, false), Some(NotTaken::NotesCode));
     assert_eq!(why(false, true, false), Some(NotTaken::Perturbed));
     assert_eq!(why(false, false, true), Some(NotTaken::MovedIn));
+}
+
+// The wall clock is an input no key holds, as for the install baseline cache (`runtime/baseline_key.rs`): a kept serve
+// daemon under `ALRUNNER_REAL_CLOCK` would otherwise hand a later session the time an earlier login stamped into a row.
+// Such a run neither takes nor records a start, with its own reason (issue 8211).
+#[test]
+fn the_gate_names_the_real_clock() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let run = login_start::RunFacts {
+        real_clock: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        login_start::why_not(&target(&engine), &start, run),
+        Some(NotTaken::RealClock)
+    );
+}
+
+// A real files directory (`--files-dir`) is an input no key holds, as for the install baseline cache: a login that reads a
+// file an earlier test wrote would read what no key holds. Such a run neither takes nor records a start, with its own
+// reason (issue 8211).
+#[test]
+fn the_gate_names_a_real_files_directory() {
+    let (engine, _) = compiled();
+    let start = plain_start(&engine);
+    let run = login_start::RunFacts {
+        real_files: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        login_start::why_not(&target(&engine), &start, run),
+        Some(NotTaken::RealFiles)
+    );
 }
 
 #[test]
@@ -417,19 +456,19 @@ fn the_gate_names_what_keeps_the_session_from_being_a_target() {
     let mut covering = target(&engine);
     covering.enable_coverage();
     assert_eq!(
-        login_start::why_not(&covering, &start, false, false, false),
+        login_start::why_not(&covering, &start, Default::default()),
         Some(NotTaken::Target("coverage"))
     );
     let mut tracing = target(&engine);
     tracing.trace_faults(true);
     assert_eq!(
-        login_start::why_not(&tracing, &start, false, false, false),
+        login_start::why_not(&tracing, &start, Default::default()),
         Some(NotTaken::Target("fault_trace"))
     );
 }
 
 // A target whose store has another shape than the start's (a table entry the start's base did not have: the key's digest
-// of the rows does not see an empty entry) is refused, `base shape`. RED at A1.
+// Of the rows does not see an empty entry) is refused, `base shape`.
 #[test]
 fn the_gate_refuses_a_target_whose_base_has_another_shape() {
     use al_data::Store;
@@ -452,7 +491,7 @@ fn the_gate_refuses_a_target_whose_base_has_another_shape() {
     other.commit_transaction();
     assert_ne!(other.base_shape(), *start.image.base_shape(), "the shapes differ");
     assert_eq!(
-        login_start::why_not(&other, &start, false, false, false),
+        login_start::why_not(&other, &start, Default::default()),
         Some(NotTaken::BaseShape)
     );
 }
@@ -478,7 +517,7 @@ fn gated_line(tweak: &dyn Fn(&mut Scratch), observed: bool) -> (u64, Option<Stri
 }
 
 // At run level: a run that follows the code it runs, a perturbation and a set clock start never take a start, and the
-// report counts the sessions the gate refused. RED at A1: no line (the zero replays are right for the wrong reason).
+// Report counts the sessions the gate refused.
 #[test]
 fn a_session_the_gate_refuses_runs_its_login_and_is_counted() {
     let perturbed = |s: &mut Scratch| s.perturb.library_seed = Some(3);
@@ -500,7 +539,7 @@ fn a_session_the_gate_refuses_runs_its_login_and_is_counted() {
     assert!(line.is_some_and(|l| l.contains("refused by the gate")), "coverage");
 }
 
-// ---- the caps (design 4): 8 starts, 64 MB, a start of at most 16 MB, least recently used out ----
+// ---- the caps: 8 starts, 64 MB, a start of at most 16 MB, least recently used out ----
 
 /// The key of a new session of `engine` whose work date is `n` (so every `n` is another key).
 fn numbered_key(engine: &Arc<Engine>, n: i32) -> Key {
@@ -544,7 +583,7 @@ fn the_caps_are_eight_starts_sixty_four_mb_and_sixteen_mb_a_start() {
     assert_eq!((MAX_STARTS, MAX_BYTES, MAX_START_BYTES), (8, 64 << 20, 16 << 20));
 }
 
-// A start is kept with its bytes counted. RED at A1: `record` keeps nothing.
+// A start is kept with its bytes counted.
 #[test]
 fn a_recorded_start_is_kept_and_its_bytes_are_counted() {
     let (engine, l) = big_engine();
@@ -559,7 +598,7 @@ fn a_recorded_start_is_kept_and_its_bytes_are_counted() {
     assert!(st.knows(&numbered_key(&engine, 0)));
 }
 
-// At most eight starts, the least recently used out; a take refreshes. RED at A1.
+// At most eight starts, the least recently used out; a take refreshes.
 #[test]
 fn starts_are_bounded_by_eight_least_recently_used_out() {
     let (engine, l) = big_engine();
@@ -581,7 +620,7 @@ fn starts_are_bounded_by_eight_least_recently_used_out() {
     }
 }
 
-// At most 64 MB of kept bytes; an eviction gives its bytes back to the count the memory pool reads. RED at A1.
+// At most 64 MB of kept bytes; an eviction gives its bytes back to the count the memory pool reads.
 #[test]
 fn starts_are_bounded_by_sixty_four_mb_and_an_eviction_returns_the_bytes() {
     let (engine, l) = big_engine();
@@ -606,7 +645,7 @@ fn starts_are_bounded_by_sixty_four_mb_and_an_eviction_returns_the_bytes() {
     assert!(st.bytes() < seven + 100 * 1024, "{} against {seven}", st.bytes());
 }
 
-// A start over 16 MB is not kept, with its own reason `too large`, so one start never empties the others. RED at A1.
+// A start over 16 MB is not kept, with its own reason `too large`, so one start never empties the others.
 #[test]
 fn a_start_over_sixteen_mb_is_not_kept_and_says_too_large() {
     let (engine, l) = big_engine();
@@ -623,7 +662,7 @@ fn a_start_over_sixteen_mb_is_not_kept_and_says_too_large() {
     assert_eq!(st.kept(), 1);
 }
 
-// A refused key (no image) is remembered with why, so its session runs the login every time. RED at A1.
+// A refused key (no image) is remembered with why, so its session runs the login every time.
 #[test]
 fn a_refused_key_is_remembered_and_never_taken() {
     let (engine, _) = compiled();
@@ -637,7 +676,7 @@ fn a_refused_key_is_remembered_and_never_taken() {
     assert!(st.line().is_some_and(|l| l.contains("field tasks")));
 }
 
-// Two threads that meet one new key both run the login; the first `record` wins and one start is kept. RED at A1.
+// Two threads that meet one new key both run the login; the first `record` wins and one start is kept.
 #[test]
 fn two_threads_with_one_new_key_keep_one_start() {
     let (engine, l) = compiled();
@@ -653,7 +692,7 @@ fn two_threads_with_one_new_key_keep_one_start() {
     assert_eq!(starts(&engine).kept(), 1);
 }
 
-// ---- the rows of a start are the login's own (design 3.2, 4) ----
+// ---- the rows of a start are the login's own ----
 
 const BULK: &str = r#"
 table 77480 "RPL Bulk" { fields { field(1; Id; Integer) { } } keys { key(PK; Id) { } } }
@@ -691,7 +730,7 @@ fn kept_over_base(seed: &str) -> u64 {
 }
 
 // An install codeunit that leaves 5,000 rows does not make the start larger than one over 50 rows: the start keeps the rows
-// the login wrote, as a delta over the session's own store (`big1` against `with` in design section 4). RED at A1: 0.
+// The login wrote, as a delta over the session's own store.
 #[test]
 fn a_start_from_a_large_install_base_keeps_only_the_logins_rows() {
     let (small, large) = (kept_over_base("RPL Seed Small"), kept_over_base("RPL Seed Large"));
@@ -702,7 +741,7 @@ fn a_start_from_a_large_install_base_keeps_only_the_logins_rows() {
     );
 }
 
-// Step 3 review H2: the number sequences' refusal mark the runner sets before the login (`Scratch::numbers_unmeasured`,
+// The number sequences' refusal mark the runner sets before the login (`Scratch::numbers_unmeasured`,
 // al-runner issue 8152) is an input of the key, and the thaw keeps the target's own: two sessions that differ only in it
 // never share a start.
 #[test]
@@ -722,7 +761,9 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
     let mut marked = target(&engine);
     marked.mark_numbers_unmeasured(std::rc::Rc::from("marked"));
     let before = marked.state_lines();
-    marked.thaw_login_image(&start.image);
+    marked
+        .thaw_login_image(&start.image)
+        .expect("a thaw target takes the start");
     let kept = |s: &al_vm::StateLines| {
         s.lines
             .iter()
@@ -733,7 +774,7 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
     assert!(kept(&before).is_some_and(|l| l.contains("marked")));
 }
 
-// Step 3 review H3: the key's digest of each committed table is kept per state of the table (its stamp), so a later
+// The key's digest of each committed table is kept per state of the table (its stamp), so a later
 // session whose tables a write did not reach digests nothing again; a write is a new state, so another digest.
 #[test]
 fn a_tables_digest_is_kept_per_state_and_a_write_makes_another() {
@@ -787,7 +828,7 @@ codeunit 40 LogInManagement
 }
 "#;
 
-// Step 3 review round 2, R2-M1: a counter read only as a difference around one call (`calls_made` and its kind) is no
+// A counter read only as a difference around one call (`calls_made` and its kind) is no
 // input or output of the login: real logins of one key differ in it (the WorkDate memo), and the check must not report
 // that as a difference, real against real or replay against run.
 #[test]

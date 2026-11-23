@@ -1,5 +1,5 @@
-//! A library cell (al-builtins `LibraryValue`) in the arena, variant by variant (design section 2.1). A state of plain
-//! owned data is kept as it is ([`OwnedLibrary`]); a record handle is a node. v1 defers the nodes of JSON and XML trees
+//! A library cell (al-builtins `LibraryValue`) in the arena, variant by variant. A state of plain owned data is kept
+//! as it is ([`OwnedLibrary`]); a record handle is a node. The image defers the nodes of JSON and XML trees
 //! (their parents are `Weak`), the Http types (shared header lists), FilterPageBuilder and a data transfer's plan, each
 //! with its own reason. What lies outside the session (a client of the network, a file, an open stream, a SecretText's
 //! text) is never imaged.

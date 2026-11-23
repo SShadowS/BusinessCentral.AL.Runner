@@ -211,7 +211,11 @@ impl Session {
         result: Result<(), Signal>,
     ) -> Result<Option<Vec<Value>>, Signal> {
         match result {
-            Ok(()) => self.validate_step_end(st),
+            Ok(()) => {
+                let end = self.validate_step_end(st);
+                self.code_inserted_step_end(st)?;
+                end
+            }
             Err(e) => {
                 let step = st.borrow_mut().validate_step.take();
                 if let Some(step) = step.filter(|s| s.pinned) {
@@ -233,7 +237,7 @@ impl Session {
     ) -> Result<(), Signal> {
         if rec_bound && !st.borrow().draft && st.borrow().cursor == Cursor::Row {
             let typed = self.page_rec(st).borrow().fields.clone();
-            st.borrow_mut().agcr_xrec = Some(typed);
+            st.borrow_mut().agcr_xrec = Some(typed.into_vec());
         }
         match discard {
             Some(row) => self.validate_step_discard(st, row),
@@ -274,7 +278,7 @@ impl Session {
             s.dirty = false;
             s.refresh.cancel_update();
         }
-        rec.borrow_mut().fields = row;
+        rec.borrow_mut().fields = row.into();
         Ok(())
     }
 

@@ -1,6 +1,6 @@
-//! Session state outside al-vm's `Session` that al-testrun keeps (PERF-01 step 3, al-runner issue 8211, design section
-//! 3.3): every `static` of al-testrun (a thread-local or a process table, test code left out), each listed with what a login
-//! start does with it, as `crates/al-vm/src/login_image/fields.rs` lists those of al-vm, al-builtins and al-data.
+//! Session state outside al-vm's `Session` that al-testrun keeps (al-runner issue 8211): every `static` of al-testrun (a
+//! thread-local or a process table, test code left out), each listed with what a login start does with it, as
+//! `crates/al-vm/src/session_fields.rs` lists those of al-vm, al-builtins and al-data.
 //! al-test-cli `tests/outside_session_state.rs` fails for a `static` of al-testrun that is not listed here, and for a listed
 //! one that is no longer there.
 //!
@@ -33,13 +33,17 @@
 //!   `static NEXT`, `static THREAD_ID`, `static LEGACY`: gated (the profiler: `profiling::active()` is in the gate).
 //! - `crates/al-testrun/src/host.rs` `static SERVER_URL`, `static COMPANIES`, `static COMPANY_NAME`,
 //!   `static PUBLISH_ORDER_KNOWN`: key (a serve request sets them: `Key::run`, `RunSettings`, by content; the company name
-//!   also reaches `Key::company`). `static RUN_START`, `static FILES_DIR`, `static ENVIRONMENT`: run (`OnceLock`s, set once per
-//!   process whatever a later request asks: the run clock's start, `--files-dir`, `--environment`).
+//!   also reaches `Key::company`). `static RUN_START`, `static FILES_DIR`, `static ENVIRONMENT`, `static ON`: run (`OnceLock`s,
+//!   set once per process whatever a later request asks: the run clock's start, `--files-dir`, `--environment`,
+//!   `ALRUNNER_REAL_CLOCK`; a run with a files directory or the real clock takes no start, `NotTaken::RealFiles`,
+//!   `NotTaken::RealClock`).
 //! - `crates/al-testrun/src/dotnet.rs` `static BUILD`, `static PROCESSES`, `static START_ON_THIS_THREAD`: run (the sidecar
 //!   build lock, a process counter, the start-up time read after each test codeunit; an image needs the DotNet state of a
 //!   new session, so a login that started a sidecar has no start).
-//! - `crates/al-testrun/src/compile_cache.rs` `static COUNTER`, `static HASH`: run (the compile cache's file counter and the
-//!   hash of the runner's own build).
+//! - `crates/al-testrun/src/compile_cache.rs` `static COUNTER`, `static HASH`, `static PINNED_EXECUTABLE`: run (the compile
+//!   cache's file counter, the hash of the runner's own build and the executable it is read from).
 //! - `crates/al-testrun/src/crash.rs` `static RUNNING`, `static PREVIOUS`, `static INSTALL`, `static TOLD`: run (the crash
 //!   handler's note of the codeunit that runs and its signal state).
+//! - `crates/al-testrun/src/login_replay.rs` `static NEXT`: run (the numbers a backing that does not say who it is gets,
+//!   one per session, so its key matches no other key).
 //! - `crates/al-testrun/src/report_render.rs` `static STARTS`: run (a counter for the folder name of a render sidecar).

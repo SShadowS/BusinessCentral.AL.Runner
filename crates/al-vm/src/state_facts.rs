@@ -7,8 +7,8 @@ use crate::state_render::content;
 use std::collections::BTreeMap;
 
 /// Why the SQL counters have no comparable form: a counter was read, or the record methods since the last Commit left
-/// state that only the session's own log explains (`SqlCounters::left_inactive`). Its path comes before `: `, as for every
-/// value with no comparable form (al-testrun `login_replay/difference.rs` prints only the path).
+/// state that only the session's own log explains (`SqlCounters::left_inactive`). Written as every value with no
+/// comparable form is: its path, `: `, then why.
 const SQL_ACTIVE: &str = "SQL counters: read, or not at rest since the last Commit";
 
 impl Session {
@@ -18,7 +18,7 @@ impl Session {
         lines.push(self.event_calls_line());
         lines.push(self.media_line());
         lines.push(self.transaction_line());
-        lines.push(self.emptied_line());
+        lines.push(self.committed_marks_line());
         match self.sql.left_inactive() {
             Some(left) => lines.push(format!("sql {}", left.line())),
             None => opaque.push(SQL_ACTIVE.to_string()),
@@ -62,12 +62,13 @@ impl Session {
         )
     }
 
-    /// The tables a DeleteAll without filters emptied, as the committed store keeps them (`MemStore::committed_marks`): a
-    /// read of a table whose rows BC holds but the runner does not know answers only while its table is emptied
-    /// (records.rs `is_unseeded`), so two sessions with the same rows can still answer differently. Sorted.
-    fn emptied_line(&self) -> String {
-        let (emptied, _) = self.store.committed_marks();
-        format!("emptied {}", content(&emptied))
+    /// The marks of the committed store the committed rows leave out (`MemStore::committed_marks`), sorted: the tables a
+    /// DeleteAll without filters emptied (a read of a table whose rows BC holds but the runner does not know answers only
+    /// while its table is emptied, records.rs `is_unseeded`) and the company copies (a read in a copy answers with its
+    /// source's backing rows, `MemStore::note_copy`). With either, two sessions with the same rows can answer otherwise.
+    fn committed_marks_line(&self) -> String {
+        let (emptied, copies) = self.store.committed_marks();
+        format!("emptied {} company copies {}", content(&emptied), content(&copies))
     }
 
     /// How often the session committed (a record's own read is current against it, `state_render.rs`) and what the last
@@ -114,5 +115,31 @@ mod tests {
         let differ: Vec<_> = a.iter().zip(&b).filter(|(x, y)| x != y).collect();
         assert_eq!(differ.len(), 1, "{differ:?}");
         assert!(differ[0].0.starts_with("emptied "), "{differ:?}");
+    }
+
+    // A company copy (`MemStore::note_copy`: a company that holds the backing rows of another) is a committed mark the
+    // committed rows leave out (`MemStore::committed_marks`), and it outlives the Commit: a read in the copy answers with
+    // its source's backing rows. Two sessions that differ only in a copy do not hold the same, though their rows are
+    // equal.
+    #[test]
+    fn a_company_copy_is_a_state_line() {
+        let (_, l) = al_sema::lower::compile(Vec::new(), &Default::default());
+        let engine = crate::Engine::new(l.program, Vec::new());
+        let mut copied = crate::Session::new(engine.clone());
+        let mut fresh = crate::Session::new(engine);
+        copied.store.note_copy("COPY", "CRONUS");
+        copied.commit_transaction();
+        fresh.commit_transaction();
+        // The SQL counters' line depends on the thread's last store operation, which the copy's note is.
+        let lines = |s: &mut crate::Session| -> Vec<String> {
+            (s.state_lines().lines.into_iter())
+                .filter(|l| !l.starts_with("sql "))
+                .collect()
+        };
+        let (a, b) = (lines(&mut copied), lines(&mut fresh));
+        assert_eq!(a.len(), b.len());
+        let differ: Vec<_> = a.iter().zip(&b).filter(|(x, y)| x != y).collect();
+        assert_eq!(differ.len(), 1, "{differ:?}");
+        assert!(differ[0].0.contains("company copies "), "{differ:?}");
     }
 }

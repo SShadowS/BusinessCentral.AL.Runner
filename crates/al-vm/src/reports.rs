@@ -72,8 +72,7 @@ pub(crate) const ITEM_VIEW_GROUP: i32 = 5;
 enum Entry {
     /// `Run` and `RunModal`: the request page opens unless the caller or the report switches it off.
     Run,
-    /// `Execute` never shows the request page
-    /// (record/TestTxModelReportExec.al:195-210, Test09).
+    /// `Execute` never shows the request page (record/TestTxModelReportExec.al:195-210, Test09).
     Execute,
     /// `Report.Print(Id, '')` of a processing-only report with UseSystemPrinter, run as an Execute (reports/
     /// Y13ReportSystemPrinter.al:357-358). Its triggers' `UseRequestPage()` is not pinned and keeps the instance's answer
@@ -516,7 +515,7 @@ impl Session {
                 let result = if quit {
                     Ok(())
                 } else {
-                    match self.report_enter_world(&schema, window) {
+                    match self.report_enter_world(&schema, window, true) {
                         Ok(enters) => {
                             let outer = std::mem::replace(&mut self.report.run_modal, id == ids::REPORT_RUNMODAL_1);
                             let outer_bare = std::mem::replace(&mut self.report.run_bare, false);
@@ -684,7 +683,7 @@ impl Session {
                 };
                 // Print never shows the request page, so only the TransactionType term applies
                 // (record/TestTxModelReportExec.al:227-239, Test11).
-                self.report_enter_world(&schema, false)?;
+                self.report_enter_world(&schema, false, false)?;
                 unsupported(format!(
                     "Report.Print of \"{}\" (what printing a processing-only report does is not pinned)",
                     schema.name()
@@ -1375,7 +1374,7 @@ impl Session {
         // request page "defaults to true"), or a static call's RequestWindow. A report without a
         // requestpage section opens its page as well (reports/TestReportRuntimeContracts.al:416-440).
         let shows_page = entry == Entry::Run && window;
-        let enters = self.report_enter_world(schema, shows_page)?;
+        let enters = self.report_enter_world(schema, shows_page, false)?;
         self.report_run_entered(inst, schema, entry, window, enters, record_ref)
     }
 
@@ -1428,6 +1427,7 @@ impl Session {
             answers_getter: entry != Entry::Print,
             depth: self.depth,
             page_triggers: self.pages.trigger_kinds.len(),
+            update_world: enters && schema.report().transaction_type.as_deref() == Some("update"),
         });
         let ran = self.report_in_world(enters, |s| s.report_body(inst, schema, shows_page, None, record_ref));
         self.report.report_running.pop();
@@ -2676,7 +2676,7 @@ impl Session {
             RefCall::StaticSaveAs
         };
         let deferred = self.report_record_ref(&inst, &schema, record_ref, !parameters.is_empty(), call)?;
-        let enters = self.report_enter_world(&schema, false)?;
+        let enters = self.report_enter_world(&schema, false, false)?;
         let plain_call = parameters.is_empty() && record_ref.is_none();
         let fresh = Dataset::for_report_save(id, &format, &target, plain_call, region.clone(), language);
         let outer = self.report.dataset.replace(fresh);
@@ -3883,7 +3883,7 @@ use request_flag::{REQUEST_PAGE_OFF, REQUEST_PAGE_OFF_UNPINNED_GETTER, REQUEST_P
 mod request_unshown;
 mod running;
 mod save_processing_only;
-mod transaction_world;
+pub(crate) mod transaction_world;
 pub(crate) mod word_xml_part;
 
 mod explicit_parent_link;

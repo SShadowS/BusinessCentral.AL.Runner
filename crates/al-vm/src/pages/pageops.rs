@@ -307,7 +307,11 @@ impl Session {
                 });
                 self.test_call_ended(&page, &result);
                 Self::factbox_line_after_set_value(method, &page, &result);
-                self.refuse_error_after_found_row_save(&page, result)
+                let result = self.refuse_error_after_found_row_save(&page, result);
+                if method == PageOp::TestFieldSetValue {
+                    return self.coded_after_set_value(&page, result);
+                }
+                result
             }
             other => unsupported(format!("{method} on {}", other.describe())),
         }
@@ -668,6 +672,7 @@ impl Session {
     fn ask_update_refresh(&mut self, st: &St, save: bool, arg: Option<&Value>) -> Result<(), Signal> {
         self.refuse_update_in_action(st)?;
         st.borrow_mut().refresh.ask_by_update(save);
+        Self::validate_view_update(st, save);
         self.note_view_left(st)?;
         self.note_part_update_left_view(st)?;
         self.land_on_code_inserted_line(st, arg)
@@ -676,6 +681,7 @@ impl Session {
     fn save_from_update(&mut self, method: PageOp, st: &St) -> Result<Value, Signal> {
         if method == PageOp::PageSaveRecord {
             st.borrow_mut().save_record_called = true;
+            self.save_record_on_code_inserted_line(st)?;
         }
         // CurrPage.SaveRecord() in the OnValidate of a part's control changes neither Rec nor xRec of the stored row; a new
         // row gets its inserted key in Rec while xRec stays the blank new row
@@ -699,12 +705,13 @@ impl Session {
             let stored = self.page_rec(st).borrow().fields.clone();
             self.set_xrec_fields(st, xrec);
             self.validate_step_saved(st, &stored);
-            st.borrow_mut().xrec_after_validate = Some(stored);
+            st.borrow_mut().xrec_after_validate = Some(stored.into_vec());
         } else {
             self.save_record_now(st, method)?;
         }
         // What `CurrPage.Update(true)` saved (al-vm pages/leave_new_line.rs, testpage/NewRowThenMove.al:73).
         st.borrow_mut().saved_by_update = method != PageOp::PageSaveRecord;
+        self.code_inserted_saved(st)?;
         Ok(Value::Null)
     }
 
@@ -1249,7 +1256,7 @@ impl Session {
                 // LookupCancel (testpage/PnGRefresh.al:996 QN_CloseQ_Sheet_RunModal_OtherChanged_CloseInAction
                 // `run-modal-result = LookupCancel`, `row-after = A,orig A`; :1113 the List page). Pinned for that read back only.
                 if let Some(fields) = fields.filter(|_| a == "LookupCancel" && st.borrow().selection.is_none()) {
-                    st.borrow_mut().selection = Some(fields);
+                    st.borrow_mut().selection = Some(fields.into_vec());
                 }
                 Ok(r)
             }

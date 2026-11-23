@@ -9,8 +9,18 @@ use al_testrun::isolation::TestIsolation;
 /// Each test of codeunit `codeunit` in `src`, each rolled back on its own: its outcome (debug form) and whether it ran through
 /// an assumption.
 pub(crate) fn run(src: &str, codeunit: &str) -> Vec<(String, String, bool)> {
+    run_with(src, codeunit, |_| {})
+}
+
+/// [`run`], with `setup` applied to the engine first (a BC version's target, for one).
+pub(crate) fn run_with(
+    src: &str,
+    codeunit: &str,
+    setup: impl FnOnce(&mut al_vm::Engine),
+) -> Vec<(String, String, bool)> {
     let l = compile(src);
-    let engine = al_vm::Engine::new(l.program.clone(), blocked(&l));
+    let mut engine = al_vm::Engine::new(l.program.clone(), blocked(&l));
+    setup(std::sync::Arc::get_mut(&mut engine).expect("a fresh engine"));
     let oi = l
         .program
         .objects
@@ -525,7 +535,7 @@ codeunit 50122 "XN Test"
     end;
 
     [Test]
-    procedure DirectFromTrigger_ReadsXRec_Refused()
+    procedure DirectFromTrigger_ReadsXRec_Runs()
     var
         Item: Record "XN Item";
     begin
@@ -587,7 +597,7 @@ codeunit 50122 "XN Test"
     end;
 
     [Test]
-    procedure DirectFromTrigger_CopyOfXRec_Refused()
+    procedure DirectFromTrigger_CopyOfXRec_Runs()
     var
         Item: Record "XN Item";
     begin
@@ -646,20 +656,24 @@ codeunit 50122 "XN Test"
 fn issue_8189_neighbors_refuse_a_read_of_xrec_or_keep_main() {
     let o = run(XREC_NEIGHBORS, "XN Test");
     let want = [
-        ("DirectFromTrigger_ReadsXRec_Refused", XREC_REFUSED, false),
+        // The codeunit called straight from the trigger: the trigger's xRec, pinned (al-runner issue 8284,
+        // record/validate/XRecTableProcThroughCodeunit.al CodeunitFromTriggerDirectly_AfterGet, record/validate/
+        // XRecTableProcThroughSubscriber.al:764), whether the procedure reads it or not.
+        ("DirectFromTrigger_ReadsXRec_Runs", PASS, false),
         ("DirectFromTrigger_NoXRecRead_Runs", PASS, false),
         // The Validate runs; only a read of the xRec it hands on refuses.
         ("OnModify_ValidateInProc_Runs", PASS, false),
         ("OnModify_ValidateInProc_TriggerReadsXRec_Refused", XREC_REFUSED, false),
-        ("DirectFromTrigger_CopyOfXRec_Refused", XREC_REFUSED, false),
+        ("DirectFromTrigger_CopyOfXRec_Runs", PASS, false),
         ("MeasuredChain_FreshRecord_Refused", XREC_REFUSED, false),
         ("MeasuredChain_FieldRefValidate_Refused", XREC_REFUSED, false),
         // Run: a record read by Get or inserted by itself, both stored (XRecTableProcThroughCodeunit.al:337-352).
         ("MeasuredChain_ReadByFindFirst_Refused", XREC_REFUSED, false),
         ("MeasuredChain_Temporary_Refused", XREC_REFUSED, false),
-        // The pinned chain hands the trigger's xRec on whether the procedure reads it or not.
-        ("MeasuredChain_NoXRecRead_Runs", PASS, false),
-        ("NoRunningCall_PlainCall_BlankXRec", PASS, false),
+        // The pinned chain hands the trigger's xRec on whether the procedure reads it or not. Each writes after refused
+        // tests whose reach is not fully known, so the type they left is not known: the write is marked.
+        ("MeasuredChain_NoXRecRead_Runs", PASS, true),
+        ("NoRunningCall_PlainCall_BlankXRec", PASS, true),
     ];
     check(&o, &want);
 }
@@ -816,7 +830,7 @@ codeunit 50144 "XG Test"
     end;
 
     [Test]
-    procedure BaseTrigger_Codeunit_ExtProc_ReadsXRec_Refused()
+    procedure BaseTrigger_Codeunit_ExtProc_ReadsXRec_Runs()
     var
         Item: Record "XG Item";
     begin
@@ -825,7 +839,7 @@ codeunit 50144 "XG Test"
     end;
 
     [Test]
-    procedure ExtCode_CallsOtherExtProc_PlainCall()
+    procedure ExtCode_CallsOtherExtProc_Refused()
     var
         Item: Record "XG Item";
     begin
@@ -851,11 +865,15 @@ fn issue_8189_get_of_a_written_row_and_running_extension_triggers_refuse() {
             XREC_REFUSED,
             false,
         ),
-        // The running call is a trigger of a table extension, or the called procedure is one of a table extension.
+        // The running call is a trigger of a table extension: not measured.
         ("ExtTrigger_Codeunit_BaseProc_ReadsXRec_Refused", XREC_REFUSED, false),
-        ("BaseTrigger_Codeunit_ExtProc_ReadsXRec_Refused", XREC_REFUSED, false),
-        // A table extension's own code calling another table extension's procedure: a plain call, as on main.
-        ("ExtCode_CallsOtherExtProc_PlainCall", PASS, false),
+        // The called procedure is one of a table extension: the base trigger's xRec, pinned (al-runner issue 8284,
+        // record/validate/XRecTableProcThroughCodeunit.al BaseField_Codeunit_ExtProc, record/validate/
+        // XRecTableProcThroughSubscriber.al:647).
+        ("BaseTrigger_Codeunit_ExtProc_ReadsXRec_Runs", PASS, false),
+        // A table extension's procedure that the codeunit calls (as above, with the trigger's xRec) calls another table
+        // extension's procedure on Rec: not measured, and no longer main's blank xRec (review of PR 8304, 2026-11-20).
+        ("ExtCode_CallsOtherExtProc_Refused", XREC_REFUSED, false),
     ];
     check(&o, &want);
 }
