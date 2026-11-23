@@ -15,6 +15,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 mod autoinc;
+mod bg_readisolation_lock;
 mod bgsession;
 mod blob_copy;
 mod blob_transfer;
@@ -123,6 +124,7 @@ mod permissions;
 mod platform;
 mod profile;
 mod queries;
+mod query_cache;
 mod query_date_filter;
 mod query_reopen;
 mod query_save_as;
@@ -151,6 +153,7 @@ mod report_save;
 mod reports;
 mod resource_reads;
 mod run_page_link_open;
+mod session_fields;
 mod sessionops;
 mod setup_no_op;
 mod slot_default;
@@ -172,6 +175,7 @@ mod tenant_set_delete;
 mod test_rows;
 mod test_runner_host;
 mod testdata;
+mod transaction_type;
 mod transactions;
 mod translations;
 mod ui;
@@ -725,9 +729,11 @@ impl Engine {
         self.codeunits.get(&id).and_then(|c| c.any)
     }
 
-    /// The value of type `T` made from this engine's program, made by `make` the first time it is asked for and shared
-    /// by every session and thread of the engine after that: for data that depends on the program alone (al-testrun's
-    /// index of the static reach). `make` must not ask the engine for derived data itself.
+    /// The value of type `T` made by `make` the first time it is asked for and shared by every session and thread of the
+    /// engine after that: for data that depends on the program alone (al-testrun's index of the static reach), and for
+    /// state that lives as long as the engine and that every session adds to, as one value (al-testrun's login replay
+    /// check, `login_replay.rs`: its tally behind a lock, across the engine's requests). `make` must not ask the engine
+    /// for derived data itself.
     pub fn derived<T: std::any::Any + Send + Sync>(&self, make: impl FnOnce() -> T) -> Arc<T> {
         let mut slots = self.derived.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let slot = slots
@@ -875,6 +881,8 @@ pub struct Session {
     pub(crate) isolated_set_in_test: std::collections::HashSet<(String, String)>,
     /// The isolated storage keys this test codeunit set, in this test or an earlier one (isolated_storage_reads.rs).
     pub(crate) isolated_written_in_codeunit: std::collections::HashSet<(String, String)>,
+    /// The rows this test codeunit wrote and the tables it locked, as a page background task's locking read meets them.
+    pub(crate) row_locks: bg_readisolation_lock::CodeunitRowLocks,
     /// What a later test of the running codeunit may not reach (`storage_checkpoint.rs`).
     unmeasured: storage_checkpoint::Unmeasured,
     /// The TaskScheduler tasks this session created (`tasks.rs`).
@@ -994,14 +1002,22 @@ pub struct Session {
     /// The records (by handle) whose `validating` entry a part's link stamp pushed (`stamp_from_filters_seen_as`): the
     /// platform validates the link value, so the entry holds whatever code runs at that moment.
     pub(crate) stamp_validating: Vec<usize>,
+    /// The OnBeforeValidateEvent or OnAfterValidateEvent being raised now, innermost last (`records/validate_event_xrec.rs`).
+    pub(crate) validate_events: Vec<crate::records::ValidateEvent>,
     /// The call site named for the Validate about to start, with its record's handle (`Session::validate_at`).
     pub(crate) validate_site: Option<(usize, crate::records::ValidateSite)>,
-    /// The Validates running now, innermost last: the record's handle and the call site (`Session::take_validate_site`).
-    pub(crate) validate_sites: Vec<(usize, Option<crate::records::ValidateSite>)>,
+    /// The Validates running now, innermost last (`Session::while_validating`).
+    pub(crate) validate_sites: Vec<crate::records::ValidateRun>,
     /// The table procedures that run on a record by a plain call (no operation of the record called them), innermost
     /// last: the record's handle, the depth of `call_stack` inside the procedure and its blank xRec. A Validate of that
     /// record in the procedure's own body passes this xRec (`RecordOp::Validate`).
     pub(crate) plain_proc_xrec: Vec<(usize, usize, crate::records::Rec)>,
+    /// The xRecs of the table procedures that run on a record with an xRec they share with their caller or a running call
+    /// (`ProcXrec::Shared` and `ProcXrec::SharedReadOnly`), innermost last.
+    pub(crate) shared_proc_xrec: Vec<crate::records::Rec>,
+    /// The `call_stack` index of each frame an interface method call entered (`run_iface`), innermost last: the codeunit
+    /// procedure is reached through an interface (records/running_call_xrec.rs tells the chains apart by it).
+    pub(crate) iface_frames: Vec<usize>,
     pub(crate) cx: al_data::AccessContext,
     /// The tables that held a row when the install baseline was captured (none without one).
     pub(crate) baseline_rows: std::collections::BTreeSet<u32>,
@@ -1018,8 +1034,8 @@ pub struct Session {
     /// (`Ctx::field_error_with_form`); `None` outside such a call.
     pub(crate) field_error_form: Option<al_builtins::native::ErrorTextForm>,
     /// The parameters of the routine that just failed with an error, as it left them:
-    /// the caller writes its `var` arguments back before it handles the error. Where the error ends without such a caller
-    /// (caught or held), `caught_errors.rs` clears it.
+    /// the caller writes its `var` arguments back before it handles the error. Each call site clears it before its call
+    /// (interp.rs), so it takes only what its own routine left; see caught_errors.rs.
     pub(crate) error_finals: Option<Vec<Value>>,
     /// The scalar globals passed by `var` to a procedure call that is still running. BC passes the argument by reference,
     /// the runtime copies it in and back; the two differ only when code reaches the global by its own name while the call
@@ -1161,6 +1177,9 @@ pub struct Session {
     /// The host move whose parts are reading again: Next and Previous, a GoToKey or GoToRecord that stayed on the row, and the
     /// moves `pageops.rs` syncs in its last branch (GoToRecord, GoToKey and the others) (`pages/empty_part_rec.rs`).
     pub(crate) host_move_running: Option<pages::HostMove>,
+    /// The part whose calls after the test's own filter take the steps of `pages/part_update_left_view.rs`
+    /// (`TestFilterReread`): a test call on any other page ends them.
+    pub(crate) test_filter_steps: Option<std::rc::Weak<std::cell::RefCell<pages::PageState>>>,
     /// A host move syncs a part that serves its rows from OnFindRecord or OnNextRecord: the part keeps its rows when its link
     /// values did not change (`pages/parts.rs` `sync_parts_with`).
     /// `Some(true)`: a part that shows no row or only its blank line stays as it is too (a part linked through a Provider that
@@ -1186,6 +1205,8 @@ pub struct Session {
     /// the session company's rows as they were, so the rows install code wrote there are known
     /// (`Session::copy_company`, `Session::cx_for`).
     pub(crate) full_copies: std::collections::BTreeSet<String>,
+    /// Rows whose SystemRowVersion is the Insert's, not BC's (`crate::state::RestampedRows`).
+    pub(crate) restamped_rows: Vec<crate::state::RestampedRows>,
     /// While `Database.CopyCompany` inserts the Company row: why the `RunTrigger` of the Company's insert events is not
     /// known. The subscribers get it as an unknown value (`Session::table_event`).
     pub(crate) run_trigger_unknown: Option<&'static str>,
@@ -1376,6 +1397,7 @@ impl Session {
             backed_companies,
             company_unknown: Default::default(),
             full_copies: Default::default(),
+            restamped_rows: Vec::new(),
             run_trigger_unknown: None,
             package_load: false,
             sleep_budget: None,
@@ -1432,9 +1454,12 @@ impl Session {
             truncate_undo: Default::default(),
             validating: Vec::new(),
             stamp_validating: Vec::new(),
+            validate_events: Vec::new(),
             validate_site: None,
             validate_sites: Vec::new(),
             plain_proc_xrec: Vec::new(),
+            shared_proc_xrec: Vec::new(),
+            iface_frames: Vec::new(),
             cx: al_data::AccessContext {
                 company: company.into(),
                 user: user.into(),
@@ -1459,6 +1484,7 @@ impl Session {
             isolated_committed: Default::default(),
             isolated_set_in_test: Default::default(),
             isolated_written_in_codeunit: Default::default(),
+            row_locks: Default::default(),
             unmeasured: Default::default(),
             tasks: Default::default(),
             install_scope: false,
@@ -1529,6 +1555,7 @@ impl Session {
             host_new_running: None,
             part_open_running: false,
             host_move_running: None,
+            test_filter_steps: None,
             part_sync_keeps_same_link: None,
             dotnet: Default::default(),
             application_areas: String::new(),
@@ -1550,8 +1577,9 @@ impl Session {
         session
     }
 
-    /// What the AL test runner does before each test method: every application area on, and the
-    /// transaction type back at UpdateNoLocks. What an earlier test wrote to a demo table does not count for this one: the corpus
+    /// What the AL test runner does before each test method: every application area on, and the transaction type of the
+    /// method's start (`start_test_transaction`: UpdateNoLocks for the first one of a codeunit, the type the one before
+    /// left for a later one). What an earlier test wrote to a demo table does not count for this one: the corpus
     /// tests that write setup rows put the demo values back afterwards (record/QkSetupRows.al), which leaves the
     /// runtime with the install-code row (record/captions/QdCaptionClassAreas.al:798 QF_GLSetup_CorpusRow).
     pub fn start_test_method(&mut self) {
@@ -1569,34 +1597,8 @@ impl Session {
         self.isolated_set_in_test.clear();
         self.demo_written.clear();
         self.gl_setup_written = false;
-        self.tx.transaction_type = crate::transactions::TRANSACTION_TYPE_UPDATE_NO_LOCKS;
-        self.tx.phase = crate::transactions::TxPhase::Fresh;
-        self.tx.open.locks = Default::default();
-        self.tx.open.at_test_start = true;
+        self.start_test_transaction();
         self.pages.test_methods_started += 1;
-    }
-
-    /// Makes every change so far durable (and a Truncate of this transaction final).
-    pub fn commit_transaction(&mut self) {
-        self.guarded_body_commit();
-        al_data::Store::commit(&mut self.store);
-        self.crm_committed();
-        self.commits += 1;
-        self.sql.committed();
-        self.truncate_undo.clear();
-        // Rows at or below this rowversion are durable: a buffer older than one of them is stale.
-        self.tx.committed_row_version = self.next_row_version;
-        // A transaction a lock opened counts as one that wrote: MinimumActiveRowVersion after it is not pinned.
-        self.tx.last_commit_wrote = self.tx.phase == crate::transactions::TxPhase::Write || self.tx.open.locks.lock_tx;
-        self.end_open_transaction();
-        self.tx.rolled_back = false;
-        self.tx.rollback_unpinned = None;
-        self.tx.rollback_kind = None;
-        self.isolated_committed = self.isolated_storage.clone();
-        self.pages.saved_values_committed = self.pages.saved_values.clone();
-        self.tasks.commit();
-        let removed = std::mem::take(&mut self.media_removed.0);
-        self.media_removed.1.extend(removed);
     }
 
     /// The test runner took a checkpoint of the committed data: what was removed before it stays removed.
@@ -1648,12 +1650,15 @@ impl Session {
     }
 
     pub fn rollback_transaction(&mut self) {
+        self.note_row_locks_rollback();
         self.note_rollback_for_stale_rule();
         al_data::Store::rollback(&mut self.store);
         self.rollbacks += 1;
         self.crm_rolled_back();
         self.sql.rolled_back();
+        let runner_tx = self.tx.open.runner_tx;
         self.end_open_transaction();
+        self.tx.open.runner_tx = runner_tx;
         self.tx.rolled_back = true;
         self.isolated_storage = self.isolated_committed.clone();
         // What SaveValues pages stored is kept in the database: a rollback takes back what was stored since the last commit. An
@@ -1734,6 +1739,7 @@ impl Session {
                     globals: Default::default(),
                     unpinned_buffer: None,
                     view_assumption: None,
+                    auto_calc_dropped: false,
                     run_page_link: None,
                 })))
             }
@@ -2010,6 +2016,7 @@ impl Session {
 
     pub fn mark_install_end(&mut self) {
         self.install_row_version = self.next_row_version;
+        self.reset_query_cache();
     }
 
     /// The `SessionId()` this session answers: an install session's own id, else the host's.
@@ -2713,7 +2720,7 @@ impl Session {
             if e.call_stack.is_empty() {
                 self.error_raised_in = Some(object);
             }
-            self.add_frame(e, object, top);
+            self.add_leaving_frame(e, object, top);
         }
         self.profile_leave();
         self.call_stack.pop();

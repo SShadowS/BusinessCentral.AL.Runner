@@ -703,7 +703,7 @@ pub(crate) struct Unit {
     /// See `RunOptions::skip_after_timeout`.
     skip_after_timeout: bool,
     /// See `RunOptions::stop_after_first_failure`.
-    stop_after_first_failure: bool,
+    stop_after_first_failure: Option<run::StopAfterFailure>,
     /// See `RunOptions::perturb`.
     perturb: crate::stability::Perturb,
     /// See `RunOptions::run_seed`.
@@ -791,7 +791,7 @@ pub(crate) struct Scratch {
     /// See `RunOptions::skip_after_timeout`.
     skip_after_timeout: bool,
     /// See `RunOptions::stop_after_first_failure`.
-    stop_after_first_failure: bool,
+    stop_after_first_failure: Option<run::StopAfterFailure>,
     /// See `RunOptions::perturb`.
     perturb: crate::stability::Perturb,
     /// See `RunOptions::run_seed`.
@@ -965,7 +965,7 @@ fn run_unit(
             flags: u.flags,
             report_unpinned_errors: u.report_unpinned_errors,
             skip_after_timeout: u.skip_after_timeout,
-            stop_after_first_failure: u.stop_after_first_failure,
+            stop_after_first_failure: u.stop_after_first_failure.clone(),
             perturb: u.perturb.clone(),
             run_seed: u.run_seed,
             runner: u.runner,
@@ -1105,7 +1105,7 @@ fn scratch_unit(
         flags: Default::default(),
         report_unpinned_errors: false,
         skip_after_timeout: false,
-        stop_after_first_failure: false,
+        stop_after_first_failure: None,
         perturb: Default::default(),
         run_seed: opts.run_seed,
         runner: None,
@@ -1233,6 +1233,7 @@ mod apply_manifests;
 mod baseline_key;
 mod blocked;
 mod cache;
+mod carry_after;
 mod case_lookup;
 mod chain;
 mod chain_walk;
@@ -1242,6 +1243,8 @@ mod corpus;
 mod data_driven;
 #[cfg(test)]
 mod diagnostics_tests;
+#[cfg(test)]
+mod disabled_login_memo_tests;
 mod discovery;
 #[cfg(test)]
 mod group1_sessions_tests;
@@ -1259,6 +1262,7 @@ mod lane_starts;
 mod login_explain_tests;
 #[cfg(test)]
 mod login_image_tests;
+mod login_memo_tests;
 #[cfg(test)]
 mod login_replay_tests;
 #[cfg(test)]

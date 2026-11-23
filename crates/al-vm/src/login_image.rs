@@ -3,10 +3,15 @@
 //! ([`Session::thaw_login_image`]). Nothing replays from it yet: al-testrun `login_replay.rs` freezes each new key's
 //! session, thaws it into a twin and compares the two with the login replay check, its differential test.
 //!
-//! Every field of `Session` is in one class of the table in `fields.rs`. The image holds the `plain` fields by value, the
-//! sub-states and counters of `session_parts.rs`, the committed rows as a `SharedBaseline` (ADR-069's form, so no Blob
-//! buffer is shared with the session that goes on to run its tests), and the SingleInstance object graph as an arena
-//! (`arena.rs`). A field of the `refuse` or `rest` class that does not hold a new session's value means no image.
+//! Every field of `Session` is in one class of the session field table (`session_fields.rs`). The image holds the `plain`
+//! fields by value (`fields.rs`, made from the table), the sub-states and counters of `session_parts.rs`, the committed
+//! rows as a `SharedBaseline` (ADR-069's form, so no Blob buffer is shared with the session that goes on to run its
+//! tests), and the SingleInstance object graph as an arena (`arena.rs`). A field of the `refuse` or `rest` class that
+//! does not hold a new session's value means no image (`Session::image_refused_field`, `Session::at_rest_why`).
+//!
+//! Of the session state the table lists outside `Session`'s fields, what is the session's own is imaged: the emptied
+//! marks of the store (`emptied`, test `a_table_the_login_emptied_stays_emptied_in_the_twin`) and an ErrorInfo's call
+//! stack (`ErrorInfoNode::callstack`, test `an_error_infos_call_stack_follows_it_into_the_twin`).
 //!
 //! The thaw's target is a session made by `Session::with_host` on the image's engine with the run's session flags
 //! applied: every field the image does not write keeps that new session's value. It writes through the session's own
@@ -106,7 +111,7 @@ impl Session {
         if let Some(field) = self.at_rest_why() {
             return Err(NotImaged::NotAtRest(field));
         }
-        if let Some(field) = self.refused_field() {
+        if let Some(field) = self.image_refused_field() {
             return Err(NotImaged::Field(field));
         }
         if self.store.has_uncommitted() {
@@ -141,7 +146,7 @@ impl Session {
             "an image is thawn on the engine it was taken on"
         );
         assert!(
-            self.at_rest() && self.refused_field().is_none(),
+            self.at_rest_why().is_none() && self.image_refused_field().is_none(),
             "the thaw's target is a new session"
         );
         self.restore_baseline(&image.rows.thaw(Some(&self.engine)));

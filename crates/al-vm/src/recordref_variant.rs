@@ -85,8 +85,7 @@ impl VariantRefs {
     /// Holds what a new session holds as far as code can tell: no `GetTable` runs, every Variant-held handle is gone and
     /// every typed alias pair has a half that is gone. Each reader upgrades the handles and passes over a gone one (a pair
     /// only when both halves live: `has_typed_alias`), and each note drops them first (`note_variant_held`,
-    /// `copy_typed_alias`), so such lists answer as empty ones.
-    /// A session image (al-vm `login_image`) requires this.
+    /// `copy_typed_alias`), so such lists answer as empty ones. What a session image of the login requires (issue 8211).
     pub(crate) fn holds_no_live_handle(&self) -> bool {
         let VariantRefs {
             get_table,

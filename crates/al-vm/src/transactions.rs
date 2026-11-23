@@ -131,9 +131,6 @@ pub(crate) fn al_error(message: &str) -> Signal {
     al_error_code(message, "")
 }
 
-/// `TxState::transaction_type` of a test's start: the TransactionType member UpdateNoLocks
-/// (session-system/ProbeSystemEnumMembers.al:60-161).
-pub(crate) const TRANSACTION_TYPE_UPDATE_NO_LOCKS: i32 = 0;
 /// How far the open transaction has started (`TxState::phase`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub(crate) enum TxPhase {
@@ -290,8 +287,8 @@ impl Session {
         self.tx_model == TxModel::None && self.tx.tx_world == 0
     }
 
-    /// `Commit()`. The next transaction's type is Update until a set changes it
-    /// (session-system/ProbeSystemEnumMembers.al:94-112, TestClearAllTransactionTypeContracts.al:245-253). A `[CommitBehavior(Ignore)]` scope turns it into a no-op, and exempts it from
+    /// `Commit()`. The next transaction keeps the type until a set changes it ([`Self::keep_type_at_commit`]). A
+    /// `[CommitBehavior(Ignore)]` scope turns it into a no-op, and exempts it from
     /// the `AutoRollback` refusal (record/TestTransactionModelAutoRollback.al:Test07); the
     /// `AutoRollback` refusal outranks `[CommitBehavior(Error)]` (:Test08).
     pub(crate) fn commit_builtin(&mut self) -> Result<(), Signal> {
@@ -319,16 +316,17 @@ impl Session {
         }
         // A deferred duplicate-key Insert comes out here (corpus record/TestRecordRuntimeTextsAndViews.al:
         // Record_Insert_DuplicateKey_WithoutBlobField_IsDeferred_...: "raised by Commit").
-        if let Some((_, e)) = self.tx.open.deferred_insert.take() {
-            return Err(Signal::Error(Box::new(e)));
+        if let Some(d) = self.tx.open.deferred_insert.take() {
+            return Err(Signal::Error(Box::new(d.error)));
         }
         self.commit_transaction();
         // A Commit puts LockTimeout back on (session-system/PnBRecordMisc.al:LastUsedRowVersion_AndLockTimeout
         // `lockTimeoutAfterCommit`). The timeout duration is not pinned.
         self.tx.lock_timeout = true;
-        // The next transaction has not started and its type is Update (see `TxState::phase`).
+        // The next transaction has not started (see `TxState::phase`).
         self.tx.phase = TxPhase::Fresh;
-        self.tx.transaction_type = 1;
+        self.keep_type_at_commit();
+        self.moment_after_commit();
         Ok(())
     }
 
@@ -368,12 +366,12 @@ impl Session {
             .open
             .deferred_insert
             .as_ref()
-            .map(|(t, _)| self.engine.program.objects[*t].name.clone())
+            .map(|d| self.engine.program.objects[d.table].name.clone())
     }
 
     /// Takes the error of a duplicate-key `Insert` that is still deferred, for the test runner at the end of a test.
     pub fn take_deferred_insert_error(&mut self) -> Option<AlError> {
-        self.tx.open.deferred_insert.take().map(|(_, e)| e)
+        self.tx.open.deferred_insert.take().map(|d| d.error)
     }
 
     pub fn inconsistent_table(&self) -> Option<String> {
@@ -443,7 +441,7 @@ impl Session {
     }
 
     /// Whether routine `r` of object `o` is a `[Test]` method of a test codeunit.
-    fn is_test_method(&self, o: usize, r: usize) -> bool {
+    pub(crate) fn is_test_method(&self, o: usize, r: usize) -> bool {
         self.declared_subtype(o).is_some_and(|s| s.eq_ignore_ascii_case("Test"))
             && self.engine.program.objects[o].routines[r]
                 .attributes
@@ -871,8 +869,8 @@ impl Session {
             }
         }
 
-        // A run ends the moment the Update report term is measured at (`OpenTx::at_test_start`).
-        self.tx.open.at_test_start = false;
+        // A run ends the moment an Update report without its request page is measured at (`OpenTx::moment`).
+        self.tx.open.moment = None;
         let on_run = obj
             .routines
             .iter()
@@ -947,8 +945,8 @@ impl Session {
                 // (testpage/TestPageBgTaskTx_Tests.al:RunPageBackgroundTask_WorkerCommitLeavesCallersRowsUncommitted).
                 // A duplicate-key Insert that was deferred comes out of that commit: the run fails with its error
                 // (xmlports/import/XpTImportBasic.al:Import_DuplicateKeyExisting, through a guarded run).
-                if let Some((_, e)) = self.tx.open.deferred_insert.take() {
-                    let mut e = Box::new(e);
+                if let Some(d) = self.tx.open.deferred_insert.take() {
+                    let mut e = Box::new(d.error);
                     self.add_top_frame(&mut e);
                     if self.pages.bg_worker.is_none() {
                         self.rollback_transaction();
@@ -1044,6 +1042,33 @@ impl Session {
             self.commit_transaction();
         }
         r
+    }
+
+    /// Makes every change so far durable (and a Truncate of this transaction final).
+    pub fn commit_transaction(&mut self) {
+        self.note_row_locks_commit();
+        self.note_commit_for_query_cache();
+        self.guarded_body_commit();
+        self.send_pending_inserts();
+        al_data::Store::commit(&mut self.store);
+        self.crm_committed();
+        self.commits += 1;
+        self.sql.committed();
+        self.truncate_undo.clear();
+        // Rows at or below this rowversion are durable: a buffer older than one of them is stale.
+        self.tx.committed_row_version = self.next_row_version;
+        // A transaction a lock opened counts as one that wrote: MinimumActiveRowVersion after it is not pinned.
+        self.tx.last_commit_wrote = self.tx.phase == crate::transactions::TxPhase::Write || self.tx.open.locks.lock_tx;
+        self.end_open_transaction();
+        self.tx.runner_tx_rolled_back = false;
+        self.tx.rolled_back = false;
+        self.tx.rollback_unpinned = None;
+        self.tx.rollback_kind = None;
+        self.isolated_committed = self.isolated_storage.clone();
+        self.pages.saved_values_committed = self.pages.saved_values.clone();
+        self.tasks.commit();
+        let removed = std::mem::take(&mut self.media_removed.0);
+        self.media_removed.1.extend(removed);
     }
 }
 

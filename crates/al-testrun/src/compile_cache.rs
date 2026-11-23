@@ -126,15 +126,87 @@ impl Layers {
 /// builtins catalog. It cannot miss a crate, which a hash of source files can.
 pub fn runtime_build() -> [u8; 32] {
     static HASH: OnceLock<[u8; 32]> = OnceLock::new();
-    *HASH.get_or_init(|| {
-        let bytes = std::env::current_exe().and_then(std::fs::read);
-        match bytes {
-            Ok(b) => hash_build_bytes(&b),
-            // Without the executable the key cannot say which compiler made an entry: a hash of
-            // the time would only ever miss. Use a value no file can match.
-            Err(e) => Sha256::digest(format!("no executable: {e}").as_bytes()).into(),
-        }
-    })
+    *HASH.get_or_init(|| build_identity(read_pinned(pin_running_executable()), process_nonce()))
+}
+
+/// The open file of the executable this process started from, kept from [`pin_running_executable`]. The hash of
+/// [`runtime_build`] is made later (on first use), and a handle opened at start still reads the build that runs when
+/// the file at the path was replaced since (an upgrade, a rebuild): on macOS and Windows the path alone would give the
+/// key the new build's identity (issue 8691).
+static PINNED_EXECUTABLE: OnceLock<std::io::Result<PinnedFile>> = OnceLock::new();
+
+/// Opens the running executable and keeps the handle. Call it first thing in `main`; later calls do nothing.
+pub fn pin_running_executable() -> &'static std::io::Result<PinnedFile> {
+    PINNED_EXECUTABLE.get_or_init(open_running_executable)
+}
+
+fn open_running_executable() -> std::io::Result<PinnedFile> {
+    // On Linux `/proc/self/exe` opens the file the process runs from even when its path was deleted or replaced.
+    #[cfg(target_os = "linux")]
+    if let Ok(f) = std::fs::File::open("/proc/self/exe") {
+        return PinnedFile::new(f);
+    }
+    PinnedFile::new(std::fs::File::open(std::env::current_exe()?)?)
+}
+
+/// An open file with its size and modification time at pin time. A rename over the path leaves the handle on the old
+/// file; an overwrite in place (`cp` onto it) changes the file itself, which the two values show: the hash then
+/// refuses to read it, and the key takes the process's own value (a cache miss, never a wrong hit).
+pub struct PinnedFile {
+    file: std::fs::File,
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+}
+
+impl PinnedFile {
+    fn new(file: std::fs::File) -> std::io::Result<PinnedFile> {
+        let m = file.metadata()?;
+        Ok(PinnedFile {
+            file,
+            len: m.len(),
+            modified: m.modified().ok(),
+        })
+    }
+}
+
+/// All bytes of the pinned file, read from the handle (the file at its old path is not looked at). An error when the
+/// file changed in place since the pin.
+fn read_pinned(pinned: &std::io::Result<PinnedFile>) -> std::io::Result<Vec<u8>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let p = match pinned {
+        Ok(p) => p,
+        Err(e) => return Err(std::io::Error::new(e.kind(), e.to_string())),
+    };
+    let m = p.file.metadata()?;
+    if m.len() != p.len || m.modified().ok() != p.modified {
+        return Err(std::io::Error::other(
+            "the executable changed in place since the process started",
+        ));
+    }
+    let mut f = &p.file;
+    let mut bytes = Vec::new();
+    f.seek(SeekFrom::Start(0))?;
+    f.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+/// A value of this process alone ([`build_identity`] without the executable): the time and the process id.
+fn process_nonce() -> u128 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    now ^ (u128::from(std::process::id()) << 96)
+}
+
+/// The build hash of `bytes`, the running executable. Without it the key cannot say which build made an entry, and one
+/// value for every such build would let two builds read each other's entries (a program another build lowered): the
+/// value is then this process's own (`nonce`), so its entries are never read by another process. A miss, never a wrong
+/// program.
+fn build_identity(bytes: std::io::Result<Vec<u8>>, nonce: u128) -> [u8; 32] {
+    match bytes {
+        Ok(b) => hash_build_bytes(&b),
+        Err(e) => Sha256::digest(format!("no executable ({e}), process {nonce:032x}").as_bytes()).into(),
+    }
 }
 
 /// The chunk size of [`hash_build_bytes`].
@@ -832,5 +904,67 @@ pub fn write_index(dir: &Path, key: &Key, index: &[Vec<al_sema::FileIndex>]) {
         let _ = std::fs::remove_file(&tmp);
     } else {
         prune(dir, &[path]);
+    }
+}
+
+#[cfg(test)]
+mod build_identity_tests {
+    use super::*;
+
+    fn unreadable() -> std::io::Result<Vec<u8>> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "No such file or directory",
+        ))
+    }
+
+    // Two builds that cannot read their executable never share a value: each process has its own, so neither reads
+    // what the other wrote.
+    #[test]
+    fn without_the_executable_two_processes_never_share_a_build_hash() {
+        assert_ne!(build_identity(unreadable(), 1), build_identity(unreadable(), 2));
+    }
+
+    #[test]
+    fn with_the_executable_the_build_hash_is_the_hash_of_its_bytes() {
+        let bytes = b"an executable".to_vec();
+        assert_eq!(build_identity(Ok(bytes.clone()), 1), hash_build_bytes(&bytes));
+        assert_eq!(build_identity(Ok(bytes.clone()), 2), hash_build_bytes(&bytes));
+    }
+
+    // Issue 8691: the file at the path is replaced after the process started (an upgrade); the identity stays the
+    // one of the file that was opened at start.
+    #[test]
+    fn a_pinned_executable_keeps_its_identity_when_the_file_at_its_path_is_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("alrunner");
+        std::fs::write(&path, b"old build").unwrap();
+        let pinned = std::fs::File::open(&path).and_then(PinnedFile::new);
+        let new = dir.path().join("alrunner.new");
+        std::fs::write(&new, b"new build, longer").unwrap();
+        std::fs::rename(&new, &path).unwrap();
+        let bytes = read_pinned(&pinned).unwrap();
+        assert_eq!(build_identity(Ok(bytes), 1), hash_build_bytes(b"old build"));
+    }
+
+    // An overwrite in place (cp onto the file) changes the file the handle holds: no hash of the new bytes.
+    #[test]
+    fn a_pinned_executable_overwritten_in_place_gives_no_build_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("alrunner");
+        std::fs::write(&path, b"old build").unwrap();
+        let pinned = std::fs::File::open(&path).and_then(PinnedFile::new);
+        std::fs::write(&path, b"new build, longer").unwrap();
+        let bytes = read_pinned(&pinned);
+        assert!(bytes.is_err());
+        let a = build_identity(bytes, 1);
+        assert_ne!(a, hash_build_bytes(b"new build, longer"));
+        assert_ne!(a, build_identity(read_pinned(&pinned), 2));
+    }
+
+    #[test]
+    fn the_pinned_running_executable_reads_the_test_binary() {
+        let bytes = read_pinned(pin_running_executable()).expect("the test binary reads itself");
+        assert_eq!(bytes, std::fs::read(std::env::current_exe().unwrap()).unwrap());
     }
 }
