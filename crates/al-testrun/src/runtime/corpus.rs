@@ -403,6 +403,11 @@ impl CorpusRuntime {
             false,
             &mut Grow::Off,
         )
+        .map(|(mut c, store)| {
+            // The caller goes on with the compile: a warm server keeps it, a test runs on it.
+            store.go_on(&mut c);
+            c
+        })
     }
 
     /// [`compile_suites`](Self::compile_suites); with `lean`, selected tests that are free of data are compiled without
@@ -419,7 +424,7 @@ impl CorpusRuntime {
         opts: &RunOptions,
         lean: bool,
         grow: &mut Grow,
-    ) -> Result<Compiled, String> {
+    ) -> Result<(Compiled, super::workspace_layer::Store), String> {
         use al_sema::check::tdd_decl;
         let ranges: std::collections::BTreeMap<String, Vec<(u32, u32)>> = if opts.tdd {
             apps.iter()
@@ -432,7 +437,7 @@ impl CorpusRuntime {
         } else {
             Default::default()
         };
-        let mut compiled =
+        let (mut compiled, mut store) =
             Self::compile_suites_once(apps, kinds, manifests, symbols, target, suites, opts, lean, grow)?;
         // `--tdd` (ADR-051 decision 10): the fields, enum values and objects the test apps need are declared in a stub
         // file of each, and the apps are compiled again (a stub table's fields are found only once it exists).
@@ -444,7 +449,7 @@ impl CorpusRuntime {
             let files = tdd_decl::stub_files(&compiled.ws, &seen, &ranges);
             let (mut apps, kinds) = compiled.into_apps();
             tdd_decl::set_stub_files(&mut apps, files);
-            compiled = Self::compile_suites_once(
+            let (next, more) = Self::compile_suites_once(
                 apps,
                 kinds,
                 manifests,
@@ -455,8 +460,10 @@ impl CorpusRuntime {
                 lean,
                 &mut Grow::Off,
             )?;
+            compiled = next;
+            store = store.and(more);
         }
-        Ok(compiled)
+        Ok((compiled, store))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -470,7 +477,7 @@ impl CorpusRuntime {
         opts: &RunOptions,
         lean: bool,
         grow: &mut Grow,
-    ) -> Result<Compiled, String> {
+    ) -> Result<(Compiled, super::workspace_layer::Store), String> {
         // AL_NO_BASELINE=1 leaves the install baseline out (to measure what it costs).
         let baseline_wanted =
             kinds.contains(&al_sema::AppKind::Dependency) && std::env::var_os("AL_NO_BASELINE").is_none();
@@ -513,33 +520,9 @@ impl CorpusRuntime {
         // How many apps, from the first of the program, the compile cache holds.
         let mut n_cached = 0;
         let order: Option<Vec<usize>> = if use_cache {
-            // Dependency apps first, Microsoft's before the others (the layers of the compile
-            // cache follow this order), then the dependency apps that stand on a workspace app,
-            // then the workspace's.
-            let in_order = |deps: Vec<usize>| -> Vec<usize> {
-                let dep_apps: Vec<&al_sema::workspace::AppSource> = deps.iter().map(|&i| &apps[i]).collect();
-                let dep_manifests: Vec<Manifest> = deps
-                    .iter()
-                    .map(|&i| manifests.get(i).cloned().unwrap_or_default())
-                    .collect();
-                crate::compile_cache::dependency_order(&dep_apps, &dep_manifests)
-                    .into_iter()
-                    .map(|k| deps[k])
-                    .collect()
-            };
-            let cached = in_order(
-                (0..n_apps)
-                    .filter(|&i| kinds[i] == al_sema::AppKind::Dependency && !on_workspace[i])
-                    .collect(),
-            );
-            n_cached = cached.len();
-            Some(
-                cached
-                    .into_iter()
-                    .chain(in_order((0..n_apps).filter(|&i| on_workspace[i]).collect()))
-                    .chain((0..n_apps).filter(|&i| kinds[i] != al_sema::AppKind::Dependency))
-                    .collect(),
-            )
+            let (order, cached) = cache_order(&apps, &kinds, manifests, &on_workspace);
+            n_cached = cached;
+            Some(order)
         } else if grow_order.is_some() {
             grow_order
         } else if let Grow::Keep(shared) = &*grow {
@@ -590,20 +573,7 @@ impl CorpusRuntime {
         };
         let suites = &suites_in[..];
         let manifests = &manifests[..];
-        // A dependency app is compiled with the symbols of its own app.json, the project's apps with the
-        // project's (hard rule 6: a project that defines CLEAN25 does not change Base Application).
-        let dep_symbols: Vec<Option<BTreeSet<String>>> = kinds
-            .iter()
-            .enumerate()
-            .map(|(i, k)| {
-                (*k == al_sema::AppKind::Dependency).then(|| {
-                    manifests
-                        .get(i)
-                        .map(|m| m.symbols.iter().cloned().collect())
-                        .unwrap_or_default()
-                })
-            })
-            .collect();
+        let dep_symbols = internals_grant::dependency_symbols(&kinds, manifests);
         let load_ws =
             |apps, kinds, lazy| internals_grant::load_workspace(apps, kinds, symbols, &dep_symbols, lazy, manifests);
         // The apps whose files hold no text yet, in program order.
@@ -652,10 +622,7 @@ impl CorpusRuntime {
         // Whether the install baseline runs, and why it does when it was weighed.
         let mut baseline = baseline_wanted;
         let mut baseline_note: Option<String> = None;
-        let catalog = match target {
-            Some(t) => al_builtins::catalog::Catalog::for_target(t),
-            None => al_builtins::catalog::Catalog::load(),
-        };
+        let catalog = catalog_for(target);
         let mut apps = apps;
         // Selected tests that look free of data are compiled first the way the demand-driven path
         // does it, without the baseline's roots and without the compile cache: that touches only what
@@ -676,7 +643,43 @@ impl CorpusRuntime {
         // A grown compile is the complete compile of its pass (its baseline is weighed on it below).
         let growing = matches!(grow, Grow::From(..));
         let mut grow_kept = None;
-        if try_skip
+        // The workspace layer of the compile cache (ADR-022 amendment 2026-11-15): a compile read from it is the compile.
+        let mut layer = workspace_layer::Layer::plan(&workspace_layer::LayerInputs {
+            opts,
+            apps: &apps,
+            kinds: &kinds,
+            manifests,
+            symbols,
+            target,
+            roots: &roots,
+            n_cached,
+            use_cache,
+            identities: &identities,
+            order: &order,
+            suites,
+            lean,
+            try_skip,
+            baseline_wanted,
+            growing: !matches!(grow, Grow::Off),
+        });
+        let hit = layer.read(
+            &mut apps,
+            &mut kinds,
+            manifests,
+            symbols,
+            target,
+            n_cached,
+            &lazy,
+            &identities,
+            &catalog,
+        );
+        if let Some((d, index)) = hit.as_ref().map(|h| (h.decided.clone(), h.source_index)) {
+            // A read compiles nothing (and so never says the compile was made twice).
+            (baseline, baseline_note, compiles) = (d.baseline, d.baseline_note, 0);
+            (compile_cache_skipped, source_index) = (d.compile_cache_skipped, index);
+        }
+        if hit.is_none()
+            && try_skip
             && !require_cache
             && !growing
             && crate::observe::text_looks_pure(&apps, &kinds, symbols, only.as_deref())
@@ -782,9 +785,10 @@ impl CorpusRuntime {
                 break;
             }
         }
-        let (ws, mut lowered, cache_report, layers) = match compiled {
-            Some((ws, lowered)) => (ws, lowered, None, None),
-            None => match opts.compile_cache.as_ref().filter(|_| use_cache) {
+        let (ws, mut lowered, cache_report, layers) = match (hit, compiled) {
+            (Some(h), _) => (h.ws, h.lowered, h.cache_report, h.layers),
+            (None, Some((ws, lowered))) => (ws, lowered, None, None),
+            (None, None) => match opts.compile_cache.as_ref().filter(|_| use_cache) {
                 Some(cc) => {
                     let (ws, lowered, report, layers) = compile_with_cache(
                         cc,
@@ -911,6 +915,10 @@ impl CorpusRuntime {
                 eprintln!("{}", crate::reach::report(&ws, &lowered));
             }
         }
+        // The workspace layer stores the program as the compile made it, before the run applies the manifests.
+        let pre_apply = layer
+            .wants_store()
+            .then(|| (lowered.program.apps.clone(), lowered.program.sources.clone()));
         // Nothing else holds the program yet (a kept compile leaves it to the run, `al_sema::lower::Growable`), so this
         // does not copy it.
         super::apply_manifests::apply(&mut lowered.program, manifests, &opts.layout_sources);
@@ -939,10 +947,11 @@ impl CorpusRuntime {
             let out = lowered.left_out.iter().filter(|l| **l).count();
             (out > 0).then_some((out, all))
         };
-        Ok(Compiled {
+        let mut compiled = Compiled {
             ws,
             lowered,
             cache_report,
+            workspace_cache: None,
             baseline_wanted,
             baseline,
             baseline_note,
@@ -964,7 +973,9 @@ impl CorpusRuntime {
             kept: Default::default(),
             grow_kept,
             uncovered,
-        })
+        };
+        let store = layer.finish(&mut compiled, pre_apply);
+        Ok((compiled, store))
     }
 
     /// The run phase: engine, install baseline, the test codeunits. Leaves `compiled` as it was, so a warm
@@ -996,6 +1007,7 @@ impl CorpusRuntime {
             ws,
             lowered,
             cache_report,
+            workspace_cache,
             baseline_wanted,
             baseline,
             baseline_note,
@@ -1016,13 +1028,7 @@ impl CorpusRuntime {
             (*baseline_wanted, *baseline, *compile_cache_skipped, *source_index);
         let baseline_note = baseline_note.clone();
         // The selection of this request, in program order: a warm compile may reach more than the request asks for.
-        let in_program_order = |v: &[(usize, u32)]| {
-            let mut new_of = vec![0; order.len()];
-            for (new, &old) in order.iter().enumerate() {
-                new_of[old] = new;
-            }
-            v.iter().map(|&(a, id)| (new_of[a], id)).collect::<Vec<_>>()
-        };
+        let in_program_order = |v: &[(usize, u32)]| in_program_order(order, v);
         // The selection the compile was made for: a warm server's request may select less of it.
         let compiled_only = opts_only.as_deref();
         let mut opts_only = match &opts.only {
@@ -1035,15 +1041,10 @@ impl CorpusRuntime {
         if opts.stop_on_compile_errors && !compile_errors.is_empty() {
             // A debugger answers its client's `launch` with the first error; no test runs. A parse error has no AL code.
             if let (Some(ready), Some(e)) = (&opts.debug_ready, compile_errors.first()) {
-                let code = if e.code.is_empty() {
-                    String::new()
-                } else {
-                    format!("{} ", e.code)
-                };
                 (ready.0)(&DebugReady {
                     program: &lowered.program,
                     order,
-                    first_error: Some(format!("error {code}{}:{}:{}: {}", e.file, e.line, e.column, e.message)),
+                    first_error: Some(first_error_line(e)),
                 });
             }
             return CorpusRuntime {
@@ -1055,6 +1056,7 @@ impl CorpusRuntime {
                     compile: *compile_phase,
                     compile_parts: lowered.timings,
                     cache: cache_report.clone(),
+                    workspace_cache: workspace_cache.clone(),
                     lean: *lean,
                     compiles: *compiles,
                     ..Default::default()
@@ -1879,6 +1881,7 @@ impl CorpusRuntime {
                 suites: suite_times,
                 compile_parts,
                 cache: cache_report.clone(),
+                workspace_cache: workspace_cache.clone(),
                 engine: engine_time,
                 baseline_skipped,
                 install_runs,
@@ -2590,4 +2593,23 @@ fn note_leaks(units: &mut [Unit], carried: &[super::chain_walk::Carry], sees: &d
             }
         }
     }
+}
+
+/// Test codeunits as (caller app, id), in the program's app numbering (`order`: program app -> caller app).
+fn in_program_order(order: &[usize], v: &[(usize, u32)]) -> Vec<(usize, u32)> {
+    let mut new_of = vec![0; order.len()];
+    for (new, &old) in order.iter().enumerate() {
+        new_of[old] = new;
+    }
+    v.iter().map(|&(a, id)| (new_of[a], id)).collect()
+}
+
+/// The first compile error as a debugger's client is told it (`DebugReady::first_error`); a parse error has no code.
+fn first_error_line(e: &super::CompileError) -> String {
+    let code = if e.code.is_empty() {
+        String::new()
+    } else {
+        format!("{} ", e.code)
+    };
+    format!("error {code}{}:{}:{}: {}", e.file, e.line, e.column, e.message)
 }
