@@ -863,7 +863,8 @@ fn a_thaw_into_a_session_that_is_not_new_refuses_and_leaves_it_as_it_was() {
     f.run("FillDatabase");
     f.run("FillCollections");
     let image = image(&mut f.session);
-    let plants: [(fn(&mut Session), &str); 3] = [
+    type Plant = fn(&mut Session);
+    let plants: [(Plant, &str); 3] = [
         (|s| s.depth = 1, "depth"),
         (|s| s.sessions_started = 1, "sessions_started"),
         (|s| s.fault_trace = true, "fault_trace"),
