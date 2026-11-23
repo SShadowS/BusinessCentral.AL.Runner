@@ -285,8 +285,8 @@ fn a_key_that_is_not_imaged_runs_the_login_every_time_and_is_frozen_once() {
 }
 
 // An uncaught error of the install code leaves `error_finals` on the session (`install_once`'s fallback makes the install
-// session the test session): the freeze refuses it (`NotAtRest`) and the gate would refuse it (`thaw_target_why`), so no start
-// is made or taken (design 3.5). RED at A1: no report line names it.
+// session the test session), and the login's calls clear it: the session that records is not a thaw target before its
+// login (`LoginBase::target_why`), so it keeps no start, as a later such session takes none (`thaw_target_why`).
 #[test]
 fn an_uncaught_install_error_keeps_error_finals_and_no_start_is_made_or_taken() {
     let failing = r#"
@@ -299,7 +299,10 @@ codeunit 77495 "RPL Failing Install" { Subtype = Install; trigger OnInstallAppPe
     assert_eq!(ran.outcomes[0], ran.outcomes[1]);
     assert_eq!(ran.outcomes[0], ran.outcomes[2]);
     let line = starts(&engine).line().expect("the refused key is reported");
-    assert!(line.contains("not at rest: error_finals"), "{line}");
+    assert!(
+        line.contains("3 refused by the gate (3: target: error_finals)"),
+        "{line}"
+    );
 }
 
 // What the starts' report line says, names only (design 2, 4): replays, starts kept with their size, why keys were not
@@ -722,7 +725,9 @@ fn the_numbers_mark_the_runner_sets_is_another_key_and_the_thaw_keeps_the_target
     let mut marked = target(&engine);
     marked.mark_numbers_unmeasured(std::rc::Rc::from("marked"));
     let before = marked.state_lines();
-    marked.thaw_login_image(&start.image).expect("a thaw target takes the start");
+    marked
+        .thaw_login_image(&start.image)
+        .expect("a thaw target takes the start");
     let kept = |s: &al_vm::StateLines| {
         s.lines
             .iter()

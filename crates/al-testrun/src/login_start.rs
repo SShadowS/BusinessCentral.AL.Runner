@@ -298,8 +298,7 @@ pub(crate) fn record(
     wrote: &CompanyOpenWrites,
     hits: HitBits,
 ) {
-    let starts = starts(engine);
-    if starts.knows(&key) {
+    if starts(engine).knows(&key) {
         return;
     }
     let start = session.login_image(base).map(|image| Start {
@@ -307,7 +306,18 @@ pub(crate) fn record(
         wrote: wrote.clone(),
         hits,
     });
-    starts.record(key, start);
+    keep(engine, key, base, start);
+}
+
+/// Keeps `start` as the start of `key` ([`Starts::record`]) when the session it was taken from was a thaw target before its
+/// login (`base`, `LoginBase::target_why`), as a later session must be to take it ([`target_gate`]); else the session is
+/// counted as refused by the gate.
+pub(crate) fn keep(engine: &Engine, key: Key, base: &al_vm::LoginBase, start: Result<Start, NotImaged>) {
+    let starts = starts(engine);
+    match base.target_why() {
+        Some(field) => starts.not_taken(NotTaken::Target(field)),
+        None => starts.record(key, start),
+    }
 }
 
 #[cfg(test)]

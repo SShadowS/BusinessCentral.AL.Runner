@@ -90,16 +90,19 @@ pub(crate) fn raises(
     #[derive(Default)]
     struct Memo(Raises);
     let memo = engine.derived(Memo::default);
-    if let Some(&known) = memo
-        .0
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(&(test, watched, after_refusal))
+    if let Some(&known) =
+        memo.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&(test, watched, after_refusal))
     {
         return known;
     }
     let raised = watched != Some(NO_CLIENT)
-        && matches!(decide(engine, lowered, test, watched, after_refusal), Login::Raise { .. });
+        && matches!(
+            decide(engine, lowered, test, watched, after_refusal),
+            Login::Raise { .. }
+        );
     memo.0
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)

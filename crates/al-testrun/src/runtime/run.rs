@@ -217,8 +217,15 @@ fn open_company(
     // (`Start::again`, `after_refusal`) takes its own key; the call that refused ends at `?` below unnoted, so only the
     // session that opens the company is checked or recorded.
     let raises = || {
-        (session.test_object)
-            .is_some_and(|t| crate::login::raises(&engine, lowered, t, crate::login::watched(session, disabled), after_refusal))
+        (session.test_object).is_some_and(|t| {
+            crate::login::raises(
+                &engine,
+                lowered,
+                t,
+                crate::login::watched(session, disabled),
+                after_refusal,
+            )
+        })
     };
     let key = (check || (flags.login_replay() && raises()))
         .then(|| crate::login_replay::Key::of(session, (isolation, scratch.hub), flags, skipped_installs));
@@ -235,7 +242,8 @@ fn open_company(
             // It runs before the workspace's own Company Triggers subscribers: the order of the two is not pinned
             // (docs/probes-needed.md, WorkDate row).
             crate::install::login_work_date(&engine, lowered, session)?;
-            let wrote = crate::install::test_session_company_open(lowered, session, disabled, skipped_installs, after_refusal)?;
+            let wrote =
+                crate::install::test_session_company_open(lowered, session, disabled, skipped_installs, after_refusal)?;
             session.commit_transaction();
             let hits = al_builtins::assumptions::take_hit_bits();
             if let (Some(key), Some(base), true) = (key, base, wrote.raised) {

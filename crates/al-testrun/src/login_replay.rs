@@ -671,7 +671,10 @@ fn thaw_twin(
     twin: impl FnOnce() -> Session + Send,
 ) -> Result<LoginState, Uncompared> {
     #[cfg(test)]
-    let (target, plant) = (TWIN_TARGET.with(std::cell::Cell::get), TWIN_PLANT.with(std::cell::Cell::get));
+    let (target, plant) = (
+        TWIN_TARGET.with(std::cell::Cell::get),
+        TWIN_PLANT.with(std::cell::Cell::get),
+    );
     let base = base.portable().ok_or(Uncompared::NoBase)?;
     std::thread::scope(|scope| {
         // A test thread's stack: the drop of a deep graph recurses on it.
@@ -722,8 +725,10 @@ pub(crate) fn checked(
         let image = check.round_trip(session, base, &state, twin);
         match gate {
             Some(why) => starts.not_taken(why),
-            None => starts.record(
+            None => crate::login_start::keep(
+                engine,
                 key,
+                base,
                 image.map(|image| crate::login_start::Start {
                     image,
                     wrote: wrote.clone(),
