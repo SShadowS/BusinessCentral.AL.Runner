@@ -248,7 +248,7 @@ fn open_company(
         None => None,
     };
     let notes_code = observed || session.notes_code_run() || crate::profiling::active();
-    let perturbed = *perturb != crate::stability::Perturb::default() || scratch.clock_start.is_some();
+    let perturbed = *perturb != crate::stability::Perturb::default() || scratch.clock_set;
     let facts = crate::login_start::RunFacts {
         notes_code,
         perturbed,
@@ -275,7 +275,7 @@ fn open_company(
                 // run's flags, the test codeunit entered.
                 let object = session.test_object;
                 let twin = || {
-                    let mut host = crate::host::host_perturbed(scratch.clock_start, perturb);
+                    let mut host = crate::host::host_perturbed(scratch.clock, perturb);
                     host.run_seed = scratch.run_seed.seed;
                     let mut twin = Session::with_host(engine.clone(), host);
                     scratch.flags.apply(&mut twin);
