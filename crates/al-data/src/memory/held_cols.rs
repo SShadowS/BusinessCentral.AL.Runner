@@ -337,8 +337,9 @@ impl MemStore {
         }
     }
 
-    /// [`MemStore::note_held`] for a row of the table with object index `object`.
-    fn note_held_in(&mut self, object: u32, row: &Row) {
+    /// [`MemStore::note_held`] for a row of the table with object index `object`: for rows taken in without a `TableDef`
+    /// (`MemStore::note_held_rows`, `MemStore::with_committed_row_changes`).
+    pub(super) fn note_held_in(&mut self, object: u32, row: &Row) {
         let note = |map: &mut std::collections::HashMap<u32, Vec<usize>>, i: usize| {
             let held = map.entry(object).or_default();
             if !held.contains(&i) {

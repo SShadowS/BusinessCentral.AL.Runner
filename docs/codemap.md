@@ -150,7 +150,7 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `contract.rs`: The conformance suite every `Store` must pass. Entry: `table`.
 - `lib.rs`: The Store trait and table definitions. Entry: `Store`.
 - `memory.rs`: In-memory store on persistent maps. Entry: `MemStore`.
-- `memory/` (7 files): In-memory store on persistent maps. Entry: `MemStore`. Files: `key.rs`, `held_cols.rs`, `alt_cache.rs`, `band.rs`, `footprint.rs`, `order_carry.rs`, `source_stamps.rs`
+- `memory/` (9 files): In-memory store on persistent maps. Entry: `MemStore`. Files: `key.rs`, `held_cols.rs`, `alt_cache.rs`, `band.rs`, `footprint.rs`, `order_carry.rs`, `source_stamps.rs`, `row_changes.rs`, `shape.rs`
 
 ### al-deps
 
@@ -288,6 +288,9 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `impact_static.rs`: Static selection: the graph of routines, objects. Entry: `Graph`.
 - `login.rs`: The test session's login. Entry: `decide`.
 - `login_replay.rs`: The check that a replay of the raised login would… Entry: `Key::of`.
+- `login_replay/` (3 files): The replay key's parts and the check's differences (issue 8211). Files: `difference.rs`, `key_parts.rs`, `rows_digest.rs`
+- `login_start.rs`: Replaying the raised login from its image (issue 8211). Entry: `Start`.
+- `login_start/outside.rs`: The state outside a session a replay may meet.
 - `partner_login.rs`: The partner dependency apps' "System… Entry: `subscribers`.
 - `license.rs`: Which BC license a run uses: `--license FILE`. Entry: `LicenseUse`.
 - `isolation.rs`: TestIsolation of the runner codeunit. Entry: `TestIsolation`.
@@ -349,6 +352,9 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `autoinc.rs`: AutoIncrement fields: taking the next value, explicit keys. Entry: `auto_increment_field`.
 - `baseline.rs`: The install baseline, with the install routines… Entry: `Baseline`.
 - `baseline/install_orders.rs`: What installing partner apps in several orders needs. Entry: `install_order_differences`.
+- `baseline/row_delta.rs`: A baseline as the rows it holds apart from another (the login image's rows). Entry: `RowDelta`.
+- `login_image.rs`: The session image a login replay thaws (issue 8211). Entry: `LoginImage`.
+- `login_image/` (12 files): Freezing and thawing a session's state. Files: `arena.rs`, `fields.rs`, `freeze.rs`, `library.rs`, `plain.rs`, `plain/tests.rs`, `record.rs`, `session_parts.rs`, `size.rs`, `temps.rs`, `tests.rs`, `thaw.rs`
 - `install_footprint.rs`: The footprint of a partner app's install session. Entry: `Session::install_footprint_start`.
 - `order_trial.rs`: A subscriber whose install order is not known runs… Entry: `trial_start`.
 - `callstack.rs`: The AL call stack of an error and the live stack. Entry: `add_frame`.

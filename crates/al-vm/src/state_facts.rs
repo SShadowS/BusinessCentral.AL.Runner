@@ -13,8 +13,9 @@ use crate::state_render::content;
 use std::collections::BTreeMap;
 
 /// Why the SQL counters have no comparable form: a counter was read, or the record methods since the last Commit left
-/// state that only the session's own log explains (`SqlCounters::left_inactive`).
-const SQL_ACTIVE: &str = "SQL counters (read, or not at rest since the last Commit)";
+/// state that only the session's own log explains (`SqlCounters::left_inactive`). Written as every value with no
+/// comparable form is: its path, `: `, then why.
+const SQL_ACTIVE: &str = "SQL counters: read, or not at rest since the last Commit";
 
 impl Session {
     /// The lines of the facts of this module, in a fixed order; a fact with no comparable form goes to `opaque` with why.
@@ -113,7 +114,11 @@ mod tests {
         emptied.commit_transaction();
         fresh.commit_transaction();
         let (a, b) = (emptied.state_lines(), fresh.state_lines());
-        let differ: Vec<_> = a.lines.iter().zip(&b.lines).filter(|(x, y)| x != y).collect();
+        // The SQL counters are a line of one session and not of the other (the DeleteAll is a store operation after its
+        // Commit's): the lines without them.
+        let plain = |l: &Vec<String>| l.iter().filter(|l| !l.starts_with("sql ")).cloned().collect::<Vec<_>>();
+        let (a, b) = (plain(&a.lines), plain(&b.lines));
+        let differ: Vec<_> = a.iter().zip(&b).filter(|(x, y)| x != y).collect();
         assert_eq!(differ.len(), 1, "{differ:?}");
         assert!(differ[0].0.starts_with("emptied "), "{differ:?}");
     }
@@ -131,8 +136,15 @@ mod tests {
         copied.store.note_copy("COPY", "CRONUS");
         copied.commit_transaction();
         fresh.commit_transaction();
-        let (a, b) = (copied.state_lines(), fresh.state_lines());
-        let differ: Vec<_> = a.lines.iter().zip(&b.lines).filter(|(x, y)| x != y).collect();
+        // The SQL counters' line depends on the thread's last store operation, which the copy's note is.
+        let lines = |s: &mut crate::Session| -> Vec<String> {
+            (s.state_lines().lines.into_iter())
+                .filter(|l| !l.starts_with("sql "))
+                .collect()
+        };
+        let (a, b) = (lines(&mut copied), lines(&mut fresh));
+        assert_eq!(a.len(), b.len());
+        let differ: Vec<_> = a.iter().zip(&b).filter(|(x, y)| x != y).collect();
         assert_eq!(differ.len(), 1, "{differ:?}");
         assert!(differ[0].0.contains("company copies "), "{differ:?}");
     }
