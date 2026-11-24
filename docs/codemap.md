@@ -72,6 +72,8 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `format.rs`: The cache entry file: header, dictionary. Entry: `build`.
 - `index.rs`: The index entry: the scan of the dependency sources. Entry: `build_index`.
 - `key.rs`: The key of an entry: every input of the compile… Entry: `Key`.
+- `workspace.rs`: The workspace layer file (ADR-022 amendment 2026-11-15). Entry: `carrier_key`.
+- `digest.rs`: The SHA-256 helpers of the cache keys (length first).
 - `lib.rs`: Crate root of the compile cache format (ADR-022).
 
 ### al-builtins
@@ -221,6 +223,9 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `workspace.rs`: A set of apps: parse every file. Entry: `Workspace`.
 - `workspace/moved_tables.rs`: A workspace table kept as the… Entry: `moved_table_of_dependency`.
 - `workspace/subscriber_publisher.rs`: The object an `[EventSubscriber]` names… Entry: `subscriber_publisher`.
+- `workspace/stored.rs`: A workspace as a stored compile keeps it. Entry: `StoredWorkspace`.
+- `workspace/dump.rs`: The equality oracle of the workspace layer. Entry: `Workspace::canonical_dump`.
+- `lower/stored.rs`: A compile as the workspace layer stores it. Entry: `store`, `restore`.
 - `xmlports.rs`: XmlPort objects (Format = Xml). Entry: `RawNode`.
 
 ### al-syntax
@@ -252,6 +257,8 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `refusal_keys.rs`: The refusal key lists of every crate that refuses. Entry: `LISTS`.
 - `not_passing.rs`: ADR-065, the lists of the cases the runtime does… Entry: `check`.
 - `base_oracle.rs`: The base branch's oracle and lists. Entry: `Base`.
+- `workspace_leg.rs`: The outcomes leg of the workspace layer (`AL_CORPUS_WORKSPACE_CACHE=1`). Entry: `say`.
+- `workspace_equality.rs`: The workspace layer's equality check per BC major.
 - `lib.rs`: Runs the corpus's `[Test]` codeunits and reports…
 - `main.rs`: The binary: run each oracle version, report. Entry: `main`.
 - `oracle.rs`: The oracle: JUnit and xUnit cases of real BC, identified by. Entry: `CaseId`.
@@ -305,14 +312,17 @@ al-testkit     dev only: compile AL from a string and run a routine     al-testf
 - `stability.rs`: Stability mode: the config (`parse_config`. Entry: `parse_config`.
 - `stopped_state.rs`: What code the runner stopped leaves of the session… Entry: `roll_back_refused_test`.
 - `test_suites.rs`: The `--test-suites` file. Entry: `TestSuites`.
-- `runtime/` (28 files): Runs test codeunits the way BC's test runner does. Entry: `CorpusRuntime`. Files: `mod.rs`, `compiled.rs`, `baseline_key.rs`, `grow.rs`, `corpus.rs`, `chain.rs`, `carry_after.rs`, `discovery.rs`, `chain_walk.rs`, `strict_walk.rs`, `single_lane.rs`, `narrowing.rs`, `not_run_link.rs`, `single_fresh.rs`, `order_hint.rs`, `memory.rs`, `compile_halt.rs`, `threads.rs`, `install_once.rs`, `cache.rs`, `run.rs`, `data_driven.rs`, `test_handlers.rs`, `written.rs`, `runner_reset.rs`, `handlers.rs`, `blocked.rs`, `table_reads.rs`
+- `runtime/` (29 files): Runs test codeunits the way BC's test runner does. Entry: `CorpusRuntime`. Files: `mod.rs`, `compiled.rs`, `baseline_key.rs`, `grow.rs`, `corpus.rs`, `chain.rs`, `carry_after.rs`, `discovery.rs`, `chain_walk.rs`, `strict_walk.rs`, `single_lane.rs`, `narrowing.rs`, `not_run_link.rs`, `single_fresh.rs`, `order_hint.rs`, `memory.rs`, `compile_halt.rs`, `threads.rs`, `install_once.rs`, `cache.rs`, `run.rs`, `data_driven.rs`, `test_handlers.rs`, `written.rs`, `runner_reset.rs`, `handlers.rs`, `blocked.rs`, `table_reads.rs`, `workspace_layer.rs`
 - `target.rs`: Reads the version fields of an app.json. Entry: `build_query`.
+- `workspace_cache.rs`: The workspace layer of the compile cache (ADR-022 amendment 2026-11-15). Entry: `WorkspaceKey`.
+- `switches.rs`: The one rule of an on/off environment switch. Entry: `on`.
 
 ### alrunner-cli
 
 - `affected.rs`: `al-runner test --affected` and serve `affectedOnly`. Entry: `Affected::prepare`.
 - `apps.rs`: Reads the APPs given on the command line and builds… Entry: `load`.
 - `args.rs`: Command-line parsing and the `--help` text of `al-runner`. Entry: `parse`.
+- `workspace_layer.rs`: What the command line hands the workspace layer and says of it. Entry: `options`.
 - `demotool.rs`: `--company-data demotool`. Entry: `resolve`.
 - `bcapps.rs`: Where the Microsoft recipe files come from. Entry: `resolve`.
 - `path_note.rs`: The note about another `al-runner` on PATH. Entry: `maybe_note`.
