@@ -150,7 +150,7 @@ mod tests {
     /// found by pointers, and only the changed rows are compared by value (issue 6924: a 65,000-row start per step).
     #[test]
     fn rows_a_clone_shares_are_not_compared_and_the_changes_name_the_changed_rows() {
-        let base = MemStore::from_exported(vec![table(2000)]);
+        let base = MemStore::from_exported(vec![table(2000)], &[]);
         let mut later = base.clone();
         let slot: Slot = (std::sync::Arc::from("CRONUS"), 18);
         let mut t = later.committed.get(&slot).unwrap().clone();
