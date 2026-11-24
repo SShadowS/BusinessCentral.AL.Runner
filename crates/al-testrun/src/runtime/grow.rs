@@ -45,6 +45,35 @@ pub(crate) enum Grow {
     From(Box<KeptCompile>, bool),
 }
 
+impl Grow {
+    /// The program order of a run that grows a kept compile: the kept compile's apps first, in its order, then its own
+    /// (ADR-063). `None` when it does not grow one; a kept compile that cannot be grown sets `self` to `Off` (the pass
+    /// compiles from source and says why).
+    pub(crate) fn order(
+        &mut self,
+        apps: &[al_sema::workspace::AppSource],
+        kinds: &[al_sema::AppKind],
+        manifests: &[Manifest],
+        symbols: &BTreeSet<String>,
+        target: Option<&al_version::Target>,
+    ) -> Option<Vec<usize>> {
+        let order = match &*self {
+            Grow::From(kept, _) => match kept.order_for(apps, kinds, manifests, symbols, target) {
+                Ok(order) => Some(order),
+                Err(why) => {
+                    eprintln!("note: this pass compiles its apps from source: {why}");
+                    None
+                }
+            },
+            _ => None,
+        };
+        if order.is_none() && matches!(self, Grow::From(..)) {
+            *self = Grow::Off;
+        }
+        order
+    }
+}
+
 /// Whether `AL_FRESH_PASS_COMPILE` asks every pass to compile from source.
 pub fn fresh_pass_compile() -> bool {
     crate::switches::on("AL_FRESH_PASS_COMPILE")

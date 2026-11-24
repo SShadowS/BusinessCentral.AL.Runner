@@ -2278,8 +2278,8 @@ fn test_inner(
         })
     );
     if let Some(w) = warm {
-        let workspace_cache = crate::workspace_layer::own_report(p, Some(w)).map(|r| r.state.as_str());
-        w.timings = Some(RequestTimings::of(setup, p, coverage_time, test_data.as_ref(), workspace_cache));
+        let ws = crate::workspace_layer::own_report(p, Some(w)).map(|r| r.state.as_str());
+        w.timings = Some(RequestTimings::of(setup, p, coverage_time, test_data.as_ref(), ws));
         w.report = Some(Report {
             doc: serde_json::from_str(&crate::unpinned::json(
                 crate::seed::json(

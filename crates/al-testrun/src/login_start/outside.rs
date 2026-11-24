@@ -40,6 +40,8 @@
 //! - `crates/al-testrun/src/dotnet.rs` `static BUILD`, `static PROCESSES`, `static START_ON_THIS_THREAD`: run (the sidecar
 //!   build lock, a process counter, the start-up time read after each test codeunit; an image needs the DotNet state of a
 //!   new session, so a login that started a sidecar has no start).
+//! - `crates/al-testrun/src/workspace_cache.rs` `static DEFERRED`, `static WRITERS`: run (the workspace layer's entry
+//!   writes deferred to the end of the run and their writer threads; no session reads them).
 //! - `crates/al-testrun/src/compile_cache.rs` `static COUNTER`, `static HASH`, `static PINNED_EXECUTABLE`: run (the compile
 //!   cache's file counter, the hash of the runner's own build and the executable it is read from).
 //! - `crates/al-testrun/src/crash.rs` `static RUNNING`, `static PREVIOUS`, `static INSTALL`, `static TOLD`: run (the crash

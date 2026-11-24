@@ -501,20 +501,7 @@ impl CorpusRuntime {
         // app would be refused as outside the workspace (al-runner issue 6044). It is compiled with the
         // workspace, after the cached dependency apps.
         let on_workspace = dependency_apps_on_workspace(&apps, &kinds);
-        // ADR-063: a run that grows a kept compile has the kept compile's apps first, in its order, then its own.
-        let grow_order: Option<Vec<usize>> = match &*grow {
-            Grow::From(kept, _) => match kept.order_for(&apps, &kinds, manifests, symbols, target) {
-                Ok(order) => Some(order),
-                Err(why) => {
-                    eprintln!("note: this pass compiles its apps from source: {why}");
-                    None
-                }
-            },
-            _ => None,
-        };
-        if grow_order.is_none() && matches!(grow, Grow::From(..)) {
-            *grow = Grow::Off;
-        }
+        let grow_order = grow.order(&apps, &kinds, manifests, symbols, target);
         let use_cache = grow_order.is_none()
             && opts.compile_cache.is_some()
             && (0..n_apps).any(|i| kinds[i] == al_sema::AppKind::Dependency && !on_workspace[i])
