@@ -421,6 +421,8 @@ pub(crate) fn tx_not_as_new(tx: &crate::state::TxState) -> Option<&'static str> 
         lock_timeout_duration: _,
         committed_row_version: _,
         commit_counter: _,
+        // Read only against a stamp taken later (`version_entry.rs`): any value.
+        write_counts: _,
         rolled_back: _,
         rollback_unpinned,
         rollback_kind,
