@@ -330,8 +330,8 @@ fn other_accents_in_a_key_keep_mains_order() {
 }
 
 /// The rows `with_committed_row_changes` puts on top of a store are noted as a write notes them, so the store refuses
-/// what the store they were taken from refuses (a lane worker's carried start, al-testrun `lane_starts.rs`): the whole
-/// table put on an empty store, and two rows put row by row on a store that holds the third.
+/// what the store they were taken from refuses (a twin's store with a login's rows put on top, al-vm `login_image.rs`):
+/// the whole table put on an empty store, and two rows put row by row on a store that holds the third.
 #[test]
 fn rows_put_on_top_refuse_an_order_the_written_rows_refuse() {
     let rows = [("Alpha", "A"), ("ærø", "B"), ("Bravo", "C")];

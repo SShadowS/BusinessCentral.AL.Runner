@@ -23,6 +23,7 @@ pub(crate) struct RecordNode {
     change_company_called: bool,
     fields: Vec<Frozen>,
     filters: Vec<PlainFilter>,
+    decimal_cut_filters: Vec<PlainFilter>,
     filter_group: i32,
     marks: Vec<Vec<Frozen>>,
     marked_only: bool,
@@ -72,7 +73,7 @@ impl RecordNode {
                 b.row.as_ref().map_or(0, String::len) + b.assigned.len() * size_of::<usize>()
             });
         all(&self.fields)
-            + self.filters.len() * size_of::<PlainFilter>()
+            + (self.filters.len() + self.decimal_cut_filters.len()) * size_of::<PlainFilter>()
             + self
                 .marks
                 .iter()
@@ -157,6 +158,7 @@ impl Walker<'_> {
             crm,
             fields,
             filters,
+            decimal_cut_filters,
             filter_group,
             marks,
             marked_only,
@@ -214,6 +216,10 @@ impl Walker<'_> {
         for f in filters {
             plain_filters.push(PlainFilter::of(f).ok_or_else(|| super::freeze::no_form(path, "record filter"))?);
         }
+        let mut plain_cut_filters = Vec::with_capacity(decimal_cut_filters.len());
+        for f in decimal_cut_filters {
+            plain_cut_filters.push(PlainFilter::of(f).ok_or_else(|| super::freeze::no_form(path, "record filter"))?);
+        }
         let mut frozen_marks = Vec::with_capacity(marks.len());
         for m in marks {
             frozen_marks.push(self.field_values(m, &format!("{path} mark"))?);
@@ -242,6 +248,7 @@ impl Walker<'_> {
             change_company_called: *change_company_called,
             fields: self.field_values(fields, path)?,
             filters: plain_filters,
+            decimal_cut_filters: plain_cut_filters,
             filter_group: *filter_group,
             marks: frozen_marks,
             marked_only: *marked_only,
@@ -372,6 +379,7 @@ impl Maker<'_> {
             change_company_called,
             fields,
             filters,
+            decimal_cut_filters,
             filter_group,
             marks,
             marked_only,
@@ -414,6 +422,7 @@ impl Maker<'_> {
             // A buffer that shared a table's initial values is copied on its first write: an owned one reads the same.
             fields: self.values(fields).into(),
             filters: filters.iter().map(PlainFilter::filter).collect(),
+            decimal_cut_filters: decimal_cut_filters.iter().map(PlainFilter::filter).collect(),
             filter_group: *filter_group,
             marks: marks.iter().map(|m| self.values(m)).collect(),
             marked_only: *marked_only,
