@@ -110,6 +110,10 @@ pub mod impact;
 pub mod install_footprint;
 mod install_footprint_row_version;
 mod install_left;
+mod login_image;
+pub use login_image::{
+    BaseShape, ImageSize, KindSize, LoginBase, LoginImage, NODE_KINDS, NotImaged, NotThawed, PortableBase,
+};
 mod interfaces;
 mod isdirty;
 mod license_ceiling;

@@ -29,6 +29,7 @@ mod key_value_tests;
 mod order_carry;
 mod replace;
 mod row_changes;
+mod shape;
 mod source_stamps;
 #[cfg(test)]
 mod source_stamps_tests;
@@ -1255,6 +1256,9 @@ impl MemStore {
             } else {
                 self.emptied.remove(&slot);
             }
+            // The rows come in without a write of each, so note their held columns as `from_exported` does: the store
+            // then refuses the reads the store the tables came from refuses.
+            self.note_held_rows(t.object, &table);
             self.tables.insert(slot, table);
         }
         self.commit();
