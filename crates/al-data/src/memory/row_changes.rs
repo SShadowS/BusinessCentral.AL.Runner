@@ -1,12 +1,12 @@
 //! The committed rows one store holds apart from another, row by row ([`MemStore::committed_row_changes_from`]), and
 //! a store with such changes put on top ([`MemStore::with_committed_row_changes`]).
 //!
-//! The readers are the safety net of an install footprint (`footprint.rs` `MemStore::unrecorded_writes`, ADR-079 step
-//! 1) and the login image (al-vm `login_image.rs`, issue 8211), which holds the rows a login wrote as a row delta over
-//! the store it started from (al-vm `baseline/row_delta.rs`) and puts them on top of a twin's store. The persistent
-//! maps share every entry a session did not touch, so the difference is found by comparing pointers, and only the rows
-//! that differ are compared by value. The lane starts of ADR-066 amendment 5 that first replayed the changes are gone
-//! (ADR-070 step 3).
+//! The readers are the safety net of an install footprint (ADR-079 step one: `footprint.rs`
+//! `MemStore::unrecorded_writes`) and the login image (al-vm `login_image.rs`, issue 8211), which holds the rows a login
+//! wrote as a row delta over the store it started from (al-vm `baseline/row_delta.rs`) and puts them on top of a twin's
+//! store. The persistent maps share every entry a session did not touch, so the difference is found by comparing
+//! pointers, and only the rows that differ are compared by value. The lane starts of ADR-066 amendment 5 that first
+//! replayed the changes are gone (ADR-070 step 3).
 
 use super::{Key, MemStore, PkStorage, Row, Slot, Table, table_storage};
 use crate::{Store, Value};
