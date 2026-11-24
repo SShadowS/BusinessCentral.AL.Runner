@@ -879,7 +879,7 @@ impl Scratch {
             hub: Default::default(),
             hub_leg: Default::default(),
             leak: Default::default(),
-            leak_hit: Default::default(),
+            leak_hits: Default::default(),
             onrun_carry: Default::default(),
             driver: Default::default(),
             read_tables: Default::default(),
