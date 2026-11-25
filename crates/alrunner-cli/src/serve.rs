@@ -683,6 +683,10 @@ fn run_tests(base: &TestArgs, fields: &Map<String, Value>, ctx: &mut WarmCtx, fl
                     }
                     if let Some(pass) = ctx.timings.as_ref().and_then(|t| t.passes.get(k)) {
                         line["timings"] = json!({"resetMs": ms(pass.reset), "wallMs": ms(pass.wall)});
+                        // The digest of the resource texts the entry's tests ran with, as installed for its run.
+                        if let Some(h) = pass.resources_hash {
+                            line["resourcesHash"] = json!(h.iter().map(|b| format!("{b:02x}")).collect::<String>());
+                        }
                     }
                     for w in c["warnings"].as_array().into_iter().flatten().filter_map(Value::as_str) {
                         let shown = id.as_str().map_or_else(|| id.to_string(), String::from);

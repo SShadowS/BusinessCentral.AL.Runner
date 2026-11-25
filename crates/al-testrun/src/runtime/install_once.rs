@@ -127,11 +127,35 @@ struct Key {
 }
 
 /// The start of a pass: its entry's resource texts (`Engine::resource_overrides`), of which [`start_installed`] compares
-/// those of the files the install code read.
-pub(super) fn begin_pass(engine: &Engine, resources: &al_vm::ResourceOverrides) {
-    if let Ok(mut o) = engine.resource_overrides.write() {
-        o.clone_from(resources);
+/// those of the files the install code read. Returns the [`resources_digest`] of the texts as installed, where
+/// `NavApp.GetResourceAsText` reads them (`PassTime::resources_hash`).
+pub(super) fn begin_pass(engine: &Engine, resources: &al_vm::ResourceOverrides) -> Option<[u8; 32]> {
+    let mut o = engine.resource_overrides.write().ok()?;
+    o.clone_from(resources);
+    Some(resources_digest(&o))
+}
+
+/// The digest of the resource texts `o` puts in force, as the serve protocol gives it (`resourcesHash`): SHA-256 over
+/// the (name, text) pairs of every app, an app's files replaced by the same text counting once, sorted by the bytes of
+/// the name (UTF-8) and then of the text; each pair as the u64 little-endian byte length of the name, the name, the
+/// u64 little-endian byte length of the text, the text. No texts: the digest of nothing.
+pub(crate) fn resources_digest(o: &al_vm::ResourceOverrides) -> [u8; 32] {
+    use sha2::{Digest, Sha256};
+    let mut pairs: Vec<(&[u8], &[u8])> = o
+        .values()
+        .flat_map(|files| files.iter())
+        .map(|(n, t)| (n.as_bytes(), t.as_slice()))
+        .collect();
+    pairs.sort_unstable();
+    pairs.dedup();
+    let mut h = Sha256::new();
+    for (name, text) in pairs {
+        for part in [name, text] {
+            h.update((part.len() as u64).to_le_bytes());
+            h.update(part);
+        }
     }
+    h.finalize().into()
 }
 
 /// The end of a run's passes: the resource texts of its entries are not the next run's. Returns how many times the
@@ -267,4 +291,44 @@ fn install(lowered: &Lowered, engine: &Arc<Engine>, scratch: &Scratch, key: Key)
         left,
     };
     (installed, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resources_digest;
+    use std::sync::Arc;
+
+    fn hex(d: [u8; 32]) -> String {
+        d.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    /// The digest is of the texts as installed: two apps under test whose file of one name the entry replaced count it
+    /// once, in any order of the apps, and no texts give the digest of nothing.
+    #[test]
+    fn the_digest_counts_a_text_two_apps_hold_once_and_none_is_the_empty_digest() {
+        let files = |pairs: &[(&str, &str)]| {
+            Arc::new(
+                pairs
+                    .iter()
+                    .map(|(n, t)| (n.to_string(), t.as_bytes().to_vec()))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let one = [(0, files(&[("other.txt", "x"), ("active.txt", "M0001")]))]
+            .into_iter()
+            .collect();
+        let two = [
+            (3, files(&[("active.txt", "M0001")])),
+            (1, files(&[("other.txt", "x"), ("active.txt", "M0001")])),
+        ]
+        .into_iter()
+        .collect();
+        let want = "b589aa5cbb6f0ba8c1defc2884eb82e47aeba964108a4736a440d004ccd51acd";
+        assert_eq!(hex(resources_digest(&one)), want);
+        assert_eq!(hex(resources_digest(&two)), want);
+        assert_eq!(
+            hex(resources_digest(&Default::default())),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
 }

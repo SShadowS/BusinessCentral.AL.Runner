@@ -1403,8 +1403,9 @@ impl CorpusRuntime {
             let reset_ns = std::sync::atomic::AtomicU64::new(0);
             // Writing the snapshot the test threads read (the first pass on several threads does it).
             let mut encode_time = std::time::Duration::ZERO;
-            super::install_once::begin_pass(&engine, &pass.resources);
             let (refused, skip) = pass_refused(install_read_resources, pass, &passes, &entry_ranges, &list);
+            // The texts the entry's tests run with; a pass that runs none (`refused`) ran with none.
+            let installed = super::install_once::begin_pass(&engine, &pass.resources).filter(|_| refused.is_none());
             let (opts_only, limit) = (&pass.only, pass.limit);
             // The test codeunits to run, in the order the report lists them.
             let mut units: Vec<Unit> = Vec::new();
@@ -1813,7 +1814,7 @@ impl CorpusRuntime {
             if !opts.entries.is_empty() {
                 entry_ranges.push(start..list.len());
             }
-            pass_times.push(PassTime::ended(pass_started, encode_time, &reset_ns));
+            pass_times.push(PassTime::ended(pass_started, encode_time, &reset_ns, installed));
         }
         let install_runs = super::install_once::end_run(&engine, &installs);
         let login_replay = crate::login_start::phases(&engine);

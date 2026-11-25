@@ -2475,6 +2475,97 @@ fn the_companies_field_is_the_companies_flag_for_one_request() {
     assert_eq!(o.0, "pass", "{o:?}");
 }
 
+/// The `resourcesHash` of an entry whose run had `pairs` (name, text) in force, by the recipe of the protocol (section
+/// 2): SHA-256, lowercase hex, over the pairs sorted by the UTF-8 bytes of the name, each as the u64 little-endian byte
+/// length of the name, the name, the u64 little-endian byte length of the text, the text.
+fn resources_hash(pairs: &[(&str, &str)]) -> String {
+    use sha2::Digest;
+    let mut sorted = pairs.to_vec();
+    sorted.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    let mut h = sha2::Sha256::new();
+    for (name, text) in sorted {
+        for part in [name, text] {
+            h.update((part.len() as u64).to_le_bytes());
+            h.update(part.as_bytes());
+        }
+    }
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The `entrySummary` lines of a request, by entry id.
+fn entry_summaries(lines: &[Value]) -> std::collections::BTreeMap<String, Value> {
+    lines
+        .iter()
+        .filter(|l| l["type"] == "entrySummary")
+        .map(|l| (l["entry"].as_str().unwrap_or("?").to_string(), l.clone()))
+        .collect()
+}
+
+/// Each `entrySummary` has `resourcesHash`, the digest of the resource texts its run had in force: two entries with
+/// different texts differ, each is the recipe's value of its texts, and an entry without resources (with other fields)
+/// has the digest of none.
+#[test]
+fn an_entry_summary_has_the_hash_of_the_resource_texts_its_run_had() {
+    assert_eq!(
+        resources_hash(&[("other.txt", "x"), ("active.txt", "M0001")]),
+        "b589aa5cbb6f0ba8c1defc2884eb82e47aeba964108a4736a440d004ccd51acd"
+    );
+    let d = tempfile::tempdir().unwrap();
+    let a = mutant_app(d.path());
+    let mut s = started();
+    s.send(json!({"command": "runTests", "sourcePaths": [a], "entries": [
+        {"id": "m1", "resources": {"active.txt": "M0001"}, "test": "Codeunit50661.Passes"},
+        {"id": "m2", "resources": {"other.txt": "x", "active.txt": "M0001"}, "test": "Codeunit50661.Passes"},
+        {"id": "plain", "test": "Codeunit50661.Passes", "excludeTests": ["Codeunit50661.Active"], "testTimeoutSecs": 30},
+    ]}));
+    let lines = s.until_summary();
+    let e = entry_summaries(&lines);
+    let hash = |id: &str| {
+        e[id]["resourcesHash"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{id}: {lines:?}"))
+            .to_string()
+    };
+    assert_eq!(hash("m1"), resources_hash(&[("active.txt", "M0001")]), "{lines:?}");
+    assert_eq!(
+        hash("m2"),
+        resources_hash(&[("active.txt", "M0001"), ("other.txt", "x")]),
+        "{lines:?}"
+    );
+    assert_ne!(hash("m1"), hash("m2"));
+    assert_eq!(hash("plain"), resources_hash(&[]), "{lines:?}");
+    assert_eq!(
+        hash("plain"),
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line(), json!({"status": "shutting down"}));
+}
+
+/// Al-runner issue 8206: when the install baseline read a resource file, an entry with resources of its own is not
+/// run, and its `entrySummary` has no `resourcesHash` (its texts were never in force for a test); an entry without
+/// resources runs and has the digest of none.
+#[test]
+fn an_entry_not_run_for_its_resources_has_no_resources_hash() {
+    let d = tempfile::tempdir().unwrap();
+    let (main, dep) = resource_baseline_apps(d.path(), true);
+    let dep = dep.to_string_lossy().to_string();
+    let cache = d.path().join("cache").to_string_lossy().to_string();
+    let mut s = Server::start(&["--no-download", "--no-test-data", "--dep", &dep, "--cache-dir", &cache]);
+    s.line();
+    s.send(json!({"command": "runTests", "sourcePaths": [main], "entries": [
+        {"id": "own", "resources": {"flag.txt": "on"}, "test": "Codeunit50832."},
+        {"id": "none", "test": "Codeunit50832."},
+    ]}));
+    let lines = s.until_summary();
+    let e = entry_summaries(&lines);
+    assert_eq!(e["own"]["errors"], json!(1), "{lines:?}");
+    assert!(e["own"].get("resourcesHash").is_none(), "{lines:?}");
+    assert_eq!(e["none"]["resourcesHash"], json!(resources_hash(&[])), "{lines:?}");
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line(), json!({"status": "shutting down"}));
+}
+
 /// Al-runner issue 8206: a dependency with install code (a row `INSTALL`), and an app under test with a resource file
 /// `flag.txt` whose test fails with the flag text and the row count in its message. With `install_reads_resource`, the
 /// app's own install code (which the install baseline runs too) adds a row holding the text of `flag.txt`.

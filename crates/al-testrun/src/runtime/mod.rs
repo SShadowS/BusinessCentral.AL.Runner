@@ -588,19 +588,24 @@ pub struct PassTime {
     pub reset: std::time::Duration,
     /// The wall time of the pass, its reset included.
     pub wall: std::time::Duration,
+    /// The digest of the resource texts the pass's tests ran with (`install_once::resources_digest`); `None` when the
+    /// pass ran no test for a reason of the whole pass (`pass_refused`: al-runner issue 8206, or the stop of a group).
+    pub resources_hash: Option<[u8; 32]>,
 }
 
 impl PassTime {
     /// The time of a pass that started at `started`: `encode`, writing the snapshot, and `reset_ns`, the longest time a
-    /// test thread took to copy the baseline.
+    /// test thread took to copy the baseline; `resources_hash`, the digest of the texts its tests ran with.
     fn ended(
         started: std::time::Instant,
         encode: std::time::Duration,
         reset_ns: &std::sync::atomic::AtomicU64,
+        resources_hash: Option<[u8; 32]>,
     ) -> PassTime {
         PassTime {
             reset: encode + std::time::Duration::from_nanos(reset_ns.load(std::sync::atomic::Ordering::Relaxed)),
             wall: started.elapsed(),
+            resources_hash,
         }
     }
 }
