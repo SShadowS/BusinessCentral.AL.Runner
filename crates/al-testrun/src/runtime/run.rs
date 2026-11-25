@@ -503,6 +503,7 @@ fn run_codeunit_inner(
     let run_seed = scratch.run_seed;
     let (mut session, moved) = new_session(engine, session_host(scratch), baseline, execute);
     set_up_session(&mut session, scratch, observe.is_some());
+    scratch.clock.session_made();
     let covering = crate::coverage::enabled();
     let is_on_run = |r: usize| obj.routines[r].is_trigger && obj.routines[r].name.eq_ignore_ascii_case("OnRun");
     let tests: Vec<usize> = (0..obj.routines.len())
@@ -591,6 +592,7 @@ fn run_codeunit_inner(
         Ok(opened) => opened,
         Err(not) => return observed_not_run(observe.as_deref_mut(), &session, &not, all),
     };
+    scratch.clock.opened();
     // SingleInstance state an earlier test codeunit left (ADR-066 amendment 2): notes from here on, and in the lane the
     // single instances of the codeunit before are moved in.
     start_singles(&mut session, execute, moved, scratch.watch);
@@ -828,6 +830,7 @@ fn run_codeunit_inner(
             // The number of this test for the SingleInstance notes (ADR-066 amendment 7; 0 without notes).
             let test_no = single_test_begins(session, scratch.watch);
             let test_started = std::time::Instant::now();
+            scratch.clock.test_started(test_started);
             let draws_before = session.inherited_random_draws();
             let carried_before = session.carried_random_draws();
             let bound_before = session.bound_subscriptions();
@@ -1329,15 +1332,17 @@ fn run_codeunit_inner(
                     &Observed::of_test(session, failure.as_ref(), refused_in),
                 );
             }
-            crate::isolation::after_test(
-                session,
-                checkpoint.as_ref(),
-                runner_function,
-                sequences.as_mut(),
-                failed,
-                ended == Some(Ended::Failed),
-                &routine.name,
-            );
+            scratch.clock.rollback(|| {
+                crate::isolation::after_test(
+                    session,
+                    checkpoint.as_ref(),
+                    runner_function,
+                    sequences.as_mut(),
+                    failed,
+                    ended == Some(Ended::Failed),
+                    &routine.name,
+                )
+            });
             if let (Outcome::Fail(_), Some(e)) = (&outcome, &failure) {
                 if !e.call_stack.is_empty() {
                     stacks.push((name.clone(), e.call_stack.clone()));
@@ -1350,15 +1355,8 @@ fn run_codeunit_inner(
             // `--tdd` (ADR-051 decision 5): the stubs that ran while the test ran, its handlers and subscribers included.
             let (reached, ui_answered) = scratch.take_marks(&name, session);
             let took = test_started.elapsed();
-            // The count starts with the test (`start_sleep_budget`): a test that did not start slept nothing.
-            let slept_ms = if began {
-                u64::try_from(session.slept_in_test_ms()).unwrap_or(0)
-            } else {
-                0
-            };
-            if slept_ms > 0 {
-                scratch.slept.push((name.clone(), slept_ms));
-            }
+            scratch.clock.test_ended(test_started, took);
+            let slept_ms = scratch.note_slept(&name, session, began);
             if execute {
                 scratch.messages.push((name.clone(), session.take_messages()));
             }

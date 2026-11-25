@@ -37,9 +37,9 @@
 //!   `field leak_hits`, `field onrun_carry`, `field read_tables`, `field discovery`, `field on_run_rows`,
 //!   `field report_unpinned_errors`, `field skip_after_timeout`, `field stop_after_first_failure`, `field runner`,
 //!   `field watch`, `field singles_past_stop`, `field singles_out`, `field unfinished_after_start`,
-//!   `field refused_mid_run`, `field test_panicked`, `field unfinished_at`, `field order_hints`: after (what to
-//!   capture, the runner codeunit, the single instance watch, the carries and the leak are taken after the open; the
-//!   rest chooses, limits or reports the tests).
+//!   `field refused_mid_run`, `field test_panicked`, `field unfinished_at`, `field order_hints`, `field clock`: after
+//!   (what to capture, the runner codeunit, the single instance watch, the carries and the leak are taken after the
+//!   open; the rest chooses, limits, times or reports the tests).
 //! - `crates/al-vm/src/lib.rs` (`Engine`, "Set by a run"): `field emit_version`: key (`Key::emit_version`).
 //!   `field unseeded`, `field demo_tables`: key (`Key::refused_reads`). `field resource_overrides`: key
 //!   (`Key::resources`). `field test_data`: key (`Key::backing`) and engine. `field license`: key (`Key::license`) and

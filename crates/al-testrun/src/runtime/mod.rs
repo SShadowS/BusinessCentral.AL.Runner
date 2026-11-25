@@ -553,6 +553,8 @@ pub struct Phases {
     pub login_replay: LoginReplay,
     /// What the run did, counted (the work ratchet of `al-test-cli`).
     pub work: RunWork,
+    /// The tests phase by step, summed over the test codeunits (`tests_split.rs`).
+    pub split: tests_split::TestsSplit,
 }
 
 /// What one run did, as counts that are the same on every run of the same inputs: the work ratchet of the corpus run
@@ -586,6 +588,21 @@ pub struct PassTime {
     pub reset: std::time::Duration,
     /// The wall time of the pass, its reset included.
     pub wall: std::time::Duration,
+}
+
+impl PassTime {
+    /// The time of a pass that started at `started`: `encode`, writing the snapshot, and `reset_ns`, the longest time a
+    /// test thread took to copy the baseline.
+    fn ended(
+        started: std::time::Instant,
+        encode: std::time::Duration,
+        reset_ns: &std::sync::atomic::AtomicU64,
+    ) -> PassTime {
+        PassTime {
+            reset: encode + std::time::Duration::from_nanos(reset_ns.load(std::sync::atomic::Ordering::Relaxed)),
+            wall: started.elapsed(),
+        }
+    }
 }
 
 impl Phases {
@@ -842,6 +859,8 @@ pub(crate) struct Scratch {
     pub(crate) unfinished_at: Vec<(u32, String)>,
     /// ADR-066 amendment 12, decision 2: the hint of each failed test (`TestResult::order_hint`), set by the lane.
     pub(crate) order_hints: Vec<(String, OrderHint)>,
+    /// Where the codeunit's run is, by step, for the split of the tests phase (`tests_split.rs`).
+    pub(crate) clock: tests_split::UnitClock,
 }
 
 /// How the tests of a codeunit ended (`Scratch::note_ended`).
@@ -860,6 +879,20 @@ impl Scratch {
             self.read_tables.extend(touched.indirect_reads.iter().copied());
         }
         touched
+    }
+
+    /// The time test `name` slept, in ms, kept when it is not 0. The count starts with the test (`start_sleep_budget`):
+    /// a test that did not start (`began`) slept nothing.
+    pub(crate) fn note_slept(&mut self, name: &str, session: &Session, began: bool) -> u64 {
+        let slept_ms = if began {
+            u64::try_from(session.slept_in_test_ms()).unwrap_or(0)
+        } else {
+            0
+        };
+        if slept_ms > 0 {
+            self.slept.push((name.to_string(), slept_ms));
+        }
+        slept_ms
     }
 
     /// How the codeunit's tests ended (`unfinished_after_start`, `refused_mid_run`, `test_panicked`).
@@ -896,6 +929,8 @@ pub(crate) struct UnitResult {
     result: Result<UnitOutcomes, String>,
     took: std::time::Duration,
     sidecar_start: std::time::Duration,
+    /// `took` by step (`tests_split.rs`); a codeunit that panicked or did not start counts as none.
+    split: tests_split::TestsSplit,
 }
 
 /// ADR-066 amendment 10, decision 6: once the run stopped at its hard memory limit, the tests of `u` that have no
@@ -959,6 +994,7 @@ fn run_unit(
             result,
             took: started.elapsed(),
             sidecar_start: std::time::Duration::ZERO,
+            split: tests_split::TestsSplit::default(),
         };
     }
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1077,6 +1113,10 @@ fn run_unit(
         }
     }
     let took = started.elapsed();
+    let split = match &result {
+        Ok((.., scratch)) => tests_split::TestsSplit::of(started, &scratch.clock, started + took),
+        Err(_) => tests_split::TestsSplit::default(),
+    };
     let sidecar_start = crate::dotnet::take_start_time();
     crate::crash::idle();
     crate::events::uninstall();
@@ -1087,6 +1127,7 @@ fn run_unit(
         result,
         took,
         sidecar_start,
+        split,
     }
 }
 
@@ -1313,6 +1354,7 @@ mod test_handlers;
 mod test_marks;
 #[cfg(test)]
 mod tests;
+pub mod tests_split;
 mod threads;
 pub(crate) mod written;
 

@@ -754,7 +754,33 @@ fn timings_json(t: &run::RequestTimings, wall: std::time::Duration) -> Value {
     if t.passes.len() == 1 {
         v["resetMs"] = json!(ms(t.passes[0].reset));
     }
+    v["testsParts"] = tests_parts_json(t);
     v
+}
+
+/// `testsMs` by step, summed over the request's test codeunits (`timings.testsParts`): `entryStartMs`, `resetMs`,
+/// `bodiesMs` and `otherMs` add up to `testsMs` (each rounded to a tenth); the other keys are parts of one of them.
+fn tests_parts_json(t: &run::RequestTimings) -> Value {
+    let s = &t.tests_split;
+    let (entry_start, reset, bodies) = (ms(s.entry_start()), ms(s.reset()), ms(s.bodies));
+    let tests = ms(t.tests);
+    let passes: std::time::Duration = t.passes.iter().map(|p| p.wall).sum();
+    // With several test threads the codeunits' times overlap, and `otherMs` can be below zero.
+    let other = ((tests - entry_start - reset - bodies) * 10.0).round() / 10.0;
+    json!({
+        "entryStartMs": entry_start,
+        "resetMs": reset,
+        "bodiesMs": bodies,
+        "otherMs": other,
+        "sessionMs": ms(s.session),
+        "loginMs": ms(s.login),
+        "onRunMs": ms(s.on_run),
+        "betweenMs": ms(s.between),
+        "codeunitEndMs": ms(s.end),
+        "rollbackInBodiesMs": ms(s.rollback_in_bodies),
+        "outsidePassesMs": ms(t.tests.saturating_sub(passes)),
+        "codeunits": s.units,
+    })
 }
 
 /// The object keywords of AL: a `code` that starts with one (after white space and comments) is a whole object.

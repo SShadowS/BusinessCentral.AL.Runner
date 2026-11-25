@@ -588,6 +588,8 @@ pub struct RequestTimings {
     pub baseline_source: Option<&'static str>,
     /// Running the test codeunits, every pass.
     pub tests: std::time::Duration,
+    /// `tests` by step, summed over the test codeunits (`timings.testsParts`).
+    pub tests_split: al_testrun::runtime::tests_split::TestsSplit,
     /// Building the coverage document.
     pub coverage: std::time::Duration,
     /// Per pass (one per entry of the request): the threads' baseline copy and the pass's wall time.
@@ -607,6 +609,7 @@ impl RequestTimings {
             baseline: p.baseline,
             baseline_source: p.baseline_source,
             tests: p.tests,
+            tests_split: p.split,
             coverage,
             passes: p.passes.clone(),
         }

@@ -2000,6 +2000,62 @@ fn a_summary_says_where_the_time_went_and_a_kept_baseline_does_not_carry_writes(
     assert_eq!(s.line(), json!({"status": "shutting down"}));
 }
 
+/// A test codeunit with an OnRun and two test methods that write, for the split of `testsMs`.
+const TWO_METHODS: &str = r#"
+table 50720 "Split Row" { fields { field(1; K; Code[20]) { } } keys { key(PK; K) { Clustered = true; } } }
+codeunit 50720 "Split Tests"
+{
+    Subtype = Test;
+    trigger OnRun() begin end;
+    [Test] procedure First() var R: Record "Split Row"; begin R.K := 'A'; R.Insert(); end;
+    [Test] procedure Second() var R: Record "Split Row"; begin if not R.IsEmpty() then Error('kept a row'); end;
+}
+"#;
+
+/// `timings.testsParts` splits `testsMs` into the start of each entry's codeunit, the time between and after its
+/// tests, the tests' own rows and the rest, which add up to it; `bodiesMs` is the sum of the rows' `durationMs`.
+#[test]
+fn tests_parts_add_up_to_tests_ms_and_bodies_to_the_rows() {
+    let d = tempfile::tempdir().unwrap();
+    let a = app(d.path(), "split", TWO_METHODS);
+    let mut s = started();
+    for entries in [None, Some(json!([{"id": "a"}, {"id": "b"}]))] {
+        let mut req = json!({"command": "runTests", "sourcePaths": [a], "testIsolation": "test"});
+        if let Some(e) = entries {
+            req["entries"] = e;
+        }
+        s.send(req);
+        let lines = s.until_summary();
+        let rows: Vec<&Value> = lines.iter().filter(|l| l["type"] == "test").collect();
+        assert!(rows.iter().all(|r| r["status"] == "pass"), "{lines:?}");
+        let summary = lines.last().unwrap();
+        let t = &summary["timings"];
+        let parts = &t["testsParts"];
+        let key = |k: &str| parts[k].as_f64().unwrap_or_else(|| panic!("testsParts.{k}: {summary}"));
+        let sum = key("entryStartMs") + key("resetMs") + key("bodiesMs") + key("otherMs");
+        let tests = t["testsMs"].as_f64().unwrap();
+        assert!((sum - tests).abs() <= 2.0, "parts {sum} vs testsMs {tests}: {summary}");
+        let rows_ms: f64 = rows.iter().map(|r| r["durationMs"].as_f64().unwrap_or(0.0)).sum();
+        // A row's `durationMs` is its time in whole milliseconds, rounded down: up to 1 ms below its part of `bodiesMs`.
+        let below = key("bodiesMs") - rows_ms;
+        assert!(
+            (-0.1..=rows.len() as f64 + 0.1).contains(&below),
+            "bodies vs rows {rows_ms}: {summary}"
+        );
+        let start = key("sessionMs") + key("loginMs") + key("onRunMs");
+        assert!((start - key("entryStartMs")).abs() <= 0.5, "{summary}");
+        assert!(
+            (key("betweenMs") + key("codeunitEndMs") - key("resetMs")).abs() <= 0.5,
+            "{summary}"
+        );
+        assert!(key("rollbackInBodiesMs") <= key("bodiesMs") + 0.1, "{summary}");
+        assert!(key("outsidePassesMs") >= 0.0, "{summary}");
+        assert_eq!(parts["codeunits"], json!(rows.len() / 2), "{summary}");
+    }
+    s.send(json!({"command": "shutdown"}));
+    assert_eq!(s.line(), json!({"status": "shutting down"}));
+}
+
 /// A dependency app (folder `dep`) with a SingleInstance codeunit, and an app under test with one of its own, a Writer
 /// test codeunit that sets session state of each kind and a Reader that fails unless it sees none of it.
 fn state_apps(root: &Path) -> (PathBuf, PathBuf) {

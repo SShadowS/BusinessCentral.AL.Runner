@@ -306,6 +306,7 @@ impl CorpusRuntime {
             rt.adopt_cases(&second, &s.listed);
             rt.phases.baseline += second.phases.baseline;
             rt.phases.tests += second.phases.tests;
+            rt.phases.split += second.phases.split;
         }
         rt
     }
@@ -1384,7 +1385,7 @@ impl CorpusRuntime {
             .iter()
             .map(|a| (a.id.clone(), a.name.clone(), a.version.clone()))
             .collect();
-        let mut suite_work: Vec<(usize, std::time::Duration)> = Vec::new();
+        let mut suite_work: Vec<(usize, std::time::Duration, super::tests_split::TestsSplit)> = Vec::new();
         // Every test thread starts from one frozen install baseline (ADR-069), or from a copy of its own read from
         // bytes (`install_snapshot.rs`); either is far cheaper than running the install code again. It is made when a
         // pass first runs on several threads.
@@ -1673,7 +1674,7 @@ impl CorpusRuntime {
             super::discovery::refuse_after_pass(&mut slots, &chain_report, &engine, lowered, opts.strict_order);
             let results: Vec<UnitResult> = slots.into_iter().flatten().collect();
             for r in results {
-                suite_work.push((r.si, r.took));
+                suite_work.push((r.si, r.took, r.split));
                 codeunit_times.push(CodeunitTime {
                     id: r.id,
                     name: lowered.program.objects[r.oi].name.clone(),
@@ -1812,11 +1813,7 @@ impl CorpusRuntime {
             if !opts.entries.is_empty() {
                 entry_ranges.push(start..list.len());
             }
-            pass_times.push(PassTime {
-                reset: encode_time
-                    + std::time::Duration::from_nanos(reset_ns.load(std::sync::atomic::Ordering::Relaxed)),
-                wall: pass_started.elapsed(),
-            });
+            pass_times.push(PassTime::ended(pass_started, encode_time, &reset_ns));
         }
         let install_runs = super::install_once::end_run(&engine, &installs);
         let login_replay = crate::login_start::phases(&engine);
@@ -1839,7 +1836,7 @@ impl CorpusRuntime {
             .map(|(si, suite)| {
                 (
                     suite.name.clone(),
-                    suite_work.iter().filter(|(i, _)| *i == si).map(|(_, d)| *d).sum(),
+                    suite_work.iter().filter(|(i, ..)| *i == si).map(|(_, d, _)| *d).sum(),
                 )
             })
             .collect();
@@ -1893,6 +1890,7 @@ impl CorpusRuntime {
                 login_replay,
                 decoded_on_touch: lowered.cached_objects.as_ref().map(|c| c.decoded()),
                 work: run_work(*compiles, lowered, ws, cache_report.as_ref(), baseline_rows, &list),
+                split: suite_work.iter().map(|w| w.2).sum(),
                 // Not redone, not warm: the caller sets them.
                 ..Default::default()
             },

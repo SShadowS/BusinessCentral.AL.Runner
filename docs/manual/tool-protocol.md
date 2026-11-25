@@ -241,6 +241,18 @@ Differences a client must adapt to:
    starting them ahead), `affectedMs` (`affectedOnly`: the stored result and the hashes of the inputs), `entriesMs`
    (building the runs of the entries) and `prepareMs` (the rest before the compile: the dependency notes, the hooks and
    the run's options). `--timings` prints the same parts as its `setup:` line.
+   `testsParts` splits `testsMs` into four parts, summed over the request's test codeunits (every entry), which add
+   up to it: `entryStartMs` (each codeunit from its start to its first test method: the new session on the install
+   baseline, the install steps and the login that opens the company, the runner's steps before the codeunit, OnRun and
+   the start of the isolation), `resetMs` (after the first test method started, the time outside the rows: between the
+   methods, mostly reporting each row, and after the last one, the runner's steps after the codeunit and the end of
+   its session), `bodiesMs` (the rows' own time, summed; a row's `durationMs` gives it in whole milliseconds, rounded
+   down) and `otherMs` (the rest: choosing each entry's codeunits, building its rows, a thread's copy of the baseline;
+   below zero when test threads ran codeunits side by side). Parts of these: `sessionMs`, `loginMs` and `onRunMs` add up to `entryStartMs`; `betweenMs` and
+   `codeunitEndMs` add up to `resetMs`; `rollbackInBodiesMs` is the part of `bodiesMs` that ends each test's
+   isolation (the rollback of TestIsolation = Function is inside the row's time); `outsidePassesMs` is the part of
+   `otherMs` outside every entry's pass. `codeunits` counts the codeunits summed (one that panicked or was not started
+   is not counted, and its time is in `otherMs`).
    `loginReplays` and `loginStarts` (always present) count, over every request the engine ran, the test sessions that took a kept login start in place of running the login and the login starts kept (al-runner issue 8211). The first test session of a login runs it and keeps a start; later sessions of the same login, company, user and inputs thaw it. The replay is off by default (both 0); `ALRUNNER_LOGIN_REPLAY=1` turns it on. Under `ALRUNNER_LOGIN_REPLAY_CHECK=1` no session takes a start, so `loginReplays` stays 0, but the check keeps the starts it compares later sessions with, so `loginStarts` is not 0.
    `engineKept: true` when the request ran on the engines an earlier request over the same compile kept. Without
    `entries`, `resetMs` is the time the test threads took to set up their own copy of the install baseline (the
