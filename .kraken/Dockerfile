@@ -7,9 +7,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 # zip, unzip: al-runner tests and tools call python3 and zip (al-test-cli's corpus_bump_*, record_windows_oracle and
 # step_time_guard failed without them). gcc-mingw-w64-x86-64: the linker and C compiler for the Windows GNU
 # target below, so Windows-only code (console handlers, kernel32 calls) is checked here before a PR leaves draft.
+# libharfbuzz0b, libfontconfig1, fontconfig and the DejaVu and Liberation fonts: the report renderer's probe
+# (tools/dotnet-sidecar/Render.cs) needs HarfBuzz, a loadable SkiaSharp (fontconfig) and a font; without them the
+# Word-layout report cases keep their placeholder Html and --baseline-diff shows them as false regressions.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential pkg-config jq libicu-dev tzdata-legacy time ca-certificates curl python3 zip unzip \
       gcc-mingw-w64-x86-64 \
+      libharfbuzz0b libfontconfig1 fontconfig fonts-dejavu-core fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 # Rust as CI pins it (dtolnay/rust-toolchain@1.98.1 in .github/actions/setup/action.yml), outside the cache
 # volume (the base points CARGO_HOME at ~/.cache for the registry).
@@ -20,9 +24,12 @@ ENV PATH=/opt/cargo/bin:$PATH
 # The Windows GNU target: `cargo check`/`clippy --target x86_64-pc-windows-gnu` of Windows-only code, which CI's
 # portable check covers only once a PR leaves draft.
 RUN rustup target add x86_64-pc-windows-gnu
-# .NET 8 SDK and runtime: the DotNet sidecar (ADR-014, tools/dotnet-sidecar targets net8.0).
+# .NET 8 SDK and runtime: the DotNet sidecar (ADR-014, tools/dotnet-sidecar targets net8.0). The .NET 10 runtime
+# next to it: BC 29's report renderer and Company-Initialize run on .NET 10 (without it BC 29 skips them).
 RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
-    && bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /opt/dotnet && rm /tmp/dotnet-install.sh
+    && bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /opt/dotnet \
+    && bash /tmp/dotnet-install.sh --channel 10.0 --runtime dotnet --install-dir /opt/dotnet \
+    && rm /tmp/dotnet-install.sh
 ENV DOTNET_ROOT=/opt/dotnet PATH=/opt/dotnet:$PATH DOTNET_CLI_TELEMETRY_OPTOUT=1
 # Login shells (bash -l: kraken's setup, ssh sessions) rebuild PATH from /etc/profile, so ENV alone is not enough
 RUN printf '%s\n' 'export PATH=/opt/cargo/bin:/opt/dotnet:$PATH' 'export DOTNET_ROOT=/opt/dotnet' \
