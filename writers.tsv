@@ -1,0 +1,1007 @@
+writes	object_kind	object	routine	app	in_how_many_of_the_199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	API Webhook Notification Mgt.	CanScheduleJob	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetAppDescription	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetAppID	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetAppName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetAppVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetManifestNamespaceManager	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	GetXmlNodes	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Add-in Manifest Management	XMLEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Approvals Mgmt.	SkipScheduleTaskIfWorkflowEnabledOnBeforeScheduleTask	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	AcquireOnBehalfOfTokenAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	AcquireTokenByAuthorizationCodeAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	AcquireTokenByAuthorizationCodeWithCredentialsAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	AcquireTokenFromCacheAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	AcquireTokenFromCacheWithCredentialsAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	CanHandle	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	CheckProvider	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	CreateExchangeServiceWrapperWithToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	GetSaasClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnAcquireAcquireOnBehalfOfToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnAcquireTokenByAuthorizationCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnAcquireTokenByAuthorizationCodeWithCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnAcquireTokenFromCache	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnAcquireTokenFromCacheWithCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnCheckProvider	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnCreateExchangeServiceWrapperWithToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnGetSaasClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Auth Flow	OnInitialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph	GetCurrentUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph	GetTenantDetail	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph	GetUserByObjectId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph	IsGroupMember	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph	IsMemberOfGroupWithId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	CanQueryGraph	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	GetCurrentUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	GetEnvironmentSecurityGroupId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	GetTenantDetail	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	GetUserByObjectId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	IsGroupMember	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	IsM365CollaborationEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	IsMemberOfGroupWithId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Impl.	OnInitialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph Test Library	OnGraphInitialization	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User	GetGraphUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	GetGraphUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	GetUserAuthenticationObjectId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	InitializeGraphUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	IsUserDelegated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	IsUserDelegatedAdmin	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	OnIsUserDelegated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Graph User Impl.	OnIsUserDelegatedAdmin	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Mgt.	CreateExchangeServiceWrapperWithToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Mgt.	GetDefaultRedirectUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Plan Impl.	GetAzureUserPlanRoleCenterId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Plan Impl.	GetGraphUserPlans	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Plan Impl.	IsDeviceRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD Plan Impl.	IsInternalAdmin	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD User Subscribers	GetInformation	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure AD User Subscribers	TryGetCountryCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure Key Vault Impl.	GetAzureKeyVaultCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure Key Vault Impl.	GetAzureKeyVaultSecret	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure Key Vault Impl.	GetCertificateFromClient	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Azure Key Vault Impl.	GetSecretFromClient	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Booking Manager Handler	OnSetBookingItemInvoiced	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	AddDataColumn	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	AddDataRowWithXDimension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	AddEntryToMapSafely	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	AddMeasure	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	GetBusinessChartDataType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	GetDotNetTypeName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	GetXDimension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	GetXDimensionDataType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	SetValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Business Chart Impl.	SetXDimension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Int. Table. Subscriber	AddCoupledUserToDefaultOwningTeam	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ActivateConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AddUserToTeam	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AddUsersToDefaultOwningTeam	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AssignIntegrationRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AssignPreviousIntegrationUserRoles	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AssignTeamRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	AssignUserRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckEntitiesAvailability	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckIntegrationUserRequirements	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckModifyConnectionURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckOwningTeamRequirements	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	CheckRoleAssignedToTeam	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ConfigureIntegrationSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	FindOrCreateIntegrationUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	GetOptionSetMetadata	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	GetOwningTeamId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ImportAndConfigureIntegrationSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ImportDefaultCdsSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ImportIntegrationSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	InitializeConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	InsertOptionSetMetadataWithOptionValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	IsSolutionVersionValid	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	JITProvisionFirstPartyApp	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	ProcessConnectionFailures	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	SetAccessModeToNonInteractive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	SetUserAsIntegrationUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	SignInCDSAdminUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	SyncCompany	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryAddUserToTeam	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryAssignTeamRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryAssignUserRole	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryGetSolutionVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryGetUserId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	TryRegisterTableConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	UnregisterConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CDS Integration Impl.	UpdateOptionSetMetadata	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	CheckCRMConnectionURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	CheckModifyCRMConnectionURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	CheckSolutionVersionOutdated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	FirstCheckCRMConnectionURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	GetLastErrorMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	ImportCRMSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	ImportDefaultCRMSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	ImportDefaultSalesProSolution	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	InitializeCRMConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	IsSolutionOutdated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	ProcessConnectionFailures	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	ReactivateJobForTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	SetCRMNAVConnectionUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	TestCRMConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	TryRemoveCRMNAVConnectionUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Integration Management	UserCanRescheduleJob	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	CRM Synch. Helper	FulfillSalesOrder	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	GetPicture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	HasPicture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	InitializeCameraOptions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	IsAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	OnIsCameraAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Camera Page Impl.	SetQuality	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Config. Validate Management	EvaluateValueToDate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Config. Validate Management	FromOADate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Config. Validate Management	OADateToDateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Copilot Capability Install	TryGetBizChatEnabled	dependency	3
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	AssertEncryptionPossible	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	ChangeKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	ConvertByteHashToString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	CreateEncryptionKeys	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	DisableEncryption	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	DownloadEncryptionFileFromStream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	EnableEncryption	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	ExportKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	GenerateHash	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	GetEncryptionKeyAsStream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	ImportKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	ImportKeyAndConfirm	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	IsEncryptionEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	IsEncryptionPossible	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	TryGenerateHash	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Cryptography Management Impl.	UploadFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Custom Layout Reporting	ExcludeReportedObjects	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Custom Layout Reporting	ProcessReportPerLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	AddEntry	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	CloseZipArchive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	CreateZipArchive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	IsGZip	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	OpenZipArchive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Data Compression Impl.	SaveZipArchive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	AcquireAccessTokenByAuthorizationCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	AcquireAccessTokenByRefreshToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	CheckConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	CheckCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	CheckDocumentStatus	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	CheckServiceEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	DispatchDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ExecuteWebServiceGetRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ExecuteWebServicePostRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ExecuteWebServicePutRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ExecuteWebServiceRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetActivateAppNotificationId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetApiNamespace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetCheckConnectionURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetClientSecretAsSecretText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDefaultRedirectUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDispatchDocURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDispatchErrorsURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDocDispatchErrors	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDocStatusURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDocumentIDKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDocumentMetadata	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetDocumentStatus	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetErrorXPath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetExternalDocURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetFeatureTelemetryName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetFullURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetGUID	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetJsonKeyValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetMissingClientIdOrSecretErr	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetOAuth2Params	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetPUTDocURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetPredefinedClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetPredefinedClientSecret	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetPrefix	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetPublicNamespace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetRenewTokenNotificationId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetServiceSetUp	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetStatusXPath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	GetUserAgent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	HandleVANRegisterServiceConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	IsSandbox	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	LogActivityFailed	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	LogActivityFailedAndError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	LogActivityFailedCommon	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	LogActivitySucceeded	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	LogTelemetryDocumentSent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	MarkTokenAsExpired	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	OnBeforeCheckDocumentStatus	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	OnBeforeVerifyPrerequisites	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	OnGetClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	OnGetClientSecret	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ParseIdToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	ParseTokenResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	PutDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	RecallActivateAppNotification	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	SaveTokens	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	SendDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	SendRenewTokenNotification	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	SetDefaults	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	SetPropertiesBasedOnAuthRequestUrlAndRunOAuth2ControlAddIn	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	TextToGuid	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	TryAcquireAccessToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	TryGetSecurityToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	TryParseIdToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	UrlEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	VerifyIdToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Doc. Exch. Service Mgt.	VerifyPrerequisites	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	NewExcelLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	NewRdlcLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	NewWordLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	TryUpdateRdlcLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	TryUpdateWordLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Report Mgt.	ValidateWordLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	CheckError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	CheckLicenseError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	DeleteDriveItem	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	EditInOneDrive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	ExtractWebUrlFromJson	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetAccessToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetClientSecret	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetClientSecretFromIsolatedStorage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetDefaultFolderName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetDefaultLocation	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetFileContent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetFileDownloadUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphDomain	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphDriveItemUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphDriveRootUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphDriveUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphFileByIdUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetGraphItemIdUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetLocation	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetOneDriveScenario	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetRedirectURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetResourceUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetSafeCompanyName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetSafeDocumentServiceFolderName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetScopes	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	GetServiceType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	InitTempDocumentServiceRecord	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	InitializeDefaultService	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	InitializeGraphWebRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	InitializeOneDriveWebRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	InitializeWebRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	IsConfiguredLegacy	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	IsOneDriveEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	IsOneDriveEnabledForSystem	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	IsOneDriveEnabledOrUsingLegacySetup	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	LicenseError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnBeforeSetProperties	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnCanUploadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnCanUploadSystemDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnDeleteDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnGetFileContents	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnGetSharePointClientId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnGetSharePointClientSecret	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnGetSharePointRedirectURL	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OnUploadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	OpenInOneDrive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	ResolveItemId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	SetDocumentService	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	SetProperties	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	SetResourceLocation	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	ShareWithOneDrive	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Document Service Management	TrySaveStreamFromRec	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	CastToType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	Collect	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	GetMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	IsCollected	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	Rethrow	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet Exception Handler	TryCastToType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	GetCultureInfo	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	GetCultureInfoById	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	GetCultureInfoByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	InvariantCulture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	Name	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_CultureInfo	TwoLetterISOLanguageName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	DateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Day	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Hour	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Millisecond	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Minute	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Month	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Second	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	SetDateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	ToDateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	TryParse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	TryParseExact	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	TryParseExact_Impl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	TryParse_Impl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTime	Year	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeOffset	ConvertToUtcDateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeOffset	DateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeOffset	GetOffset	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeOffset	SetDateTimeOffset	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeStyles	GetDateTimeStyles	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_DateTimeStyles	None	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_String	Replace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_String	Set	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	DotNet_XMLConvert	ToDateTimeOffset	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Effective Permissions Mgt.	ExtractPermissionsFromText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Effective Permissions Mgt.	GetPermissionChangeNotificationId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Effective Permissions Mgt.	OnInitializingNotificationWithDefaultState	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Effective Permissions Mgt.	PopulatePermissionRecordWithEffectivePermissionsForObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Account Impl.	ConvertEmailAddress	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Dispatcher	RescheduleEmail	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Dispatcher	RetrySendEmail	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Impl	Send	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Message Impl.	ReplaceRgbaColorsWithRgb	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Email Message Impl.	SanitizeBody	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Environment Information Impl.	CanStartSession	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Environment Information Impl.	GetApplicationFamily	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Environment Information Impl.	GetEnvironmentName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Environment Information Impl.	IsProduction	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Environment Information Impl.	IsSaaSInfrastructure	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	CreateAppointment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	GetCurrentUserTimeZone	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	GetEndpoint	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	InitializeWithCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	InitializeWithOAuthToken	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	OnAfterGetProdEndpoint	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	ProdEndpoint	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Exchange Web Services Server	SetImpersonatedIdentity	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	AllowsDownloadSource	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	AssertIsInitialized	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	CanManageExtensions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	CheckPermissions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	GetDependenciesForExtensionToInstall	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	GetNonExcludedApps	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	GetVersionDisplayString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	HasPolicy	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	InstallExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	InstallExtensionSilently	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	InstallExtensionWithConfirmDialog	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	IsInstalledByAppId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	IsInstalledByPackageId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	OnCanManageExtensions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	RunExtensionInstallation	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Installation Impl	RunExtensionSetup	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Marketplace	InstallAppsourceExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Marketplace	InstallAppsourceExtensionWithRefreshSession	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Marketplace	IsMarketplaceEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Marketplace	SaveExtensionPendingSetup	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	AssertIsInitialized	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	CheckPermissions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	DownloadExtensionSource	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	GetExtensionSource	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	GetLatestVersionPackageIdByAppId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Extension Operation Impl	UnpublishUninstalledPerTenantExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	AppendFileNameWithIndex	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBExport	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBExportLocal	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBExportToServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBExportWithEncoding	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBImport	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBImportFromServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	BLOBImportWithFilter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	CombinePath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	CopyServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	CreateFileNameWithExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	DeleteServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	DownloadFromStreamHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	DownloadHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	DownloadTempFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetFileName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetFileNameWithoutExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetSafeFileName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetServerDirectoryFilesList	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	GetToFilterText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	InstreamExportToServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	IsAllowedPath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	Magicpath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnAfterDownloadHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnAfterGetToFilterTextSetOutExt	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnBeforeBlobExport	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnBeforeBlobExportWithEncoding	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnBeforeDownloadFromStreamHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnBeforeDownloadHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	OnBeforeUploadFileWithFilter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	ServerFileExists	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	ServerTempFileName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	StripNotsupportChrInFileName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	TempBlobToServerFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	UploadFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	UploadFileWithFilter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	File Management	ValidateFileExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Flow Service Management	CheckOAuthAccessDenied	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Flow Service Management	GetFlowDetailsUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Flow Service Management	GetFlowUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Flow Service Management	GetPowerAutomatePrivacyNoticeId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	AddBasicAuthentication	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	AddBodyAsText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	AddBodyAsTextWithEncoding	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	AddBodyBlob	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	AddHeader	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	CheckUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	CreateInstream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	DisableUI	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	GetCookie	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	GetResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	HasCookie	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	OnOverrideUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	ProcessFaultXMLResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SendRequestAndReadResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SendRequestAndReadTextResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetContentLength	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetContentType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetCookie	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetDefaults	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetMethod	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetReturnType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetTraceLogEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	SetUserAgent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	TraceLogStreamToTempFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Http Web Request Mgt.	TryLoadXMLResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	CanHandle	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	DefaultManifestText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	GetManifestVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	OnCreateAddin	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	OnGetAddin	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	OnGetAddinVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Hyperlink Manifest	OnGetCodeunitID	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	ICInboxOutboxMgt	CheckPermissionToSendICTransaction	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D Codabar Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D Code128 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D Code39 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D Code93 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D EAN13 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D EAN8 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D I2of5 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D MSI Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D Postnet Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D UPCA Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 1D UPCE Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 2D Aztec Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 2D Data Matrix Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 2D Maxi Code Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 2D PDF417 Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	IDA 2D QR-Code Encoder	EncodeFont	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	GetLatestImageAnalysisTypes	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	GetResultVerbatim	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	SetResult	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	TagConfidence	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	TagCount	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Result	TagName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	AddRequestHeader	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	GetLastError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	HasCustomVisionUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	InvokeAnalysis	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	IsLanguageSupported	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	IsMediaSupported	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	SetUseOAuth2	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V1.0	TryInvokeAnalysisInternal	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V3.2	AddContent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V3.2	LogCorrelationToTelemetry	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Analysis Wrapper V3.2	SendRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Handler Management	GetImageSize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Handler Management	ScaleDown	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	CreateAndVerifyImage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	FromStream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	GetFormatAsString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	GetHeight	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	GetWidth	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	LoadImage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	SetCodec	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Image Impl.	ToBase64	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Init. Server Printer Table	GetLocalDefaultPrinter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Init. Server Printer Table	InitTempPrinter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Intelligent Info Manifest	OnGetCodeunitID	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetArrayPropertyValueFromJObjectByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetCollectionCount	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetGuidPropertyValueFromJObjectByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetJObjectFromCollectionByIndex	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetJSONObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetObjectPropertyValueFromJObjectByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetPropertyValueFromJObjectByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	GetStringPropertyValueFromJObjectByName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	InitializeCollectionFromJArray	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	InitializeEmptyObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	InitializeObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	JSON Management	InitializeObjectFromString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Planning Line - Calendar	GenerateICS	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Queue - Send Notification	HtmlEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Queue Dispatcher	Reschedule	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Queue Dispatcher	RescheduleAsWaiting	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Queue Dispatcher	RunCleanupForCurrentJob	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Job Queue Start Codeunit	OnRun	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	AddJObjectToCollection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	EmitLengthWarning	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	GetCollection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	GetCollectionAsText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	InitializeCollectionFromString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	InitializeEmptyCollection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Json Impl.	InitializeEmptyObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	LT PX Code Coverage Ids	Initialize	corpus	2
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	LT PX Code Coverage Ids	PX_MethodIds_OfSixProcedures_TwoCodeunits	corpus	2
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	LT PX Code Coverage Ids	PX_TestIds_TwoRecordings_AndAnotherTestCodeunit	corpus	2
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	LT PX Code Coverage Ids	QH_MethodIds_Overloads_ParameterKinds_Codeunits	corpus	1
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Math	Min	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Math	Sign	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Monitored Field Notification	SendEmail	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	O365 HTML Templ. Mgt.	EncodeMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	O365 HTML Templ. Mgt.	GetCompanyLogoScaledDimensions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	O365 HTML Templ. Mgt.	ReplaceHTMLText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenByAuthorizationCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenByAuthorizationCodeWithCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenByAuthorizationCodeWithCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenFromCache	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenFromCacheWithCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokenWithClientCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AcquireTokensWithCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AppendAudienceParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	AppendPromptParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	FillScopesArray	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	GetAuthRequestUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	GetBaseUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	GetDefaultRedirectUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	Initialize	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OAuth2Impl	SetPropertiesBasedOnAuthRequestUrlAndRunOAuth2ControlAddIn	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	Authenticate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	DateConvertYYYYMMDD2XML	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	DownloadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	FindDocumentFromList	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetBatchDocuments	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetBatches	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetBatchesApi	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetCredentialsErrText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocumentForAttachment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocumentId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocumentSimplifiedStatus	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocumentStatus	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocuments	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetDocumentsExcludeProcessed	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetExtensionFromContentType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetFeatureTelemetryName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetMaxDocDownloadCount	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetOcrServiceSetup	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetOcrServiceSetupExtended	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	GetStatusHyperLink	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	HandleOCRRegisterServiceConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	HasCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	LogActivityFailed	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	LogActivityFailedNoError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	LogActivitySucceeded	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	LogTelemetryOnAfterCreateDocFromIncomingDocSuccess	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	LogTelemetryOnAfterCreateGenJnlLineFromIncomingDocSuccess	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	OnBeforeDownloadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	OnCloseIncomingDocumentHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	OnCloseIncomingDocumentsHandler	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoAddCookie	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoAddHeaders	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoGetRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoGetRequestBinary	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoPutRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	RsoRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	SetURLsToDefaultRSO	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	SetupConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	StartUpload	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	TestConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	TryAuthenticate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	URLEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UpdateIncomingDocWithOCRData	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UpdateOcrDocumentTemplates	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UpdateOrganizationInfo	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UploadAttachment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UploadFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	OCR Service Mgt.	UploadImage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	CanHandle	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnEmailHasAttachments	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnGetEmailAndAttachmentsForEntity	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnGetEmailBody	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnGetHostName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnGetHostType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnGetTempOfficeAddinContext	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnInitializeContext	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnInitializeExchangeObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnInvokeExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnIsAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnIsHostInitialized	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Host Provider	OnSendToOCR	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Jobs Handler	IsJobsHostType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	ConvertToInteger	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	CreateLinesBasedOnItemReferences	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	CreateLinesBasedOnQuantityReferences	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	FindItemFromText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	OmitFirst	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	OmitLast	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	ResolveItem	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Line Generation	SanitizeText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	AddRecipient	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	AttachAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	AttachDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	ChangeCompany	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	ChangeCompanyWithPrompt	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	CheckForExistingInvoice	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	DisplayAttachmentUploadSuccessMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	DisplayIncomingDocumentUploadSuccessMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	DisplayOCRUploadSuccessMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	DisplaySuccessMessage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	EmailHasAttachments	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetContact	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetContent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetContext	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetEmailBody	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetHandlerCodeunit	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetHostName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetHostType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetOfficeAddinTelemetryCategory	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	GetRecRefFromVendorNo	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	HandleRedirection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InitializeContext	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InitiateSendApprovalRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InitiateSendToIncomingDocuments	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InitiateSendToIncomingDocumentsWithPurchaseHeaderLink	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InitiateSendToOCR	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	InvokeExtension	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	IsAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	IsOutlookMobileApp	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	IsPopOut	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	OCRAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	OnBeforeDownloadPdfAttachment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	OnDeleteContact	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	OnGetExternalHandlerCodeunit	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	SelectAndChangeCompany	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	SendApprovalRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	SendToIncomingDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Office Management	SendToOCR	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Online Map Management	GetCultureInfo	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Online Map Management	MakeSelection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Online Map Management	URLEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	Assign	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	ClearAssignments	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	IsStarted	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	Set	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	SetExactPermissionSet	dependency	7
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	Start	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Permissions Mock	Stop	dependency	10
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Purch.-Post	RunWithCheck	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Record Link Impl.	WriteNote	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	CheckIfInstantiated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	Groups	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	InsertGroups	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	InsertMatch	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	IsMatch	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	Match	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	Regex	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Regex Impl.	Replace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Relationship Performance Mgt.	AddFieldToXml	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Relationship Performance Mgt.	RecordsToXml	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Report Layouts Impl.	ValidateLayout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Request Page Parameters Helper	ConvertParametersToFilters	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Request Page Parameters Helper	FindNodes	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Request Page Parameters Helper	GetFiltersForTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Request Page Parameters Helper	GetRequestPageOptionValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	AddBasicAuthorizationHeader	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	AddBodyToEnvelope	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	AddSoapActionHeader	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	BuildWebRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	CheckGlobals	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	CreateEnvelope	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	CreateSoapRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	CreateUUID	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	DisableHttpsCheck	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	ExtractContentFromResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	GetResponseContent	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	OnBeforeCreateSoapRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	ProcessFaultResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	SendRequestToWebService	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	SetContentType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	SetGlobals	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	SetTimeout	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	TraceLogStreamToTempFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	SOAP Web Service Request Mgt.	TraceLogXmlDocToTempFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Sales-Post	RunWithCheck	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Server Setting Impl.	GetApiServicesEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Server Setting Impl.	GetApiSubscriptionDelayTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Server Setting Impl.	GetApiSubscriptionsEnabled	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Server Setting Impl.	GetEnableEntraGroupsOnPrem	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Server Setting Impl.	GetEnableSaaSExtensionInstallSetting	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	System Privacy Notice Reg.	TryGetMicrosoftCopilotDefaultApproval	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	System Privacy Notice Reg.	TryGetMicrosoftLearnInGeoSupport	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Tenant License State Impl.	GetLicenseState	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Tenant License State Impl.	IsEvaluationMode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Tenant License State Impl.	IsPaidMode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Tenant License State Impl.	OnAddCommonCustomDimensions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Trace	LogXmlDocToTempFile	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Transform. Rule - Formatting	TextToTitleCase	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Transform. Rule - Match	RegularExpressionMatch	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	ConvertDateTimeFromInputTimeZoneToClientTimezone	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	ConvertDateTimeFromUTCToTimeZone	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	GetCurrUTCDateTime	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	GetUserTimezoneOffset	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	HtmlEncode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	IntToHex	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	IsLeapYear	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	NewLine	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	TryEvaluateDecimal	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Type Helper	TryEvaluateInteger	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Update Analysis View	UpdateAll	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Update Item Analysis View	UpdateAll	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	EscapeDataString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	GetAbsoluteUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	GetHost	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	GetPort	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	GetScheme	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	Init	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	IsValidUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	IsWellFormedUriString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri	SetUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	AddQueryParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	AddQueryParameterInternal	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	CreateNewQueryString	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	EncodeParameterKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	GetHost	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	GetQuery	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	GetUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	Init	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	ParseParametersAndFlags	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	ProcessNewParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	SetPath	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	SetQuery	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Uri Builder Impl.	SetScheme	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	User Permissions Impl.	GetEffectivePermission	dependency	1
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	User Permissions Impl.	HasUserPermissionSetAssigned	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	User Settings Impl.	GetAllowedCompaniesForCurrentUser	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VAT Lookup Ext. Data Hndl	InsertLogEntry	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VAT Lookup Ext. Data Hndl	PrepareSOAPRequestBody	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VAT Registration Log Mgt.	ExtractValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VAT Registration Log Mgt.	LogVerification	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	CanInteractWithSourceCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	CheckPermissions	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	DoesExceedCharLimit	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	FormatDependencyAsParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	FormatDependencyAsSerializedJsonObject	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	FormatDependencyId	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	FormatDependencyVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	GetAbsoluteUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	GetDependenciesAsParameter	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	GetDependenciesAsSerializedJsonArray	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	OpenExtensionSourceInVSCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	UpdateConfigurationsInVSCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	VS Code Integration Impl.	UpdateDependenciesInVSCode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Web Request Helper	GetWebResponse	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Web Request Helper	GetWebResponseError	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Web Request Helper	IsHttpUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Web Request Helper	IsSecureHttpUrl	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Web Request Helper	IsValidUri	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	AddCustomValuesToDataTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	AddFieldRefToDataTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	AddRecordRefToDataTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	CreateDataTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	EditDocumentAfterMerge	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	ExecuteMerge	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	FillDataTable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	FillDataTableRelatedRecords	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	FillDataTableUnrelatedRecords	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetAppendValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetByPrimaryKey	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetCustomFieldName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetCustomMergeFields	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetCustomTableColumns	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetFieldName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetFileName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetMergeFieldsForDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetMergeFieldsForRecord	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetMergeFieldsForRecordAndRelated	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetRelatedRecord	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	GetUnrelatedCustomMergeFields	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	Load	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	LoadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	Merge	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	MergeOneDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	MergeSplitDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	OnAfterInsertWordTemplate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	OnBeforeDeleteWordTemplate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	ReloadWordTemplate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	TryMailMergeExecute	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Word Template Impl.	TryMailMergeLoadDocument	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Workflow Imp. / Exp. Mgt	GetWorkflowCodeListFromXml	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Workflow Management	EvaluateConditionsOnRelatedTables	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Workflow Webhook Management	SendWebhookNotificaton	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Workflow Webhook Notification	Notify	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	Workflow Webhook Notification	PostHttpRequest	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	X509Certificate2 Impl.	GetCertificateThumbprint	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	X509Certificate2 Impl.	InitializeX509Certificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	X509Certificate2 Impl.	TryInitializeCertificate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddAttribute	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddAttributeToNode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddAttributeWithPrefix	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddDeclaration	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddElement	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddElementToNode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddElementWithPrefix	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddNamespaces	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddRootElement	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	AddRootElementWithPrefix	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	ClearUTF8BOMSymbols	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNode	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodeText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodeTextNs	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodeTextWithNamespace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodeWithNamespace	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodes	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	FindNodesWithNamespaceManager	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	GetAttributeValue	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	LoadXMLDocumentFromInStream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	LoadXMLDocumentFromText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	LoadXMLNodeFromInStream	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	LoadXMLNodeFromText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	LoadXmlDocFromText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	codeunit	XML DOM Management	XMLEscape	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Camera	GetPicture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Camera	HasPicture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Camera	IsAvailable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Camera	SetQuality	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	LoadTopBanners	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	NextStep	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnAction	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnDrillDown	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnInit	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnOpenPage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnQueryClosePage	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	SetDefaultControls	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	ShowAccountEdit	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	ShowChooseConnectorStep	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	ShowDoneStep	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	ShowRegisterAccountStep	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	ShowWelcomeStep	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	TryRegisterAccount	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__enabled_11020	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__enabled_11478	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__source_1296	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__source_791	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__source_8212	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__source_8542	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__sourceset_1296	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__sourceset_791	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__sourceset_8212	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__sourceset_8542	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_10562	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_10974	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_11432	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_11889	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_1235	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_12716	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_13204	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_1699	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_3206	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_3565	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_3969	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_4396	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_5425	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_6684	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_726	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Email Account Wizard	__visible_7812	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	page	Online Map Location	SetRecordTo	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Bank Account	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Annotation Coupling	ExtractNoteText	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	CreateOrganizationService	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	GetCrmVersion	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	RegisterConnectionWithName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	SetCRMSOPEnabledWithCredentials	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	TestConnection	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	TestIntegrationUserRequirements	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	CRM Connection Setup	UnregisterConnectionWithName	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Contact	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Custom Report Layout	TryValidateRdlcReport	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Customer	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Incoming Document Attachment	ExtractHeaderField	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Incoming Document Attachment	ExtractHeaderFields	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Incoming Document Attachment	UpdateIncomingDocumentHeaderFields	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Item Attribute Value Selection	ValidateType	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Job Queue Entry	ActivateNextJobInCategory	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Job Queue Entry	CancelTask	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Job Queue Entry	RefreshRecoveryTask	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Job Queue Entry	ScheduleTask	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	My Notifications	GetXmlFromTableView	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	O365 Brand Color	ConvertARGBToRGB	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	O365 Brand Color	MakePicture	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Office Add-in	IsBreakingChange	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Sales Header	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	AddAppointmentAttendee	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	GetCurrentUserTimeZone	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	InitializeExchangeAppointment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	ProcessAttendeeAppointment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	SaveAppointment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	To-do	UpdateAppointment	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	User Setup	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Vendor	OnValidate	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Workflow	CreateInstance	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Workflow	CreateInstanceBreadthFirst	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Workflow	UpdateWorkflowStepInstanceLeafLinks	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	table	Workflow	UpdateWorkflowStepInstanceNextLinks	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	xmlport	Import / Export Workflow	OnAfterAssignVariable	dependency	199
+OTHER (a .NET object, a background task or an unclassified builtin)	xmlport	Import / Export Workflow	OnBeforePassVariable	dependency	199
+binds subscriptions	codeunit	Alt. Cust. VAT Reg. Doc. Impl.	UpdateAltCustVATRegInSalesHeader	dependency	199
+binds subscriptions	codeunit	Assembly-Post	OnRun	dependency	199
+binds subscriptions	codeunit	Assembly-Post (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Batch Processing Mgt.	BatchProcess	dependency	199
+binds subscriptions	codeunit	Cust. Entry-Edit	OnRun	dependency	199
+binds subscriptions	codeunit	Custom Layout Reporting	BoundCallReportSaveAs	dependency	199
+binds subscriptions	codeunit	Custom Layout Reporting	EmailReport	dependency	199
+binds subscriptions	codeunit	Error Message Handler	Activate	dependency	199
+binds subscriptions	codeunit	Error Message Management	PopContext	dependency	199
+binds subscriptions	codeunit	Error Message Management	PushContext	dependency	199
+binds subscriptions	codeunit	Gen. Jnl.-Post Preview	PreviewStart	dependency	199
+binds subscriptions	codeunit	Inventory Posting To G/L	PostGenJnlLine	dependency	199
+binds subscriptions	codeunit	Invt. Doc.-Post (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Invt. Doc.-Post Receipt	OnRun	dependency	199
+binds subscriptions	codeunit	Invt. Doc.-Post Shipment	OnRun	dependency	199
+binds subscriptions	codeunit	Item Jnl.-Post Batch	Code	dependency	199
+binds subscriptions	codeunit	Job Jnl.-Post Batch	Code	dependency	199
+binds subscriptions	codeunit	LT CL Event Leads	GlobalTriggerManagement_RegisteredTables	corpus	1
+binds subscriptions	codeunit	LT REV More Forms	CallCase	corpus	1
+binds subscriptions	codeunit	Mfg. Posting Preview Binding	TryBindPostingPreviewHandler	dependency	199
+binds subscriptions	codeunit	Mfg. Posting Preview Binding	TryUnbindPostingPreviewHandler	dependency	199
+binds subscriptions	codeunit	Purch.-Post	ProcessPostingLines	dependency	199
+binds subscriptions	codeunit	Purch.-Post (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Purch.-Post Prepmt. (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Purchase Alloc. Acc. Mgt.	CreatePurchaseLine	dependency	199
+binds subscriptions	codeunit	Purchase Batch Post Mgt.	OnRun	dependency	199
+binds subscriptions	codeunit	Sales Alloc. Acc. Mgt.	CreateSalesLine	dependency	199
+binds subscriptions	codeunit	Sales Batch Post Mgt.	OnRun	dependency	199
+binds subscriptions	codeunit	Sales-Post	EnableAggregateTableUpdate	dependency	199
+binds subscriptions	codeunit	Sales-Post	ProcessPostingLines	dependency	199
+binds subscriptions	codeunit	Sales-Post	SetupDisableAggregateTableUpdate	dependency	199
+binds subscriptions	codeunit	Sales-Post (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Sales-Post Prepayment (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Serv. Posting Preview Binding	TryBindPostingPreviewHandler	dependency	199
+binds subscriptions	codeunit	Serv. Posting Preview Binding	TryUnbindPostingPreviewHandler	dependency	199
+binds subscriptions	codeunit	Service-Post (Yes/No)	PreviewDocument	dependency	199
+binds subscriptions	codeunit	TransferOrder-Post (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	TransferOrder-Post Receipt	RunWithCheck	dependency	199
+binds subscriptions	codeunit	TransferOrder-Post Shipment	RunWithCheck	dependency	199
+binds subscriptions	codeunit	TransferOrder-Post Transfer	RunWithCheck	dependency	199
+binds subscriptions	codeunit	Vend. Entry-Edit	OnRun	dependency	199
+binds subscriptions	codeunit	Whse.-Post Receipt (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Whse.-Post Shipment (Yes/No)	Preview	dependency	199
+binds subscriptions	codeunit	Workflow Webhook Notify Task	OnRun	dependency	199
+binds subscriptions	table	Report Selections	SaveReportAsPDFInTempBlob	dependency	199
+binds subscriptions	table	Report Selections	SendEmailToCustDirectly	dependency	199
+binds subscriptions	table	Report Selections	SendEmailToVendorDirectly	dependency	199
+binds subscriptions	table	Sales Header	EnableAggregateTableUpdate	dependency	199
+binds subscriptions	table	Sales Header	SetupDisableAggregateTableUpdate	dependency	199
+sets the language	codeunit	Assisted Company Setup	AddAssistedCompanySetup	dependency	199
+sets the language	codeunit	Assisted Setup Subscribers	Initialize	dependency	199
+sets the language	codeunit	Assisted Setup Subscribers	InitializeCustomize	dependency	199
+sets the language	codeunit	CDS Integration Impl.	RegisterAssistedSetup	dependency	199
+sets the language	codeunit	Company Creation Demo Data	TryInstallApp	dependency	199
+sets the language	codeunit	Config. Validate Management	ValidateFieldValue	dependency	199
+sets the language	codeunit	Email Impl	GetTelemetryDimensions	dependency	199
+sets the language	codeunit	Extension Marketplace	InstallAppsourceExtensionWithRefreshSession	dependency	199
+sets the language	codeunit	Feature Telemetry Impl.	LogUptake	dependency	199
+sets the language	codeunit	Guided Experience Impl.	AddGuidedExperienceItemDimensions	dependency	199
+sets the language	codeunit	IC Data Exchange API	ExtractCurrentUserAndChangeToEnglish	dependency	199
+sets the language	codeunit	IC Data Exchange API	PopulateCompanyInformationFromJson	dependency	199
+sets the language	codeunit	IC Data Exchange API	PopulateGeneralLedgerSetupFromJson	dependency	199
+sets the language	codeunit	IC Data Exchange API	PopulateHandledICInboxTransactionFromJson	dependency	199
+sets the language	codeunit	IC Data Exchange API	PopulateICInboxTransactionFromJson	dependency	199
+sets the language	codeunit	IC Data Exchange API	PopulateICPartnerFromJson	dependency	199
+sets the language	codeunit	Job Queue Management	OnStatusChanged	dependency	199
+sets the language	codeunit	Job Queue Management	RunJobQueueEntryOnce	dependency	199
+sets the language	codeunit	Job Queue Start Codeunit	OnRun	dependency	199
+sets the language	codeunit	LT P143 DeFormulas	BqGerman	corpus	1
+sets the language	codeunit	Language Impl.	ToDefaultLanguage	dependency	199
+sets the language	codeunit	Monitor Sensitive Field	AddMonitorFieldSetupWizard	dependency	199
+sets the language	codeunit	SaaS Log In Management	ChangeToEvaluationCompany	dependency	199
+sets the language	codeunit	Telemetry Impl.	AddCommonCustomDimensions	dependency	199
+sets the language	codeunit	Telemetry Impl.	AddCustomDimensionsFromSubscribers	dependency	199
+sets the language	codeunit	Translation Helper	RestoreGlobalLanguage	dependency	199
+sets the language	codeunit	Translation Helper	SetGlobalLanguageById	dependency	199
+sets the language	codeunit	Word Template Interactions	GetDataSource	dependency	199
+sets the language	page	Company Information	RestartSession	dependency	199

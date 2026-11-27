@@ -1,0 +1,287 @@
+part	in_the_102	cause	holder_kind	holder_object	holder_routine	holder_is_subscriber	holder_app	why
+P001	yes	not-in-program	codeunit	Application Area Mgmt.	LookupExperienceTier	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Asm. Navigate Mgt.	OnBeforeShowRecords	yes	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	GenJnlManagement	SetJnlBatchName	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Item Tracking Management	LookupTrackingNoInfo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	LT W Pt Runner	Run	no	corpus	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Mfg. Navigate Mgt.	OnBeforeShowRecords	yes	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Mfg. Planning Integration	PlanningErrorLogOnShowError	yes	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	No. Series - Impl.	LookupRelatedNoSeries	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Prod. Order Comp.-Reserve	ShowSourceLines	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Production BOM-Copy	CopyFromVersion	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Req. Line-Reserve	ShowPlanningComponentLines	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	ReqJnlManagement	OpenJnlBatch	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	ReqJnlManagement	WkshTemplateSelection	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Routing Line-Copy Lines	SelectCopyFromVersionList	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Serv. Navigate Mgt.	OnBeforeShowRecords	yes	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Serv. Navigate Mgt.	ShowServiceHeaderRecords	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Transfer Line-Reserve	ShowSourceLines	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	codeunit	Whse. Navigate Mgt.	OnBeforeShowRecords	yes	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Contact Card	OnDrillDown	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Create Interaction	OnAssistEdit	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Create Interaction	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Create Task	OnAssistEdit	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Customer Card	OpenCurrFiscalYearCustLedgerEntries	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Customer Card	OpenCurrFiscalYearDetailedCustLedgerEntries	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Integration Synch. Job List	OnDrillDown	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Issued Finance Charge Memo	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Issued Reminder	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Item Ledger Entries	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Make Phone Call	OnAssistEdit	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Posted Service Credit Memo	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Posted Service Invoice	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Posted Service Shipment	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Production BOM	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Routing	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Sales Order	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Sales Quote	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Service Credit Memo	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	page	Service Invoice	OnAction	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Change Customer in Contract	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Complete IC Inbox Action	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Assembly Document	LookupDocNo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Invt. Document	LookupDocNo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Production Order Document	LookupDocNo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPostedCrMemo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPostedInvoice	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPostedReceipt	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPostedReturn	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPurchArchive	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Purchase Document	LookupPurchDoc	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupPostedCrMemo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupPostedInvoice	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupPostedReturn	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupPostedShipment	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupSalesArchive	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Sales Document	LookupSalesDoc	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Copy Service Document	LookupContractNo	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Create Ret.-Related Documents	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Job Transfer to Credit Memo	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	report	Job Transfer to Sales Invoice	OnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Job	ContactLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Job Queue Entry	LookupRecordToProcess	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Purchase Header	BuyfromContactLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Purchase Header	LookupBuyFromContact	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Sales Header	SelltoContactLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Segment Line	LanguageCodeOnLookup	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Service Contract Header	ShowActiveServiceContractLines	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Service Document Log	ShowServDocLog	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Service Item Line	OnValidate	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Service Line	CopyFromServItem	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	To-do	LookupLanguageCode	no	dependency	runs page 0, which is not in the program
+P001	yes	not-in-program	table	Workflow Step Buffer	LookupEvents	no	dependency	runs page 0, which is not in the program
+P002	yes	other-refusal	page	Aged Acc. Payable Chart	UpdateChart	no	dependency	Aged Acc. Payable Chart.UpdateChart: call `BusinessChartBuffer.UpdateChart(CurrPage.BusinessChart)`: `CurrPage.BusinessChart` is a control add-in (usercontrol):
+P003	yes	other-refusal	codeunit	Cryptography Management Impl.	GetEncryptionKeyAsStream	no	dependency	Cryptography Management Impl..GetEncryptionKeyAsStream: builtin System.ExportEncryptionKey#1 is not implemented
+P004	yes	other-refusal	codeunit	Cryptography Management Impl.	ImportKeyAndConfirm	no	dependency	Cryptography Management Impl..ImportKeyAndConfirm: builtin System.ImportEncryptionKey#1 is not implemented
+P005	yes	other-refusal	table	Customer	CopyContactPicture	no	dependency	Customer.CopyContactPicture: builtin Media.ExportFile#1: what a media export writes to the server's file system is not pinned (docs/probes-needed.md)
+P006	yes	other-refusal	codeunit	Image Analysis Management	SetMedia	no	dependency	Image Analysis Management.SetMedia: builtin Blob.Export#1 is not implemented
+P007	yes	other-refusal	codeunit	Image Analysis Wrapper V3.2	AddContent	no	dependency	Image Analysis Wrapper V3.2.AddContent: a DotNet value passed to builtin HttpContent.WriteFrom#1: its type is only known at run time; assign it to a typed varia
+P008	yes	other-refusal	codeunit	Init. Server Printer Table	GetLocalDefaultPrinter	no	dependency	Init. Server Printer Table.GetLocalDefaultPrinter: variable `printersettings` has the attribute RunOnClient, which is not supported
+P009	yes	other-refusal	codeunit	Office Host Provider	OnEmailHasAttachments	yes	dependency	Office Host Provider.OnEmailHasAttachments: `OfficeHost.CallbackToken` is a DotNet value used as an operand of `in`: only a variable is lowered (a member would 
+P010	yes	other-refusal	codeunit	Office Host Provider	OnGetEmailAndAttachmentsForEntity	yes	dependency	Office Host Provider.OnGetEmailAndAttachmentsForEntity: `OfficeHost.CallbackToken` is a DotNet value used as an operand of `in`: only a variable is lowered (a m
+P011	yes	other-refusal	codeunit	Office Host Provider	OnGetEmailBody	yes	dependency	Office Host Provider.OnGetEmailBody: `OfficeHost.CallbackToken` is a DotNet value used as an operand of `in`: only a variable is lowered (a member would run onc
+P012	yes	other-refusal	page	Power BI Embedded Report Part	PushFiltersToAddin	no	dependency	Power BI Embedded Report Part.PushFiltersToAddin: call `CurrPage.PowerBIAddin.UpdateReportFilters(ReportFiltersToSet)`: a control add-in call on a page with a c
+P013	yes	other-refusal	codeunit	Privacy Subscribers	AfterExtensionIsInstalled	yes	dependency	Privacy Subscribers.AfterExtensionIsInstalled: column 1 of platform table 'Application Object Metadata' (2000000207) is not pinned: no corpus test fixes its val
+P014	yes	other-refusal	codeunit	Privacy Subscribers	AfterExtensionIsUninstalled	yes	dependency	Privacy Subscribers.AfterExtensionIsUninstalled: column 1 of platform table 'Application Object Metadata' (2000000207) is not pinned: no corpus test fixes its v
+P015	yes	other-refusal	codeunit	Purchase Batch Post Mgt.	PreparePurchaseHeader	no	dependency	Purchase Batch Post Mgt..PreparePurchaseHeader: call `PurchaseHeader.BatchConfirmUpdateDeferralDate(BatchConfirm, ReplacePostingDate, PostingDate, ReplaceVATDat
+P016	yes	other-refusal	codeunit	Report Layouts Impl.	ExportReportLayout	no	dependency	Report Layouts Impl..ExportReportLayout: builtin Report.ValidateAndPrepareLayout#2 is not implemented
+P017	yes	other-refusal	codeunit	Sales Batch Post Mgt.	PrepareSalesHeader	no	dependency	Sales Batch Post Mgt..PrepareSalesHeader: call `SalesHeader.BatchConfirmUpdateDeferralDate(BatchConfirm, ReplacePostingDate, PostingDate, ReplaceVATDate, VATDat
+P018	yes	routine-not-compiled	codeunit	Batch Processing Mgt. Handler	HandleOnHasArtifacts	yes	dependency	Batch Processing Mgt. Handler.HandleOnHasArtifacts: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P019	yes	routine-not-compiled	codeunit	CDS Integration Impl.	HandleOnRegisterServiceConnection	yes	dependency	CDS Integration Impl..HandleOnRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P020	yes	routine-not-compiled	codeunit	CRM Int. Table. Subscriber	OnFindingIfJobNeedsToBeRun	yes	dependency	CRM Int. Table. Subscriber.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P021	yes	routine-not-compiled	codeunit	CRM Integration Management	HandleCRMRegisterServiceConnection	yes	dependency	CRM Integration Management.HandleCRMRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P022	yes	routine-not-compiled	codeunit	CRM Notes Synch Job	OnFindingIfJobNeedsToBeRun	yes	dependency	CRM Notes Synch Job.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P023	yes	routine-not-compiled	codeunit	CRM Order Status Update Job	OnFindingIfJobNeedsToBeRun	yes	dependency	CRM Order Status Update Job.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P024	yes	routine-not-compiled	codeunit	CRM Statistics Job	OnFindingIfJobNeedsToBeRun	yes	dependency	CRM Statistics Job.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P025	yes	routine-not-compiled	codeunit	Doc. Exch. Service Mgt.	HandleVANRegisterServiceConnection	yes	dependency	Doc. Exch. Service Mgt..HandleVANRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P026	yes	routine-not-compiled	codeunit	Email Feature	AddEmailAccountsToServiceConnections	yes	dependency	Email Feature.AddEmailAccountsToServiceConnections: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P027	yes	routine-not-compiled	codeunit	Forward Link Mgt.	OnLoadHelpArticleCodes	yes	dependency	Forward Link Mgt..OnLoadHelpArticleCodes: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P028	yes	routine-not-compiled	codeunit	GlobalTriggerManagement	OnGlobalDelete	yes	dependency	GlobalTriggerManagement.OnGlobalDelete: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P029	yes	routine-not-compiled	codeunit	GlobalTriggerManagement	OnGlobalInsert	yes	dependency	GlobalTriggerManagement.OnGlobalInsert: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P030	yes	routine-not-compiled	codeunit	GlobalTriggerManagement	OnGlobalModify	yes	dependency	GlobalTriggerManagement.OnGlobalModify: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P031	yes	routine-not-compiled	codeunit	Item From Picture	OnGetKnownScenariosAddItemFromPicture	yes	dependency	Item From Picture.OnGetKnownScenariosAddItemFromPicture: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P032	yes	routine-not-compiled	codeunit	Map Currency Exchange Rate	HandleCurrencyExchangeRateRegisterServiceConnection	yes	dependency	Map Currency Exchange Rate.HandleCurrencyExchangeRateRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (A
+P033	yes	routine-not-compiled	codeunit	Mfg. Item Journal Mgt.	OnBeforeLookupItemNo	yes	dependency	Mfg. Item Journal Mgt..OnBeforeLookupItemNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P034	yes	routine-not-compiled	codeunit	Mfg. Item Journal Mgt.	OnGetCapacityTemplateType	yes	dependency	Mfg. Item Journal Mgt..OnGetCapacityTemplateType: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P035	yes	routine-not-compiled	codeunit	Mfg. Item Journal Mgt.	OnGetProdOrderTemplateType	yes	dependency	Mfg. Item Journal Mgt..OnGetProdOrderTemplateType: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P036	yes	routine-not-compiled	codeunit	Mfg. Purchase Document Mgt.	OnTestWorkCenterNo	yes	dependency	Mfg. Purchase Document Mgt..OnTestWorkCenterNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P037	yes	routine-not-compiled	codeunit	Mfg. Purchase Document Mgt.	ReturnShipmentLineOnIsProdOrder	yes	dependency	Mfg. Purchase Document Mgt..ReturnShipmentLineOnIsProdOrder: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P038	yes	routine-not-compiled	codeunit	OCR Service Mgt.	HandleOCRRegisterServiceConnection	yes	dependency	OCR Service Mgt..HandleOCRRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P039	yes	routine-not-compiled	codeunit	Online Map Management	HandleMAPRegisterServiceConnection	yes	dependency	Online Map Management.HandleMAPRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P040	yes	routine-not-compiled	codeunit	Package Management	BinContentSetTrackingFilterFromWhseEntryIfNotBlank	yes	dependency	Package Management.BinContentSetTrackingFilterFromWhseEntryIfNotBlank: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P041	yes	routine-not-compiled	codeunit	Package Management	EntrySummaryHasSameTracking	yes	dependency	Package Management.EntrySummaryHasSameTracking: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P042	yes	routine-not-compiled	codeunit	Package Management	ItemJournalLineOnAfterSetTrackingFilterFromItemLedgerEntry	yes	dependency	Package Management.ItemJournalLineOnAfterSetTrackingFilterFromItemLedgerEntry: not compiled: no code reached it while compiling the workspace's dependencies (AD
+P043	yes	routine-not-compiled	codeunit	Package Management	ItemLedgerEntrySetTrackingFilterFromItemTrackingSetup	yes	dependency	Package Management.ItemLedgerEntrySetTrackingFilterFromItemTrackingSetup: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013
+P044	yes	routine-not-compiled	codeunit	Package Management	ItemTrackingSetupCopyTrackingFromItemTrackingSetup	yes	dependency	Package Management.ItemTrackingSetupCopyTrackingFromItemTrackingSetup: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P045	yes	routine-not-compiled	codeunit	Package Management	JobPlanningLineCopyTrackingFromJobPlanningLine	yes	dependency	Package Management.JobPlanningLineCopyTrackingFromJobPlanningLine: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P046	yes	routine-not-compiled	codeunit	Package Management	PostedWhseReceiptLineSetTrackingFilterFromRelation	yes	dependency	Package Management.PostedWhseReceiptLineSetTrackingFilterFromRelation: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P047	yes	routine-not-compiled	codeunit	Package Management	RegisteredWhseActivityLineClearTrackingFilter	yes	dependency	Package Management.RegisteredWhseActivityLineClearTrackingFilter: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P048	yes	routine-not-compiled	codeunit	Package Management	RegisteredWhseActivityLineSetTrackingFilterFromWhseSpec	yes	dependency	Package Management.RegisteredWhseActivityLineSetTrackingFilterFromWhseSpec: not compiled: no code reached it while compiling the workspace's dependencies (ADR-0
+P049	yes	routine-not-compiled	codeunit	Package Management	ReservationEntryCopyNewTrackingFromItemJnlLine	yes	dependency	Package Management.ReservationEntryCopyNewTrackingFromItemJnlLine: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P050	yes	routine-not-compiled	codeunit	Package Management	ReservationEntryCopyNewTrackingFromWhseItemTrackingLine	yes	dependency	Package Management.ReservationEntryCopyNewTrackingFromWhseItemTrackingLine: not compiled: no code reached it while compiling the workspace's dependencies (ADR-0
+P051	yes	routine-not-compiled	codeunit	Package Management	ReservationEntrySetNewTrackingFilterFromNewReservEntry	yes	dependency	Package Management.ReservationEntrySetNewTrackingFilterFromNewReservEntry: not compiled: no code reached it while compiling the workspace's dependencies (ADR-01
+P052	yes	routine-not-compiled	codeunit	Package Management	ReservationEntrySetTrackingFilterFromItemLedgEntry	yes	dependency	Package Management.ReservationEntrySetTrackingFilterFromItemLedgEntry: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P053	yes	routine-not-compiled	codeunit	Package Management	ReservationEntrySetTrackingFilterFromSpecIfNotBlank	yes	dependency	Package Management.ReservationEntrySetTrackingFilterFromSpecIfNotBlank: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P054	yes	routine-not-compiled	codeunit	Package Management	ReservationEntrySetTrackingFilterFromWhseItemTrackingSetupIfRequired	yes	dependency	Package Management.ReservationEntrySetTrackingFilterFromWhseItemTrackingSetupIfRequired: not compiled: no code reached it while compiling the workspace's depend
+P055	yes	routine-not-compiled	codeunit	Package Management	TrackingSpecificationSetNewTrackingFilterFromNewTrackingSpec	yes	dependency	Package Management.TrackingSpecificationSetNewTrackingFilterFromNewTrackingSpec: not compiled: no code reached it while compiling the workspace's dependencies (
+P056	yes	routine-not-compiled	codeunit	Package Management	WarehouseEntryCopyTrackingFromWhseEntry	yes	dependency	Package Management.WarehouseEntryCopyTrackingFromWhseEntry: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P057	yes	routine-not-compiled	codeunit	Package Management	WarehouseEntrySetTrackingFilterIfNotBlank	yes	dependency	Package Management.WarehouseEntrySetTrackingFilterIfNotBlank: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P058	yes	routine-not-compiled	codeunit	Package Management	WarehouseJournalLineCopyTrackingFromItemLedgEntry	yes	dependency	Package Management.WarehouseJournalLineCopyTrackingFromItemLedgEntry: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P059	yes	routine-not-compiled	codeunit	Package Management	WhseItemTrackingLineClearTrackingFilter	yes	dependency	Package Management.WhseItemTrackingLineClearTrackingFilter: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P060	yes	routine-not-compiled	codeunit	Package Management	WhseItemTrackingLineCopyTrackingFromPostedWhseReceiptLine	yes	dependency	Package Management.WhseItemTrackingLineCopyTrackingFromPostedWhseReceiptLine: not compiled: no code reached it while compiling the workspace's dependencies (ADR
+P061	yes	routine-not-compiled	codeunit	Prod. Order Availability Mgt.	OnCalcQtyOnProdOrder	yes	dependency	Prod. Order Availability Mgt..OnCalcQtyOnProdOrder: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P062	yes	routine-not-compiled	codeunit	Record Restriction Mgt.	GenJournalBatchCheckGenJournalLineExportRestrictions	yes	dependency	Record Restriction Mgt..GenJournalBatchCheckGenJournalLineExportRestrictions: not compiled: no code reached it while compiling the workspace's dependencies (ADR
+P063	yes	routine-not-compiled	codeunit	Serv. Availability Mgt.	OnCalcQtyOnServiceOrder	yes	dependency	Serv. Availability Mgt..OnCalcQtyOnServiceOrder: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P064	yes	routine-not-compiled	codeunit	Serv. Doc. Exchange Mgt.	OnFindByDocumentNoAndPostingDateOnSetFilters	yes	dependency	Serv. Doc. Exchange Mgt..OnFindByDocumentNoAndPostingDateOnSetFilters: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P065	yes	routine-not-compiled	codeunit	Serv. Payment Registration	OnAfterFindRecords	yes	dependency	Serv. Payment Registration.OnAfterFindRecords: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P066	yes	routine-not-compiled	codeunit	Serv. Payment Registration	OnShowRecords	yes	dependency	Serv. Payment Registration.OnShowRecords: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P067	yes	routine-not-compiled	table	Service Line	SetHideWarrantyWarning	no	dependency	Service Line.SetHideWarrantyWarning: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P068	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseCreditMemoSellToVendorName	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseCreditMemoSellToVendorName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P069	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseCreditMemoSellToVendorNo	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseCreditMemoSellToVendorNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P070	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseInvoiceSellToVendorName	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseInvoiceSellToVendorName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P071	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseInvoiceSellToVendorNo	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseInvoiceSellToVendorNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P072	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseOrderSellToVendorName	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseOrderSellToVendorName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P073	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseOrderSellToVendorNo	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseOrderSellToVendorNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P074	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseQuoteSellToVendorName	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseQuoteSellToVendorName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P075	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidatePurchaseQuoteSellToVendorNo	yes	dependency	Standard Codes Mgt..OnAfterValidatePurchaseQuoteSellToVendorNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P076	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesCreditMemoSellToCustomerName	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesCreditMemoSellToCustomerName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P077	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesCreditMemoSellToCustomerNo	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesCreditMemoSellToCustomerNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P078	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesInvoiceSellToCustomerName	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesInvoiceSellToCustomerName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P079	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesInvoiceSellToCustomerNo	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesInvoiceSellToCustomerNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P080	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesOrderSellToCustomerName	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesOrderSellToCustomerName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P081	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesOrderSellToCustomerNo	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesOrderSellToCustomerNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P082	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesQuoteSellToCustomerName	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesQuoteSellToCustomerName: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P083	yes	routine-not-compiled	codeunit	Standard Codes Mgt.	OnAfterValidateSalesQuoteSellToCustomerNo	yes	dependency	Standard Codes Mgt..OnAfterValidateSalesQuoteSellToCustomerNo: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P084	yes	routine-not-compiled	codeunit	Top Customers By Sales Job	OnFindingIfJobNeedsToBeRun	yes	dependency	Top Customers By Sales Job.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P085	yes	routine-not-compiled	codeunit	Top Vendors By Purchases Job	OnFindingIfJobNeedsToBeRun	yes	dependency	Top Vendors By Purchases Job.OnFindingIfJobNeedsToBeRun: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P086	yes	routine-not-compiled	codeunit	VAT Registration Log Mgt.	HandleViesRegisterServiceConnection	yes	dependency	VAT Registration Log Mgt..HandleViesRegisterServiceConnection: not compiled: no code reached it while compiling the workspace's dependencies (ADR-013)
+P087	yes	runtime-id	codeunit	Batch Processing Mgt.	BatchProcess	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Batch Processing Mgt.	InvokeProcessing	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Data Exch. Type Selector	TryCreateIntermediate	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Guided Experience Impl.	RunObject	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Job Queue Start Codeunit	OnRun	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Office Management	HandleRedirection	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Report Distribution Management	VANDocumentReport	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	codeunit	Serv. Electr. Doc. Format	ValidateElectronicServiceDocument	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Data Exch.	ImportFileContent	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Data Exch.	ImportToDataExch	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Data Exch. Def	ProcessDataExchange	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Electronic Document Format	SendElectronically	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Electronic Document Format	ValidateElectronicJobsDocument	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Electronic Document Format	ValidateElectronicSalesDocument	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Payment Service Setup	CreateReportingArgs	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Purchase Header	SendToPosting	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Sales Header	SendToPosting	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P087	yes	runtime-id	table	Service Header	SendToPostWithLines	no	dependency	Codeunit.Run#3 with an object id known only at run time
+P088	yes	runtime-id	codeunit	GenJnlManagement	OpenJournalPageFromBatch	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	codeunit	Instruction Mgt.	ShowPostedDocument	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	codeunit	Page Management	PageRunAtField	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	codeunit	ReqJnlManagement	TemplateSelectionFromBatch	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	codeunit	ReqJnlManagement	WkshTemplateSelection	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	page	Item Journal Lines	OnAction	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	page	Requisition Lines	OnAction	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Cust. Ledger Entry	DrillDownOnEntries	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Cust. Ledger Entry	DrillDownOnOverdueEntries	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Customer	ShowContact	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Sales Cr.Memo Header	RunSalesInvoiceHeaderPage	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Vendor	ShowContact	no	dependency	Page.Run#4 with an object id known only at run time
+P088	yes	runtime-id	table	Vendor Ledger Entry	DrillDownOnEntries	no	dependency	Page.Run#4 with an object id known only at run time
+P089	yes	runtime-id	codeunit	Guided Experience Impl.	RunObject	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	codeunit	Marketing Text	EditMarketingText	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	codeunit	Page Management	PageRunAtField	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	page	Item List	OnAction	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Contact	CreateLink	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Payment Service Setup	OpenSetupCard	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Service Cr.Memo Header	OpenStatistics	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Service Header	OpenOrderStatistics	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Service Header	OpenStatistics	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Service Invoice Header	OpenStatistics	no	dependency	Page.RunModal#5 with an object id known only at run time
+P089	yes	runtime-id	table	Service Shipment Header	OpenStatistics	no	dependency	Page.RunModal#5 with an object id known only at run time
+P090	yes	runtime-id	codeunit	Custom Layout Reporting	PreviewReport	no	dependency	Report.Execute#3 with an object id known only at run time
+P090	yes	runtime-id	codeunit	Job Queue Start Report Runner	RunReport	no	dependency	Report.Execute#3 with an object id known only at run time
+P090	yes	runtime-id	codeunit	LT RCF Tests	TryExecute	no	corpus	Report.Execute#3 with an object id known only at run time
+P090	yes	runtime-id	codeunit	LT RPS Tests	TryExecute	no	corpus	Report.Execute#3 with an object id known only at run time
+P090	yes	runtime-id	codeunit	W3 Runner	OnRun	no	corpus	Report.Execute#3 with an object id known only at run time
+P091	yes	runtime-id	codeunit	Custom Layout Reporting	PrintReport	no	dependency	Report.Print#2 with an object id known only at run time
+P091	yes	runtime-id	codeunit	Job Queue Start Report	ProcessPrint	no	dependency	Report.Print#2 with an object id known only at run time
+P092	yes	runtime-id	codeunit	BD Region Tests	TryRun	no	corpus	Report.Run#3 with an object id known only at run time
+P092	yes	runtime-id	codeunit	BD Region Tests	TryRunWithRequestPage	no	corpus	Report.Run#3 with an object id known only at run time
+P092	yes	runtime-id	codeunit	Batch Posting Print Mgt.	PrintDocument	no	dependency	Report.Run#3 with an object id known only at run time
+P092	yes	runtime-id	codeunit	W3 Runner	OnRun	no	corpus	Report.Run#3 with an object id known only at run time
+P092	yes	runtime-id	page	Contact Card	OnAction	no	dependency	Report.Run#3 with an object id known only at run time
+P092	yes	runtime-id	table	Report Selection Warehouse	PrintDocuments	no	dependency	Report.Run#3 with an object id known only at run time
+P093	yes	runtime-id	codeunit	Custom Layout Reporting	GetRequestParameters	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	codeunit	Document-Print	PrintDocumentWithReportUsage	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	codeunit	Guided Experience Impl.	RunObject	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	codeunit	Report Layouts Impl.	TryRunCustomReport	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	codeunit	W3 Runner	OnRun	no	corpus	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	page	Bank Account Card	RunReport	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	page	Customer Card	RunReport	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	page	Vendor Card	RunReport	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	table	Custom Report Layout	RunCustomReport	no	dependency	Report.RunModal#3 with an object id known only at run time
+P093	yes	runtime-id	table	Report Selections	PrintDocumentsWithCheckDialogCommon	no	dependency	Report.RunModal#3 with an object id known only at run time
+P094	yes	runtime-id	codeunit	Custom Layout Reporting	RunRequestPage	no	dependency	Report.RunRequestPage#2 with an object id known only at run time
+P094	yes	runtime-id	codeunit	LT RPS Tests	TryRunRequestPage	no	corpus	Report.RunRequestPage#2 with an object id known only at run time
+P094	yes	runtime-id	codeunit	W3 Runner	OnRun	no	corpus	Report.RunRequestPage#2 with an object id known only at run time
+P094	yes	runtime-id	table	Job Queue Entry	RunReportRequestPage	no	dependency	Report.RunRequestPage#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	BD Region Helper	SaveAsXml	no	corpus	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	BD Region Tests	TrySaveAs	no	corpus	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	Custom Layout Reporting	CallReportSaveAs	no	dependency	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	Job Queue Start Report	ProcessSaveAs	no	dependency	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	LT RPS Tests	TrySaveAs	no	corpus	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	W3 Dataset	Save	no	corpus	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	codeunit	W3 Runner	OnRun	no	corpus	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	table	Report Selections	DoSaveReportAsHTMLInTempBlob	no	dependency	Report.SaveAs#2 with an object id known only at run time
+P095	yes	runtime-id	table	Report Selections	SaveReportAsPDFInTempBlob	no	dependency	Report.SaveAs#2 with an object id known only at run time
+P096	yes	runtime-id	codeunit	LT XpT Import Runner	OnRun	no	corpus	Xmlport.Import#2 with an object id known only at run time
+P096	yes	runtime-id	table	Data Exch.	ImportToDataExch	no	dependency	Xmlport.Import#2 with an object id known only at run time
+P097	yes	runtime-id	codeunit	Guided Experience Impl.	RunObject	no	dependency	Xmlport.Run#2 with an object id known only at run time
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToBigInteger	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToBoolean	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToCode	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToDate	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToDateFormula	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToDateTime	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToDecimal	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToDuration	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToGuid	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToInteger	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToOption	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToRecordID	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToText	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	EvaluateValueToTime	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Config. Validate Management	ValidateFieldValue	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Integration Record Synch.	EvaluateTextToOptionFieldRef	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Integration Record Synch.	SetDestinationValue	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Item Templ. Mgt.	InitFromTemplate	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	Outlook Synch. Type Conv	EvaluateTextToFieldRef	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	codeunit	XTC XRec Through Cu Tests	Way3_FieldRefValidate	no	corpus	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	table	Contact	UpdateFieldForNewCompany	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P098	yes	unknown-table-triggers	table	Item Templ.	ValidateItemField	no	dependency	FieldRef.Validate#1 runs the triggers of a table that is not known
+P099	yes	unknown-table-triggers	table	Incoming Document	RemoveReferencedRecords	no	dependency	RecordRef.Delete#1 runs the triggers of a table that is not known
+P099	yes	unknown-table-triggers	table	Payment Service Setup	DeletePaymentServiceSetup	no	dependency	RecordRef.Delete#1 runs the triggers of a table that is not known
+P100	yes	unknown-table-triggers	codeunit	Config. Template Management	InsertRecordWithKeyFields	no	dependency	RecordRef.Insert#2 runs the triggers of a table that is not known
+P100	yes	unknown-table-triggers	table	Integration Table Mapping	CopyRecordReference	no	dependency	RecordRef.Insert#2 runs the triggers of a table that is not known
+P101	yes	unknown-table-triggers	codeunit	Integration Rec. Synch. Invoke	InsertRecord	no	dependency	RecordRef.Insert#3 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	codeunit	Config. Template Management	InsertTemplate	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	codeunit	Int. Rec. Uncouple Invoke	UncoupleRecord	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	codeunit	Integration Rec. Synch. Invoke	ModifyRecord	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	codeunit	Workflow Change Rec Mgt.	ApplyNewValueFromChangeRecord	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	codeunit	Workflow Change Rec Mgt.	RevertValueForField	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P102	yes	unknown-table-triggers	table	Incoming Document	RemoveIncomingDocumentEntryNoFromUnpostedDocument	no	dependency	RecordRef.Modify#1 runs the triggers of a table that is not known
+P103	no	other-refusal	codeunit	CU AssignCall Rule	AssignCall_VarParameter_Bare	no	corpus	CU AssignCall Rule.AssignCall_VarParameter_Bare: `Bump` is not assignable
+P104	no	other-refusal	codeunit	LT AP TestPage Tests	Ap01_PartPage_ControlNamedPage	no	corpus	LT AP TestPage Tests.Ap01_PartPage_ControlNamedPage: call `Host.PartF."Page".Value()` has no callee the checker resolved
+P105	no	other-refusal	codeunit	LT AX Format Option	OptionCaption_Length5_Format9	no	corpus	LT AX Format Option.OptionCaption_Length5_Format9: Format of member R.OptCap::"Gamma Long" of option field OptCap with a length or format number (only the plain
+P106	no	other-refusal	codeunit	LT CF Query Leads	DayMonthYear_BlankAndSetDates	no	corpus	LT CF Query Leads.DayMonthYear_BlankAndSetDates: `Q`: Query "LT CF Q Date Parts": column DDay: Method = day is not supported yet
+P107	no	other-refusal	codeunit	LT CG Query Leads	DateMethods_DayMonthYear_OnDateTimeDateAndBlank	no	corpus	LT CG Query Leads.DateMethods_DayMonthYear_OnDateTimeDateAndBlank: `Q`: Query "LT CG Q DateM": column DtDay: Method = day is not supported yet
+P108	no	other-refusal	codeunit	LT CX Variants	TryIntegerBranch	no	corpus	LT CX Variants.TryIntegerBranch: a conditional expression whose branches have different types (Integer and Variant): the conversion of the false branch is not p
+P109	no	other-refusal	codeunit	LT P110 File Basics	P110_CreateCloseExists	no	corpus	LT P110 File Basics.P110_CreateCloseExists: builtin File.Pos#1 is not implemented
+P110	no	other-refusal	codeunit	LT P110 File Basics	P110_OpenExisting	no	corpus	LT P110 File Basics.P110_OpenExisting: builtin File.Pos#1 is not implemented
+P111	no	other-refusal	codeunit	LT PX Code Coverage Ids	DumpRuns	no	corpus	LT PX Code Coverage Ids.DumpRuns: `(TestsRun."Test ID")`: the value of the Code Coverage Test ID is not pinned (only that it is equal across rows and recordings
+P112	no	other-refusal	codeunit	LT RpT Request Page	ScheduleHandler	no	corpus	LT RpT Request Page.ScheduleHandler: builtin TestRequestPage.Schedule#1 is not implemented
+P113	no	other-refusal	codeunit	LT RpT Request Page	TryEnabled	no	corpus	LT RpT Request Page.TryEnabled: builtin TestRequestPage.Schedule#1 is not implemented
+P114	no	other-refusal	codeunit	LT RpT Request Page	TryVisible	no	corpus	LT RpT Request Page.TryVisible: builtin TestRequestPage.Schedule#1 is not implemented
+P115	no	other-refusal	codeunit	LT XmT XPath Namespaces	NameTable_Basics	no	corpus	LT XmT XPath Namespaces.NameTable_Basics: builtin XmlNameTable.Get#1 is not implemented
+P116	no	other-refusal	codeunit	LT XmT XPath Namespaces	Y29_NameTable_AssignForm_SharesTheTable	no	corpus	LT XmT XPath Namespaces.Y29_NameTable_AssignForm_SharesTheTable: builtin XmlNameTable.Get#1 is not implemented
+P117	no	runtime-id	codeunit	LT DG XmlPort Leads	TryExportText	no	corpus	Xmlport.Export#2 with an object id known only at run time
+P117	no	runtime-id	codeunit	LT XpT Helper	ExportTextEnc	no	corpus	Xmlport.Export#2 with an object id known only at run time
