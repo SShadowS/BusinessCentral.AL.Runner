@@ -5,9 +5,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 # without it; tzdata-legacy: the old IANA zone links the .NET sidecar maps Windows zone ids to (CI installs
 # it when missing, .github/actions/setup/action.yml); time: GNU `/usr/bin/time -v` for peak memory; python3,
 # zip, unzip: al-runner tests and tools call python3 and zip (al-test-cli's corpus_bump_*, record_windows_oracle and
-# step_time_guard failed without them).
+# step_time_guard failed without them). gcc-mingw-w64-x86-64: the linker and C compiler for the Windows GNU
+# target below, so Windows-only code (console handlers, kernel32 calls) is checked here before a PR leaves draft.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential pkg-config jq libicu-dev tzdata-legacy time ca-certificates curl python3 zip unzip \
+      gcc-mingw-w64-x86-64 \
     && rm -rf /var/lib/apt/lists/*
 # Rust as CI pins it (dtolnay/rust-toolchain@1.98.1 in .github/actions/setup/action.yml), outside the cache
 # volume (the base points CARGO_HOME at ~/.cache for the registry).
@@ -15,6 +17,9 @@ ENV RUSTUP_HOME=/opt/rustup
 RUN curl -fsSL https://sh.rustup.rs | CARGO_HOME=/opt/cargo sh -s -- -y --profile minimal \
       --default-toolchain 1.98.1 --component rustfmt,clippy,rust-analyzer --no-modify-path
 ENV PATH=/opt/cargo/bin:$PATH
+# The Windows GNU target: `cargo check`/`clippy --target x86_64-pc-windows-gnu` of Windows-only code, which CI's
+# portable check covers only once a PR leaves draft.
+RUN rustup target add x86_64-pc-windows-gnu
 # .NET 8 SDK and runtime: the DotNet sidecar (ADR-014, tools/dotnet-sidecar targets net8.0).
 RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
     && bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /opt/dotnet && rm /tmp/dotnet-install.sh
